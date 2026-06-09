@@ -1,0 +1,60 @@
+# facilityXperience Git Ignore
+
+# Environment
+.env
+.env.local
+.env.production
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+venv/
+env/
+.venv/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+migrations/versions/*.pyc
+
+# AI Models
+ai_engine/models/*.bin
+ai_engine/models/*.h5
+ai_engine/models/*.pkl
+chroma_db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Logs
+logs/
+*.log
+
+# Uploads
+uploads/
+temp/
+
+# Sensitive
+churchgate-logo.png.backup
+*.pem
+*.key
+.env
+__pycache__/
+*.pyc
+.DS_Store
