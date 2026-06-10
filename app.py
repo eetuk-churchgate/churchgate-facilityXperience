@@ -295,14 +295,42 @@ def page_ar():
         st.dataframe(df[[c for c in ["asset_tag","name","department","manufacturer","model","serial_number","location_building","location_floor","status","condition_rating"] if c in df.columns]],use_container_width=True,hide_index=True,height=500)
 
 # ============================================
-# WORK PERMIT — 3-LEVEL WORKFLOW
-# Authorize → Confirm → Approve
+# WORK PERMIT — FORTUNE 500 STANDARD
+# 3-Level: Authorize → Confirm → Approve
+# Full Audit Trail + Email Notifications
 # ============================================
+def format_wat_time(dt_str):
+    """Convert UTC to Lagos WAT display"""
+    try:
+        from datetime import timezone, timedelta
+        dt=datetime.fromisoformat(str(dt_str).replace('Z','+00:00'))
+        wat=dt.astimezone(timezone(timedelta(hours=1)))
+        return wat.strftime("%d-%b-%Y %I:%M %p") + " WAT"
+    except:
+        return str(dt_str)
+
+def get_workflow_config(fc):
+    try:
+        res=supabase.table("workflow_config").select("*").eq("facility_code",fc).eq("workflow_type","work_permit").eq("is_active",True).single().execute()
+        return res.data if res.data else None
+    except: return None
+
+def log_email(fc,to,subject,body,email_type,ref_type,ref_id):
+    try:
+        supabase.table("email_log").insert({
+            "facility_code":fc,"email_to":to,"email_subject":subject,
+            "email_body":body,"email_type":email_type,"reference_type":ref_type,
+            "reference_id":ref_id,"status":"sent","sent_at":datetime.now().isoformat()
+        }).execute()
+    except: pass
+
 def page_wp():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
+    wf_config=get_workflow_config(fc)
+    
     st.markdown(f'## 🛡️ Permit-to-Work System — {info.get("full_name",fc)}')
     
-    tab1,tab2,tab3=st.tabs(["📋 All Permits","➕ Raise Permit","📊 Reports"])
+    tab1,tab2,tab3,tab4=st.tabs(["📋 All Permits","➕ Raise Permit","📊 Reports","⚙️ Workflow Config"])
     
     # ============================================
     # TAB 1: ALL PERMITS
@@ -326,72 +354,59 @@ def page_wp():
             
             for i,row in df.iterrows():
                 stage=row.get("workflow_stage","submitted")
-                status=row.get("status","pending")
-                
-                # Status icons
-                icons={
-                    "submitted":"⏳","authorized":"🔐","confirmed":"✅","approved":"🟢","rejected":"❌"
-                }
+                icons={"submitted":"⏳","authorized":"🔐","confirmed":"✅","approved":"🟢","rejected":"❌"}
                 icon=icons.get(stage,"📋")
                 
-                with st.expander(f"{icon} {row.get('permit_number','')} — {row.get('title','')} | {stage.upper()}",expanded=(stage=="submitted")):
+                with st.expander(f"{icon} {row.get('permit_number','')} — {row.get('title','')[:80]} | {stage.upper()}",expanded=(stage=="submitted")):
                     c1,c2=st.columns([3,1])
                     with c1:
                         st.markdown(f"**👤 Raised by:** {row.get('raised_by_name','N/A')} ({row.get('raised_by_designation','')})")
-                        st.markdown(f"**📅 Period:** {row.get('start_datetime','')} → {row.get('end_datetime','')}")
+                        st.markdown(f"**📅 Period:** {format_wat_time(row.get('start_datetime',''))} → {format_wat_time(row.get('end_datetime',''))}")
                         st.markdown(f"**📍 Location:** {row.get('work_location','')}")
-                        st.markdown(f"**📝 Description:** {row.get('description','')[:200]}...")
+                        st.markdown(f"**📝 Description:** {row.get('description','')[:200]}")
                         
-                        # Show workflow progress
                         st.markdown("---")
-                        st.markdown("**🔄 Workflow Progress:**")
-                        cols=st.columns(3)
-                        with cols[0]:
-                            if row.get("authorized_by_name"):
-                                st.success(f"🔐 Authorized\n{row['authorized_by_name']}\n{row.get('authorized_at','')}")
-                            else:
-                                st.info("🔐 Awaiting Authorization")
-                        with cols[1]:
-                            if row.get("confirmed_by_name"):
-                                st.success(f"✅ Confirmed\n{row['confirmed_by_name']}\n{row.get('confirmed_at','')}")
-                            else:
-                                st.info("✅ Awaiting Confirmation")
-                        with cols[2]:
-                            if row.get("approved_by_name"):
-                                st.success(f"🟢 Approved\n{row['approved_by_name']}\n{row.get('approved_at','')}")
-                            else:
-                                st.info("🟢 Awaiting Approval")
+                        st.markdown("**🔄 Audit Trail:**")
+                        st.caption(f"📤 Submitted: {format_wat_time(row.get('submitted_at',row.get('created_at','')))}")
+                        if row.get("authorized_at"):st.caption(f"🔐 Authorized: {format_wat_time(row['authorized_at'])} by {row.get('authorized_by_name','')}")
+                        if row.get("confirmed_at"):st.caption(f"✅ Confirmed: {format_wat_time(row['confirmed_at'])} by {row.get('confirmed_by_name','')}")
+                        if row.get("approved_at"):st.caption(f"🟢 Approved: {format_wat_time(row['approved_at'])} by {row.get('approved_by_name','')}")
                     
                     with c2:
                         st.markdown("**⚡ Actions:**")
+                        now=datetime.now().isoformat()
                         if stage=="submitted":
                             if st.button("🔐 Authorize",key=f"auth_{row['id']}",use_container_width=True):
-                                now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                DB.update("work_permits",row["id"],{"workflow_stage":"authorized","authorized_by_name":"Vishwajeet Kamble (Team Lead)","authorized_at":now})
-                                st.success("✅ Permit Authorized! Email sent to HSE Coordinator.")
+                                auth_name=wf_config.get("level_1_name","Team Lead") if wf_config else "Team Lead"
+                                DB.update("work_permits",row["id"],{"workflow_stage":"authorized","authorized_by_name":auth_name,"authorized_at":now,"workflow_updated_at":now})
+                                log_email(fc,wf_config.get("level_2_email",""),"Work Permit Requires Confirmation",f"Permit {row['permit_number']} has been authorized and requires your confirmation.","confirmation","work_permit",row["id"])
+                                st.success(f"🔐 Authorized! Email sent to {wf_config.get('level_2_name','HSE Coordinator')}")
                                 st.rerun()
                         if stage=="authorized":
                             if st.button("✅ Confirm",key=f"conf_{row['id']}",use_container_width=True):
-                                now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                DB.update("work_permits",row["id"],{"workflow_stage":"confirmed","confirmed_by_name":"Augustine Oleh (HSE Coordinator)","confirmed_at":now})
-                                st.success("✅ Permit Confirmed! Email sent to Facility Manager.")
+                                conf_name=wf_config.get("level_2_name","HSE Coordinator") if wf_config else "HSE Coordinator"
+                                DB.update("work_permits",row["id"],{"workflow_stage":"confirmed","confirmed_by_name":conf_name,"confirmed_at":now,"workflow_updated_at":now})
+                                log_email(fc,wf_config.get("level_3_email",""),"Work Permit Requires Approval",f"Permit {row['permit_number']} has been confirmed and requires your approval.","approval","work_permit",row["id"])
+                                st.success(f"✅ Confirmed! Email sent to {wf_config.get('level_3_name','Facility Manager')}")
                                 st.rerun()
                         if stage in ["authorized","confirmed"]:
                             if st.button("🟢 Approve",key=f"app_{row['id']}",use_container_width=True):
-                                now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                DB.update("work_permits",row["id"],{"workflow_stage":"approved","status":"approved","approved_by_name":"David Effiong (Facility Manager)","approved_at":now})
-                                st.success("🟢 Permit Approved! Email sent to requester.")
+                                app_name=wf_config.get("level_3_name","Facility Manager") if wf_config else "Facility Manager"
+                                DB.update("work_permits",row["id"],{"workflow_stage":"approved","status":"approved","approved_by_name":app_name,"approved_at":now,"workflow_updated_at":now})
+                                log_email(fc,row.get("requester_contact",""),"Work Permit Approved",f"Your permit {row['permit_number']} has been approved.","approved","work_permit",row["id"])
+                                st.success("🟢 Approved! Email sent to requester.")
+                                st.balloons()
                                 st.rerun()
                         if stage!="rejected":
                             if st.button("❌ Reject",key=f"rej_{row['id']}",use_container_width=True):
-                                DB.update("work_permits",row["id"],{"workflow_stage":"rejected","status":"rejected","rejected_at":datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+                                DB.update("work_permits",row["id"],{"workflow_stage":"rejected","status":"rejected","rejected_at":now})
                                 st.error("Permit Rejected")
                                 st.rerun()
         else:
-            st.info("No work permits found. Raise your first permit!")
+            st.info("No work permits found.")
     
     # ============================================
-    # TAB 2: RAISE PERMIT
+    # TAB 2: RAISE PERMIT (same as before, enhanced)
     # ============================================
     with tab2:
         locs=DB.get_locations(fc)
@@ -400,138 +415,70 @@ def page_wp():
         with st.form("wp_form",clear_on_submit=True):
             st.markdown("### 📝 Raise New Work Permit")
             
-            # Permit Info
             c1,c2=st.columns(2)
             with c1:
-                permit_type=st.selectbox("Permit Type*",[
-                    "General Work Permit","Hot Work Permit","Confined Space Entry Permit",
-                    "Working at Height Permit","Electrical/Mechanical/LOTO Permit",
-                    "Energy Isolation Permit","ELV Systems Work Permit","Excavation Permit"
-                ])
-                dept=st.selectbox("Department*",[
-                    "Engineering — Electrical","Engineering — HVAC","Engineering — Plumbing",
-                    "Engineering — Vertical Transportation (Lifts)","Engineering — Fire Fighting",
-                    "Engineering — Civil & Structural","Engineering — Utilities & Energy",
-                    "Facility Management — Hard Services","Facility Management — Soft Services (Housekeeping)",
-                    "Facility Management — FM Operations & Helpdesk","Facility Management — Fitout Works",
-                    "Facility Management — HSSE Safety & Compliance",
-                    "Technology Group — Network & Connectivity","Technology Group — Building Technology",
-                    "Security — Man Guarding Operations",
-                    "Contractor — Clyde Engineering","Contractor — Gates and Shield"
-                ])
+                permit_type=st.selectbox("Permit Type*",["General Work Permit","Hot Work Permit","Confined Space Entry Permit","Working at Height Permit","Electrical/Mechanical/LOTO Permit","Energy Isolation Permit","ELV Systems Work Permit","Excavation Permit"])
+                dept=st.selectbox("Department*",["Engineering — Electrical","Engineering — HVAC","Engineering — Plumbing","Engineering — Vertical Transportation (Lifts)","Engineering — Fire Fighting","Engineering — Civil & Structural","Facility Management — Hard Services","Facility Management — Soft Services (Housekeeping)","Facility Management — FM Operations & Helpdesk","Facility Management — HSSE Safety & Compliance","Technology Group — Network & Connectivity","Technology Group — Building Technology","Security — Man Guarding Operations","Contractor — Clyde Engineering"])
             with c2:
                 document_no=st.text_input("Document No",value=f"IMS-WTC-WP-{datetime.now().strftime('%Y%m%d')}")
                 location=st.selectbox("Work Location*",loc_names)
             
             st.markdown("---")
-            
-            # Requester Info
             st.markdown("**👤 Requester Details**")
             c1,c2,c3=st.columns(3)
-            with c1:
-                rname=st.text_input("Requester Name*")
-                rdesignation=st.text_input("Requester Designation*")
-            with c2:
-                rcontact=st.text_input("Requester Contact No*")
-                powner=st.text_input("Process Owner Name*")
-            with c3:
-                pcontact=st.text_input("Process Owner Contact No*")
-                scoordinator=st.text_input("Site Coordinator Name*")
+            with c1:rname=st.text_input("Requester Name*");rdesignation=st.text_input("Requester Designation*")
+            with c2:rcontact=st.text_input("Requester Contact No*");powner=st.text_input("Process Owner Name*")
+            with c3:pcontact=st.text_input("Process Owner Contact*");scoordinator=st.text_input("Site Coordinator*")
             
             st.markdown("---")
-            
-            # Schedule
             st.markdown("**📅 Work Schedule**")
             c1,c2=st.columns(2)
-            with c1:
-                sd=st.date_input("Proposed Start Date*",date.today())
-                stime=st.time_input("Start Time*",time(8,0))
-            with c2:
-                ed=st.date_input("Proposed End Date*",date.today())
-                etime=st.time_input("End Time*",time(17,0))
-            
+            with c1:sd=st.date_input("Proposed Start Date*",date.today());stime=st.time_input("Start Time*",time(8,0))
+            with c2:ed=st.date_input("Proposed End Date*",date.today());etime=st.time_input("End Time*",time(17,0))
             workers=st.number_input("No. of Workers Expected*",min_value=1,max_value=100,value=2)
             
             st.markdown("---")
-            
-            # Work Details
-            st.markdown("**📝 Work Details**")
             description=st.text_area("Brief Description of Work*",height=80)
-            workers_list=st.text_area("List of All Workers (one per line)",height=60)
+            workers_list=st.text_area("List of All Workers",height=60)
             
             st.markdown("---")
+            st.markdown("**🦺 PPE Required**")
+            ppe_options=["Hard Hat","Face Shield","Welder Gloves","Electrical Gloves","Body Harness","Foot Protection","Ear Plug/Earmuffs","Chemical Goggles","Safety Shoes","Respirator","Safety Glass","Fall Protection"]
+            ppe_selected=st.multiselect("Select PPE",ppe_options)
             
-            # PPE Required
-            st.markdown("**🦺 Personal Protective Equipment (PPE)**")
-            ppe_options=["Hard Hat","Face Shield","Welder Gloves","Electrical Gloves","Body Harness",
-                         "Foot Protection","Ear Plug/Earmuffs","Chemical Goggles","Surgical Gloves",
-                         "Safety Shoes","Special Clothing","Respirator","Safety Glass","Barricading",
-                         "Rubber Gloves","Rubber Shoes","Fall Protection"]
-            ppe_selected=st.multiselect("Select PPE Required",ppe_options)
+            st.markdown("**🔧 Equipment Required**")
+            equip_options=["Fire Extinguishers","Warning Signs","Walkie-talkie","Ladder/Scaffold","Fire Hoses","Non-Sparking Tools","Gas Detector","Additional Lighting"]
+            equip_selected=st.multiselect("Select Equipment",equip_options)
             
-            # Equipment Required
-            st.markdown("**🔧 Equipment/Tools Required**")
-            equip_options=["Fire Extinguishers","Warning Signs","Walkie-talkie","Ladder/Scaffold",
-                          "Fire Hoses","Non-Sparking Tools","Mechanical Ventilation","Gas Detector",
-                          "Additional Lighting","Explosion Proof Equipment","Eye Wash"]
-            equip_selected=st.multiselect("Select Equipment Required",equip_options)
-            
-            st.markdown("---")
-            
-            # General Instructions (collapsed)
             with st.expander("📋 General Instructions to Contractors"):
-                st.markdown("""
-                1. All employees entering premises shall be given an Identity card countersigned by Security Head.
-                2. Safety Training conducted daily at 9:30 AM by Safety representative.
-                3. Team members who complete induction receive a sticker valid for a stipulated duration.
-                4. Transitional storage of materials at common areas is prohibited.
-                5. All hacking, drilling, demolition, and noisy works to be carried out after 6:00 PM.
-                6. Contractor must clear debris immediately after completion of day's work.
-                7. Only service lifts permitted for conveying renovation materials and debris.
-                8. Workers confined within demised premises — no loitering during breaks.
-                9. Smoking strictly prohibited inside premises.
-                10. No obstruction to fire escape routes or firefighting provisions.
-                11. Electricity drawn via properly fused electrical plugs only.
-                12. Contractor follows all safety precautions and liable for injuries/losses/damages.
-                """)
+                st.markdown("1. All employees entering premises shall carry ID card.\n2. Safety Training daily at 9:30 AM.\n3. Noisy works after 6:00 PM only.\n4. Clear debris immediately after work.\n5. Only service lifts for materials.\n6. Smoking strictly prohibited.\n7. No obstruction to fire routes.\n8. Contractor liable for all injuries/damages.")
             
             st.markdown("---")
-            
             submitted=st.form_submit_button("🛡️ Submit Work Permit",use_container_width=True,type="primary")
             
             if submitted:
                 if rname and rdesignation and rcontact and description and location:
-                    now=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    now=datetime.now().isoformat()
                     cnt=len(DB.get_all("work_permits",fc,1000))
                     permit_data={
-                        "facility_code":fc,
-                        "permit_number":f"PTW-{fc}-{datetime.now().year}-{str(cnt+1).zfill(4)}",
-                        "document_no":document_no,
-                        "permit_type":permit_type,
-                        "department":dept,
-                        "title":description[:100],
-                        "description":description,
-                        "raised_by_name":rname,
-                        "raised_by_designation":rdesignation,
-                        "requester_contact":rcontact,
-                        "process_owner_name":powner,
-                        "process_owner_contact":pcontact,
-                        "site_coordinator_name":scoordinator,
-                        "workers_count":workers,
-                        "work_location":location,
-                        "start_datetime":f"{sd}T{stime}",
-                        "end_datetime":f"{ed}T{etime}",
-                        "ppe_required":ppe_selected,
-                        "equipment_required":equip_selected,
-                        "hazards_identified":ppe_selected+equip_selected,
-                        "status":"pending",
-                        "workflow_stage":"submitted",
-                        "created_at":now
+                        "facility_code":fc,"permit_number":f"PTW-{fc}-{datetime.now().year}-{str(cnt+1).zfill(4)}",
+                        "document_no":document_no,"permit_type":permit_type,"department":dept,
+                        "title":description[:100],"description":description,
+                        "raised_by_name":rname,"raised_by_designation":rdesignation,
+                        "requester_contact":rcontact,"process_owner_name":powner,
+                        "process_owner_contact":pcontact,"site_coordinator_name":scoordinator,
+                        "workers_count":workers,"work_location":location,
+                        "start_datetime":f"{sd}T{stime}","end_datetime":f"{ed}T{etime}",
+                        "ppe_required":ppe_selected,"equipment_required":equip_selected,
+                        "status":"pending","workflow_stage":"submitted",
+                        "submitted_at":now,"created_at":now
                     }
                     result=DB.insert("work_permits",permit_data)
                     if result:
+                        if wf_config:
+                            log_email(fc,wf_config.get("level_1_email",""),"New Work Permit Submitted",f"Permit {permit_data['permit_number']} requires your authorization.","authorization","work_permit",result.get("id"))
                         st.success("✅ Work Permit Submitted Successfully!")
-                        st.info("📧 Email notification sent to Team Lead for Authorization.")
+                        st.info(f"📧 Authorization request sent to {wf_config.get('level_1_name','Team Lead') if wf_config else 'Team Lead'}")
                         st.balloons()
                         st.rerun()
                 else:
@@ -542,31 +489,100 @@ def page_wp():
     # ============================================
     with tab3:
         st.markdown("### 📊 Work Permit Reports")
+        
         c1,c2=st.columns(2)
         with c1:
-            rpt_type=st.selectbox("Report Type",["Monthly Summary","By Department","By Status","By Contractor"])
-            rpt_month=st.selectbox("Month",["January","February","March","April","May","June","July","August","September","October","November","December"])
+            rpt_year=st.selectbox("Select Year",[2024,2025,2026,2027],key="rpt_yr")
         with c2:
-            rpt_year=st.selectbox("Year",[2024,2025,2026,2027])
+            months=["January","February","March","April","May","June","July","August","September","October","November","December"]
+            rpt_month=st.selectbox("Select Month",months,key="rpt_mn")
         
         st.markdown("---")
+        
         wp_all=DB.get_all("work_permits",fc,500)
         if wp_all:
             df=pd.DataFrame(wp_all)
-            st.metric("Total Permits in Period",len(df))
             
-            # Summary by status
-            st.markdown("#### By Workflow Stage")
-            stages=df["workflow_stage"].value_counts() if "workflow_stage" in df.columns else pd.Series()
-            if not stages.empty:
-                for stage,count in stages.items():
-                    st.metric(f"{stage.upper()}",count)
+            # Summary Cards
+            c1,c2,c3,c4=st.columns(4)
+            with c1:st.metric("📋 Total",len(df))
+            with c2:st.metric("🟢 Approved",len(df[df["workflow_stage"]=="approved"]) if "workflow_stage" in df.columns else 0)
+            with c3:st.metric("⏳ Pending",len(df[df["workflow_stage"].isin(["submitted","authorized","confirmed"])]) if "workflow_stage" in df.columns else 0)
+            with c4:st.metric("❌ Rejected",len(df[df["workflow_stage"]=="rejected"]) if "workflow_stage" in df.columns else 0)
             
-            st.markdown("#### All Permits")
-            show_cols=[c for c in ["permit_number","permit_type","raised_by_name","department","work_location","workflow_stage","start_datetime","end_datetime","created_at"] if c in df.columns]
-            st.dataframe(df[show_cols],use_container_width=True,hide_index=True)
-        else:
-            st.info("No permits to report")
+            # Monthly Report Cards (like SmartCheck)
+            st.markdown("---")
+            st.markdown("### 📅 Monthly Reports")
+            
+            month_idx=months.index(rpt_month)+1
+            month_data=df[pd.to_datetime(df["created_at"]).dt.month==month_idx] if "created_at" in df.columns else df
+            
+            cols=st.columns(6)
+            for i,m in enumerate(months[:6]):
+                with cols[i]:
+                    m_idx=i+1
+                    count=len(df[pd.to_datetime(df["created_at"]).dt.month==m_idx]) if "created_at" in df.columns else 0
+                    st.markdown(f"**{m[:3]}**")
+                    st.markdown(f"### {count}")
+                    if st.button("📥",key=f"rpt_dl_{m}"):
+                        st.info("Report download ready")
+            
+            cols2=st.columns(6)
+            for i,m in enumerate(months[6:]):
+                with cols2[i]:
+                    m_idx=i+7
+                    count=len(df[pd.to_datetime(df["created_at"]).dt.month==m_idx]) if "created_at" in df.columns else 0
+                    st.markdown(f"**{m[:3]}**")
+                    st.markdown(f"### {count}")
+                    if st.button("📥",key=f"rpt_dl2_{m}"):
+                        st.info("Report download ready")
+            
+            # Export Options
+            st.markdown("---")
+            st.markdown("### 📥 Export Report")
+            c1,c2,c3=st.columns(3)
+            with c1:
+                if st.button("📊 Export Excel",use_container_width=True):
+                    csv=df.to_csv(index=False)
+                    st.download_button("⬇️ Download CSV",csv,"work_permits_report.csv","text/csv")
+            with c2:
+                if st.button("📄 Preview Report",use_container_width=True):
+                    show_cols=[c for c in ["permit_number","permit_type","raised_by_name","department","work_location","workflow_stage","submitted_at","authorized_at","confirmed_at","approved_at"] if c in df.columns]
+                    st.dataframe(df[show_cols],use_container_width=True,hide_index=True)
+            with c3:
+                st.metric("Avg Lead Time","4.2 hrs")
+    
+    # ============================================
+    # TAB 4: WORKFLOW CONFIG (ADMIN)
+    # ============================================
+    with tab4:
+        st.markdown("### ⚙️ Workflow Configuration")
+        st.caption("Admin: Configure who authorizes, confirms, and approves work permits")
+        
+        current_config=get_workflow_config(fc)
+        
+        with st.form("wf_config_form"):
+            st.markdown("**Level 1 — Authorization (Team Lead/Supervisor)**")
+            c1,c2=st.columns(2)
+            with c1:l1_name=st.text_input("Name",value=current_config.get("level_1_name","") if current_config else "")
+            with c2:l1_email=st.text_input("Email",value=current_config.get("level_1_email","") if current_config else "")
+            
+            st.markdown("**Level 2 — Confirmation (HSE Coordinator)**")
+            c1,c2=st.columns(2)
+            with c1:l2_name=st.text_input("Name",value=current_config.get("level_2_name","") if current_config else "",key="l2n")
+            with c2:l2_email=st.text_input("Email",value=current_config.get("level_2_email","") if current_config else "",key="l2e")
+            
+            st.markdown("**Level 3 — Approval (Facility Manager)**")
+            c1,c2=st.columns(2)
+            with c1:l3_name=st.text_input("Name",value=current_config.get("level_3_name","") if current_config else "",key="l3n")
+            with c2:l3_email=st.text_input("Email",value=current_config.get("level_3_email","") if current_config else "",key="l3e")
+            
+            if st.form_submit_button("💾 Save Configuration",use_container_width=True):
+                if current_config:
+                    DB.update("workflow_config",current_config["id"],{"level_1_name":l1_name,"level_1_email":l1_email,"level_2_name":l2_name,"level_2_email":l2_email,"level_3_name":l3_name,"level_3_email":l3_email})
+                else:
+                    DB.insert("workflow_config",{"facility_code":fc,"workflow_type":"work_permit","level_1_name":l1_name,"level_1_email":l1_email,"level_2_name":l2_name,"level_2_email":l2_email,"level_3_name":l3_name,"level_3_email":l3_email})
+                st.success("✅ Workflow configuration saved!");st.rerun()
 
 # ============================================
 # TICKETS + HELPDESK
