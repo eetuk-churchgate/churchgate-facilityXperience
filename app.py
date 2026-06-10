@@ -87,28 +87,54 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 # ============================================
-# DATA ENGINE
+# DATA ENGINE (FIXED FOR ENUM)
 # ============================================
 class DB:
     @staticmethod
     def get_kpis(fc):
         try:
-            wo = supabase.table("work_orders").select("id",count="exact").eq("facility_code",fc).eq("status","open").execute()
-            vis = supabase.table("visitors").select("id",count="exact").eq("facility_code",fc).eq("visit_date",str(date.today())).execute()
-            inc = supabase.table("incidents").select("id",count="exact").eq("facility_code",fc).eq("status","reported").execute()
-            tix = supabase.table("tickets").select("id",count="exact").eq("facility_code",fc).in_("status",["open","in_progress"]).execute()
-            ast = supabase.table("assets").select("id",count="exact").eq("facility_code",fc).execute()
-            ppm = supabase.table("ppm_schedules").select("id",count="exact").eq("facility_code",fc).eq("status","scheduled").execute()
-            wp = supabase.table("work_permits").select("id",count="exact").eq("facility_code",fc).eq("status","pending").execute()
-            return {"open_wo":wo.count or 0,"visitors":vis.count or 0,"open_inc":inc.count or 0,"open_tix":tix.count or 0,"assets":ast.count or 0,"ppm_due":ppm.count or 0,"pending_permits":wp.count or 0}
-        except: return {"open_wo":0,"visitors":0,"open_inc":0,"open_tix":0,"assets":0,"ppm_due":0,"pending_permits":0}
+            wo = supabase.table("work_orders").select("id", count="exact").eq("facility_code", fc).eq("status", "open").execute()
+            vis = supabase.table("visitors").select("id", count="exact").eq("facility_code", fc).eq("visit_date", str(date.today())).execute()
+            inc = supabase.table("incidents").select("id", count="exact").eq("facility_code", fc).eq("status", "reported").execute()
+            tix = supabase.table("tickets").select("id", count="exact").eq("facility_code", fc).in_("status", ["open", "in_progress"]).execute()
+            ast = supabase.table("assets").select("id", count="exact").eq("facility_code", fc).execute()
+            ppm = supabase.table("ppm_schedules").select("id", count="exact").eq("facility_code", fc).eq("status", "scheduled").execute()
+            wp = supabase.table("work_permits").select("id", count="exact").eq("facility_code", fc).eq("status", "pending").execute()
+            return {
+                "open_wo": wo.count or 0, "visitors": vis.count or 0, "open_inc": inc.count or 0,
+                "open_tix": tix.count or 0, "assets": ast.count or 0, "ppm_due": ppm.count or 0,
+                "pending_permits": wp.count or 0
+            }
+        except Exception as e:
+            return {"open_wo": 0, "visitors": 0, "open_inc": 0, "open_tix": 0, "assets": 0, "ppm_due": 0, "pending_permits": 0}
 
     @staticmethod
     def get_all(table, fc, limit=500):
         try:
-            res = supabase.table(table).select("*").eq("facility_code",fc).order("created_at",desc=True).limit(limit).execute()
-            return res.data or []
-        except: return []
+            res = supabase.table(table).select("*").eq("facility_code", fc).limit(limit).execute()
+            return res.data if res.data else []
+        except:
+            return []
+
+    @staticmethod
+    def get_assets(fc, limit=100):
+        try:
+            # Fetch assets without join first
+            res = supabase.table("assets").select("*").eq("facility_code", fc).limit(limit).execute()
+            return res.data if res.data else []
+        except Exception as e:
+            st.error(f"Asset Error: {e}")
+            return []
+
+    @staticmethod
+    def search_assets(fc, query):
+        try:
+            res = supabase.table("assets").select("*").eq("facility_code", fc).ilike("asset_tag", f"%{query}%").limit(30).execute()
+            if not res.data:
+                res = supabase.table("assets").select("*").eq("facility_code", fc).ilike("name", f"%{query}%").limit(30).execute()
+            return res.data if res.data else []
+        except:
+            return []
 
     @staticmethod
     def insert(table, data):
@@ -116,20 +142,16 @@ class DB:
             res = supabase.table(table).insert(data).execute()
             return res.data[0] if res.data else None
         except Exception as e:
-            st.error(f"Error: {e}"); return None
+            st.error(f"Insert Error: {e}")
+            return None
 
     @staticmethod
     def update(table, id_val, data):
         try:
-            supabase.table(table).update(data).eq("id",id_val).execute(); return True
-        except: return False
-
-    @staticmethod
-    def search_assets(fc, query):
-        try:
-            res = supabase.table("assets").select("*, asset_categories(name)").eq("facility_code",fc).or_(f"asset_tag.ilike.%{query}%,name.ilike.%{query}%").limit(50).execute()
-            return res.data or []
-        except: return []
+            supabase.table(table).update(data).eq("id", id_val).execute()
+            return True
+        except:
+            return False
 
 # ============================================
 # HELPERS
@@ -226,44 +248,43 @@ def page_cc():
 # ASSET REGISTER WITH QR CODES
 # ============================================
 def page_ar():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 🏗️ Asset Lifecycle Matrix — {info.get("full_name",fc)}')
-    tab1,tab2,tab3=st.tabs(["📋 All Assets","🔍 Search","📊 By Category"])
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    st.markdown(f'## 🏗️ Asset Lifecycle Matrix — {info.get("full_name", fc)}')
+    
+    tab1, tab2 = st.tabs(["📋 All Assets", "🔍 Search & QR"])
+    
     with tab1:
-        data=DB.get_all("assets",fc,100)
+        data = DB.get_assets(fc, 200)
         if data:
-            df=pd.DataFrame(data)
-            st.metric("Total Assets",len(df))
-            st.dataframe(df[[c for c in ["asset_tag","name","manufacturer","model","location_building","location_floor","status","condition_rating"] if c in df.columns]],use_container_width=True,hide_index=True)
-        else:st.info("No assets")
+            df = pd.DataFrame(data)
+            st.metric("Total Assets Loaded", len(df))
+            cols_show = [c for c in ["asset_tag", "name", "manufacturer", "model", "serial_number", "location_building", "location_floor", "location_zone", "status", "condition_rating"] if c in df.columns]
+            st.dataframe(df[cols_show], use_container_width=True, hide_index=True)
+        else:
+            st.warning("Loading assets...")
+            if st.button("🔄 Retry"):
+                st.rerun()
+    
     with tab2:
-        q=st.text_input("Search by Asset Tag or Name")
+        q = st.text_input("Search by Asset Tag")
         if q:
-            results=DB.search_assets(fc,q)
+            results = DB.search_assets(fc, q)
             if results:
-                st.success(f"{len(results)} assets found")
+                st.success(f"{len(results)} found")
                 for r in results:
-                    with st.expander(f"{r.get('asset_tag','')} — {r.get('name','')}"):
-                        c1,c2=st.columns([2,1])
+                    with st.expander(f"{r.get('asset_tag', '')} — {r.get('name', '')}"):
+                        c1, c2 = st.columns([2, 1])
                         with c1:
-                            st.write(f"**Manufacturer:** {r.get('manufacturer','N/A')} | **Model:** {r.get('model','N/A')}")
-                            st.write(f"**Location:** {r.get('location_building','')} Floor {r.get('location_floor','')} | **Zone:** {r.get('location_zone','')}")
+                            st.write(f"**Mfr:** {r.get('manufacturer','N/A')} | **Model:** {r.get('model','N/A')} | **S/N:** {r.get('serial_number','N/A')}")
+                            st.write(f"**Location:** {r.get('location_building','')} > Floor {r.get('location_floor','')} > {r.get('location_zone','')}")
                             st.write(f"**Status:** {r.get('status','')} | **Condition:** {r.get('condition_rating','')}/5")
                         with c2:
-                            qr=r.get('qr_code_url','')
-                            if qr:st.markdown(f'<img src="{qr}" width="120" class="qr-code-img">',unsafe_allow_html=True)
-                            st.caption(f"📱 Scan: {r.get('asset_tag','')}")
-            else:st.warning("No assets found")
-    with tab3:
-        cats=DB.get_all("assets",fc,500)
-        if cats:
-            df=pd.DataFrame(cats)
-            if "asset_categories" in df.columns:
-                df["cat_name"]=df["asset_categories"].apply(lambda x: x.get("name","") if isinstance(x,dict) else "")
-                cat_counts=df["cat_name"].value_counts().reset_index()
-                cat_counts.columns=["Category","Count"]
-                fig=px.bar(cat_counts,x="Category",y="Count",color="Category",title="Assets by Category")
-                st.plotly_chart(fig,use_container_width=True)
+                            qr = r.get('qr_code_url', '')
+                            if qr:
+                                st.image(qr, width=130, caption=f"Scan: {r.get('asset_tag','')}")
+            else:
+                st.warning("Nothing found")
 
 # ============================================
 # PPM DASHBOARD
