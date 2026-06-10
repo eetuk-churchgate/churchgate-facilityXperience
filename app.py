@@ -450,7 +450,8 @@ def page_wp():
                                             f"🔐 Permit {permit_no} Requires Confirmation",
                                             f"<h3>Permit Authorized</h3><p><b>{permit_no}</b> authorized by {selected_auth}.</p><p>Please confirm.</p>")
                                     st.success(f"🔐 Authorized by {selected_auth}!")
-                                    st.rerun()
+                                st.balloons()
+                                st.rerun()
                             else:
                                 st.warning("No authorizers configured for this department")
                         
@@ -471,7 +472,8 @@ def page_wp():
                                             f"✅ Permit {permit_no} Requires Approval",
                                             f"<h3>Permit Confirmed</h3><p><b>{permit_no}</b> confirmed by {selected_conf}.</p><p>Please approve.</p>")
                                     st.success(f"✅ Confirmed by {selected_conf}!")
-                                    st.rerun()
+                                st.balloons()
+                                st.rerun()
                             else:
                                 st.warning("No confirmers configured")
                         
@@ -697,16 +699,17 @@ def page_wp():
                         st.error("❌ Failed to submit permit. Please try again.")
     
     # ============================================
-    # TAB 3: REPORTS
+    # TAB 3: REPORTS (FULLY FUNCTIONAL)
     # ============================================
     with tab3:
-        st.markdown("### 📊 Work Permit Reports")
+        st.markdown("### 📊 Work Permit Analytics & Reports")
         wp_all = DB.get_all("work_permits", fc, 500)
         
         if wp_all and len(wp_all) > 0:
             df = pd.DataFrame(wp_all)
             
-            c1, c2, c3, c4 = st.columns(4)
+            # KPI Row
+            c1, c2, c3, c4, c5 = st.columns(5)
             with c1: st.metric("📋 Total", len(df))
             with c2: st.metric("🟢 Approved", len(df[df["workflow_stage"] == "approved"]) if "workflow_stage" in df.columns else 0)
             with c3: st.metric("⏳ Pending", len(df[df["workflow_stage"].isin(["submitted", "authorized", "confirmed"])]) if "workflow_stage" in df.columns else 0)
@@ -724,37 +727,207 @@ def page_wp():
                             times.append((a - s).total_seconds() / 3600)
                         except: pass
                     if times:
-                        st.metric("⏱️ Avg Approval Time", f"{sum(times)/len(times):.1f} hrs")
+                        avg_time = sum(times) / len(times)
+                        with c5: st.metric("⏱️ Avg Approval", f"{avg_time:.1f} hrs")
             
             st.markdown("---")
-            st.markdown("### 📅 Monthly Breakdown")
-            months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
             
+            # ============================================
+            # CLICKABLE MONTHLY BREAKDOWN
+            # ============================================
+            st.markdown("### 📅 Monthly Breakdown (Click to Filter)")
+            
+            # Initialize month filter in session state
+            if "report_month_filter" not in st.session_state:
+                st.session_state.report_month_filter = None
+            
+            months = ["January", "February", "March", "April", "May", "June", 
+                      "July", "August", "September", "October", "November", "December"]
+            months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            
+            # Row 1: Jan - Jun
             cols = st.columns(6)
             for i in range(6):
+                m_idx = i + 1
+                month_df = df[pd.to_datetime(df["created_at"]).dt.month == m_idx] if "created_at" in df.columns else pd.DataFrame()
+                count = len(month_df)
+                
                 with cols[i]:
-                    m_idx = i + 1
-                    count = len(df[pd.to_datetime(df["created_at"]).dt.month == m_idx]) if "created_at" in df.columns else 0
-                    st.markdown(f"**{months[i]}**")
-                    st.markdown(f"### {count}")
+                    # Make it clickable
+                    is_active = st.session_state.report_month_filter == m_idx
+                    card_style = f"background: {CHURCHGATE_RED}; color: white;" if is_active else "background: white;"
+                    
+                    st.markdown(f"""
+                    <div style="{card_style} border-radius: 10px; padding: 0.8rem; text-align: center; 
+                         border: 2px solid {'#aa0000' if is_active else '#ddd'}; cursor: pointer; margin-bottom: 0.3rem;"
+                         onclick="console.log('clicked')">
+                        <div style="font-size: 0.7rem; font-weight: 600;">{months_short[i]}</div>
+                        <div style="font-size: 1.8rem; font-weight: 800;">{count}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if st.button(f"{'🔴' if is_active else '📋'} {months_short[i]}", key=f"month_btn_{m_idx}", use_container_width=True):
+                        if st.session_state.report_month_filter == m_idx:
+                            st.session_state.report_month_filter = None  # Deselect
+                        else:
+                            st.session_state.report_month_filter = m_idx  # Select
+                        st.rerun()
             
+            # Row 2: Jul - Dec
             cols2 = st.columns(6)
             for i in range(6):
+                m_idx = i + 7
+                month_df = df[pd.to_datetime(df["created_at"]).dt.month == m_idx] if "created_at" in df.columns else pd.DataFrame()
+                count = len(month_df)
+                
                 with cols2[i]:
-                    m_idx = i + 7
-                    count = len(df[pd.to_datetime(df["created_at"]).dt.month == m_idx]) if "created_at" in df.columns else 0
-                    st.markdown(f"**{months[i+6]}**")
-                    st.markdown(f"### {count}")
+                    is_active = st.session_state.report_month_filter == m_idx
+                    card_style = f"background: {CHURCHGATE_RED}; color: white;" if is_active else "background: white;"
+                    
+                    st.markdown(f"""
+                    <div style="{card_style} border-radius: 10px; padding: 0.8rem; text-align: center; 
+                         border: 2px solid {'#aa0000' if is_active else '#ddd'}; margin-bottom: 0.3rem;">
+                        <div style="font-size: 0.7rem; font-weight: 600;">{months_short[i+6]}</div>
+                        <div style="font-size: 1.8rem; font-weight: 800;">{count}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if st.button(f"{'🔴' if is_active else '📋'} {months_short[i+6]}", key=f"month_btn_{m_idx}", use_container_width=True):
+                        if st.session_state.report_month_filter == m_idx:
+                            st.session_state.report_month_filter = None
+                        else:
+                            st.session_state.report_month_filter = m_idx
+                        st.rerun()
             
             st.markdown("---")
-            if st.button("📄 Preview Full Report", use_container_width=True):
-                show_cols = [c for c in ["permit_number", "permit_type", "raised_by_name", "department", "work_location", "workflow_stage", "submitted_at", "authorized_at", "confirmed_at", "approved_at"] if c in df.columns]
-                st.dataframe(df[show_cols], use_container_width=True, hide_index=True)
             
-            csv = df.to_csv(index=False)
-            st.download_button("⬇️ Download CSV Report", csv, f"work_permits_report_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
+            # ============================================
+            # FILTERED VIEW
+            # ============================================
+            if st.session_state.report_month_filter:
+                month_idx = st.session_state.report_month_filter
+                filtered_df = df[pd.to_datetime(df["created_at"]).dt.month == month_idx] if "created_at" in df.columns else df
+                st.markdown(f"### 📋 {months[month_idx-1]} Permits ({len(filtered_df)} records)")
+                
+                show_cols = [c for c in ["permit_number", "permit_type", "raised_by_name", "department", 
+                                          "work_location", "workflow_stage", "submitted_at", 
+                                          "authorized_at", "approved_at"] if c in filtered_df.columns]
+                st.dataframe(filtered_df[show_cols], use_container_width=True, hide_index=True)
+                
+                # Download filtered month
+                csv = filtered_df.to_csv(index=False)
+                st.download_button(f"⬇️ Download {months[month_idx-1]} CSV", csv, 
+                                   f"permits_{months[month_idx-1]}_{datetime.now().year}.csv", "text/csv")
+            else:
+                st.info("👆 Click a month above to filter permits")
+            
+            st.markdown("---")
+            
+            # ============================================
+            # ANALYTICS SUMMARY
+            # ============================================
+            st.markdown("### 📈 Analytics Summary")
+            
+            # By Permit Type
+            if "permit_type" in df.columns:
+                type_counts = df["permit_type"].value_counts()
+                st.markdown("**By Permit Type:**")
+                cols = st.columns(len(type_counts) if len(type_counts) <= 4 else 4)
+                for i, (ptype, count) in enumerate(type_counts.items()):
+                    with cols[i % 4]:
+                        st.metric(ptype[:25], count)
+            
+            # By Department  
+            if "department" in df.columns:
+                dept_counts = df["department"].value_counts().head(5)
+                st.markdown("**Top 5 Departments:**")
+                for dept, count in dept_counts.items():
+                    st.markdown(f"- {dept}: **{count}** permits")
+            
+            # By Stage
+            if "workflow_stage" in df.columns:
+                stage_counts = df["workflow_stage"].value_counts()
+                st.markdown("**By Workflow Stage:**")
+                for stage, count in stage_counts.items():
+                    st.markdown(f"- {stage.upper()}: **{count}** permits")
+            
+            st.markdown("---")
+            
+            # ============================================
+            # PDF EXPORT (via HTML preview + print)
+            # ============================================
+            st.markdown("### 📄 Export Report")
+            st.caption("Preview the report below, then use your browser's Print → Save as PDF")
+            
+            if st.button("📄 Generate PDF Report Preview", use_container_width=True, type="primary"):
+                # Build HTML report
+                html_report = f"""
+                <html>
+                <head>
+                    <style>
+                        body {{ font-family: 'Inter', Arial, sans-serif; margin: 20px; color: #1a1a1a; }}
+                        h1 {{ color: #CC0000; border-bottom: 3px solid #CC0000; padding-bottom: 10px; }}
+                        h2 {{ color: #333; margin-top: 20px; }}
+                        table {{ width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12px; }}
+                        th {{ background: #CC0000; color: white; padding: 8px; text-align: left; }}
+                        td {{ padding: 6px 8px; border-bottom: 1px solid #ddd; }}
+                        .summary-box {{ background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 10px 0; }}
+                        .kpi {{ display: inline-block; width: 22%; text-align: center; padding: 10px; }}
+                        .kpi-value {{ font-size: 24px; font-weight: 800; color: #CC0000; }}
+                        .footer {{ margin-top: 30px; font-size: 10px; color: #888; text-align: center; }}
+                    </style>
+                </head>
+                <body>
+                    <h1>🛡️ Work Permit Report</h1>
+                    <p><b>Facility:</b> {info.get('full_name', fc)} | <b>Generated:</b> {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p>
+                    
+                    <div class="summary-box">
+                        <div class="kpi"><div class="kpi-value">{len(df)}</div>Total Permits</div>
+                        <div class="kpi"><div class="kpi-value">{len(df[df['workflow_stage']=='approved']) if 'workflow_stage' in df.columns else 0}</div>Approved</div>
+                        <div class="kpi"><div class="kpi-value">{len(df[df['workflow_stage'].isin(['submitted','authorized','confirmed'])]) if 'workflow_stage' in df.columns else 0}</div>Pending</div>
+                        <div class="kpi"><div class="kpi-value">{len(df[df['workflow_stage']=='rejected']) if 'workflow_stage' in df.columns else 0}</div>Rejected</div>
+                    </div>
+                    
+                    <h2>All Work Permits</h2>
+                    <table>
+                        <tr><th>Permit No</th><th>Type</th><th>Raised By</th><th>Department</th><th>Location</th><th>Stage</th><th>Submitted</th></tr>
+                """
+                
+                for _, row in df.head(50).iterrows():
+                    html_report += f"""
+                        <tr>
+                            <td>{row.get('permit_number','')}</td>
+                            <td>{row.get('permit_type','')}</td>
+                            <td>{row.get('raised_by_name','')}</td>
+                            <td>{row.get('department','')}</td>
+                            <td>{row.get('work_location','')}</td>
+                            <td><b>{row.get('workflow_stage','').upper()}</b></td>
+                            <td>{format_wat_time(row.get('submitted_at',''))}</td>
+                        </tr>
+                    """
+                
+                html_report += """
+                    </table>
+                    <div class="footer">
+                        <p>© Churchgate Group | facilityXperience | Generated by Work Permit System</p>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                st.components.v1.html(html_report, height=600, scrolling=True)
+                st.success("📄 Report preview generated! Use Ctrl+P (or Cmd+P) → Save as PDF to download.")
+                st.info("💡 Tip: Set margins to 'None' and enable 'Background Graphics' for best results.")
+            
+            # Quick CSV download
+            st.markdown("---")
+            csv_all = df.to_csv(index=False)
+            st.download_button("⬇️ Download Full CSV Report", csv_all, 
+                              f"work_permits_full_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
+        
         else:
-            st.info("No permits to report yet.")
+            st.info("📋 No work permits to report yet. Raise your first permit to see analytics here.")
     
     # ============================================
     # TAB 4: WORKFLOW CONFIG
