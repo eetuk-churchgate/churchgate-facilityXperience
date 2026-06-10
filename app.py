@@ -528,6 +528,26 @@ def page_wp():
         if not building_options:
             building_options = {"CT": "CT — Office Tower", "SAT": "SAT — Residential Tower", "RC": "RC — Recreation Center", "IP": "IP — Intermediate Parking"}
         
+        st.markdown("**🏢 Select Building & Location**")
+        c1, c2 = st.columns(2)
+        with c1:
+            selected_building = st.selectbox("Building*", 
+                options=list(building_options.keys()),
+                format_func=lambda x: building_options.get(x, x),
+                key="wp_building")
+        with c2:
+            # Dynamic sub-locations based on selected building
+            sub_locs = get_sub_locations_for_building(fc, selected_building)
+            if not sub_locs or len(sub_locs) == 0:
+                sub_locs = [f"{selected_building} / 0"]
+            sub_location = st.selectbox("Sub-Location*", sub_locs, key="wp_subloc")
+        
+        full_location = f"{building_options.get(selected_building, selected_building)} → {sub_location}"
+        st.caption(f"📍 Full Location: {full_location}")
+        
+        st.markdown("---")
+        
+        # THE FORM STARTS HERE
         with st.form("wp_raise_form", clear_on_submit=True):
             c1, c2 = st.columns(2)
             with c1:
@@ -549,15 +569,6 @@ def page_wp():
                 ])
             with c2:
                 document_no = st.text_input("Document No", value=f"IMS-WTC-WP-{datetime.now().strftime('%Y%m%d')}")
-                selected_building = st.selectbox("Building*", 
-                    options=list(building_options.keys()),
-                    format_func=lambda x: building_options.get(x, x))
-            
-            # Dynamic sub-locations
-            sub_locs = get_sub_locations_for_building(fc, selected_building)
-            if not sub_locs:
-                sub_locs = [f"{selected_building} / 0"]
-            sub_location = st.selectbox("Sub-Location*", sub_locs)
             
             full_location = f"{building_options.get(selected_building, selected_building)} → {sub_location}"
             
