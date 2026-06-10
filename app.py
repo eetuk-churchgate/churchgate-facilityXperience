@@ -855,70 +855,149 @@ def page_wp():
             st.markdown("---")
             
             # ============================================
-            # PDF EXPORT (via HTML preview + print)
+            # PDF REPORT WITH DOWNLOAD BUTTON
             # ============================================
-            st.markdown("### 📄 Export Report")
-            st.caption("Preview the report below, then use your browser's Print → Save as PDF")
+            st.markdown("---")
+            st.markdown("### 📄 Generate PDF Report")
             
-            if st.button("📄 Generate PDF Report Preview", use_container_width=True, type="primary"):
-                # Build HTML report
+            if st.button("📊 Generate Full Analytics Report", use_container_width=True, type="primary"):
+                # Build complete analytics HTML
+                total = len(df)
+                approved_count = len(df[df["workflow_stage"] == "approved"]) if "workflow_stage" in df.columns else 0
+                pending_count = len(df[df["workflow_stage"].isin(["submitted", "authorized", "confirmed"])]) if "workflow_stage" in df.columns else 0
+                rejected_count = len(df[df["workflow_stage"] == "rejected"]) if "workflow_stage" in df.columns else 0
+                
+                # Calculate lead times
+                lead_times = []
+                delayed = 0
+                if "submitted_at" in df.columns and "approved_at" in df.columns:
+                    approved_df = df[df["approved_at"].notna()]
+                    for _, r in approved_df.iterrows():
+                        try:
+                            s = pd.to_datetime(r["submitted_at"])
+                            a = pd.to_datetime(r["approved_at"])
+                            hrs = (a - s).total_seconds() / 3600
+                            lead_times.append(hrs)
+                            if hrs > 4:  # Flag if > 4 hours
+                                delayed += 1
+                        except: pass
+                
+                avg_lead = sum(lead_times) / len(lead_times) if lead_times else 0
+                
+                # Department breakdown
+                dept_data = df["department"].value_counts().to_dict() if "department" in df.columns else {}
+                dept_rows = "".join([f"<tr><td>{d}</td><td>{c}</td></tr>" for d, c in list(dept_data.items())[:10]])
+                
+                # Stage breakdown
+                stage_data = df["workflow_stage"].value_counts().to_dict() if "workflow_stage" in df.columns else {}
+                stage_rows = "".join([f"<tr><td>{s.upper()}</td><td>{c}</td></tr>" for s, c in stage_data.items()])
+                
+                # Audit trail rows
+                audit_rows = ""
+                for _, row in df.iterrows():
+                    audit_rows += f"""
+                    <tr>
+                        <td>{row.get('permit_number','')}</td>
+                        <td>{row.get('raised_by_name','')}</td>
+                        <td>{row.get('department','')[:30]}</td>
+                        <td>{format_wat_time(row.get('submitted_at',''))}</td>
+                        <td>{format_wat_time(row.get('authorized_at',''))}</td>
+                        <td>{format_wat_time(row.get('confirmed_at',''))}</td>
+                        <td>{format_wat_time(row.get('approved_at',''))}</td>
+                        <td style="color:{'green' if row.get('workflow_stage')=='approved' else 'orange' if row.get('workflow_stage')!='rejected' else 'red'}"><b>{row.get('workflow_stage','').upper()}</b></td>
+                    </tr>"""
+                
                 html_report = f"""
-                <html>
-                <head>
-                    <style>
-                        body {{ font-family: 'Inter', Arial, sans-serif; margin: 20px; color: #1a1a1a; }}
-                        h1 {{ color: #CC0000; border-bottom: 3px solid #CC0000; padding-bottom: 10px; }}
-                        h2 {{ color: #333; margin-top: 20px; }}
-                        table {{ width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 12px; }}
-                        th {{ background: #CC0000; color: white; padding: 8px; text-align: left; }}
-                        td {{ padding: 6px 8px; border-bottom: 1px solid #ddd; }}
-                        .summary-box {{ background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 10px 0; }}
-                        .kpi {{ display: inline-block; width: 22%; text-align: center; padding: 10px; }}
-                        .kpi-value {{ font-size: 24px; font-weight: 800; color: #CC0000; }}
-                        .footer {{ margin-top: 30px; font-size: 10px; color: #888; text-align: center; }}
-                    </style>
-                </head>
-                <body>
-                    <h1>🛡️ Work Permit Report</h1>
-                    <p><b>Facility:</b> {info.get('full_name', fc)} | <b>Generated:</b> {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p>
-                    
-                    <div class="summary-box">
-                        <div class="kpi"><div class="kpi-value">{len(df)}</div>Total Permits</div>
-                        <div class="kpi"><div class="kpi-value">{len(df[df['workflow_stage']=='approved']) if 'workflow_stage' in df.columns else 0}</div>Approved</div>
-                        <div class="kpi"><div class="kpi-value">{len(df[df['workflow_stage'].isin(['submitted','authorized','confirmed'])]) if 'workflow_stage' in df.columns else 0}</div>Pending</div>
-                        <div class="kpi"><div class="kpi-value">{len(df[df['workflow_stage']=='rejected']) if 'workflow_stage' in df.columns else 0}</div>Rejected</div>
-                    </div>
-                    
-                    <h2>All Work Permits</h2>
-                    <table>
-                        <tr><th>Permit No</th><th>Type</th><th>Raised By</th><th>Department</th><th>Location</th><th>Stage</th><th>Submitted</th></tr>
-                """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {{ size: A4 landscape; margin: 12mm; }}
+        body {{ font-family: 'Inter', 'Helvetica', Arial, sans-serif; color: #1a1a1a; font-size: 11px; }}
+        .header {{ background: linear-gradient(105deg, #1a1a1a, #2a2a2a); color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }}
+        .header h1 {{ margin: 0; font-size: 22px; }}
+        .header span {{ color: #CC0000; }}
+        .kpi-row {{ display: flex; gap: 12px; margin: 15px 0; }}
+        .kpi-card {{ flex: 1; background: white; border: 1px solid #ddd; border-radius: 8px; padding: 12px; text-align: center; }}
+        .kpi-card.red {{ border-left: 4px solid #CC0000; }}
+        .kpi-card.green {{ border-left: 4px solid #10B981; }}
+        .kpi-card.orange {{ border-left: 4px solid #F59E0B; }}
+        .kpi-value {{ font-size: 26px; font-weight: 800; }}
+        .kpi-label {{ font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }}
+        .section {{ background: white; border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 15px 0; }}
+        .section h2 {{ font-size: 16px; color: #CC0000; margin-top: 0; border-bottom: 2px solid #CC0000; padding-bottom: 8px; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 10px; margin: 10px 0; }}
+        th {{ background: #CC0000; color: white; padding: 8px 6px; text-align: left; font-size: 9px; text-transform: uppercase; }}
+        td {{ padding: 6px; border-bottom: 1px solid #eee; }}
+        tr:nth-child(even) {{ background: #fafafa; }}
+        .badge {{ display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 9px; font-weight: 600; }}
+        .badge-approved {{ background: #ECFDF5; color: #065F46; }}
+        .badge-pending {{ background: #FFFBEB; color: #92400E; }}
+        .badge-rejected {{ background: #FEF2F2; color: #991B1B; }}
+        .alert-box {{ background: #FFF3CD; border: 1px solid #F59E0B; border-radius: 8px; padding: 12px; margin: 10px 0; }}
+        .footer {{ text-align: center; font-size: 9px; color: #999; margin-top: 25px; border-top: 1px solid #ddd; padding-top: 12px; }}
+        .chart-bar {{ display: flex; align-items: center; gap: 8px; margin: 5px 0; }}
+        .chart-bar-fill {{ height: 18px; border-radius: 4px; background: #CC0000; }}
+        .chart-label {{ font-size: 9px; min-width: 140px; }}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ facility<span>X</span>perience</h1>
+        <p style="margin:5px 0 0 0;">Work Permit Analytics Report</p>
+        <p style="margin:3px 0 0 0;font-size:10px;opacity:0.8;">{info.get('full_name', fc)} • {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p>
+    </div>
+    
+    <div class="kpi-row">
+        <div class="kpi-card red"><div class="kpi-value">{total}</div><div class="kpi-label">Total Permits</div></div>
+        <div class="kpi-card green"><div class="kpi-value">{approved_count}</div><div class="kpi-label">Approved</div></div>
+        <div class="kpi-card orange"><div class="kpi-value">{pending_count}</div><div class="kpi-label">Pending</div></div>
+        <div class="kpi-card"><div class="kpi-value">{rejected_count}</div><div class="kpi-label">Rejected</div></div>
+        <div class="kpi-card green"><div class="kpi-value">{avg_lead:.1f} hrs</div><div class="kpi-label">Avg Lead Time</div></div>
+    </div>
+    
+    {'<div class="alert-box"><b>⚠️ DELAYED PERMITS:</b> ' + str(delayed) + ' permit(s) exceeded 4-hour approval target. Review workflow bottlenecks.</div>' if delayed > 0 else ''}
+    
+    <div class="section">
+        <h2>📊 Department Breakdown</h2>
+        <table><tr><th>Department</th><th>Permits</th></tr>{dept_rows}</table>
+    </div>
+    
+    <div class="section">
+        <h2>🔄 Workflow Stage Distribution</h2>
+        <table><tr><th>Stage</th><th>Count</th></tr>{stage_rows}</table>
+    </div>
+    
+    <div class="section">
+        <h2>📋 Complete Audit Trail</h2>
+        <table>
+            <tr><th>Permit No</th><th>Raised By</th><th>Department</th><th>Submitted</th><th>Authorized</th><th>Confirmed</th><th>Approved</th><th>Status</th></tr>
+            {audit_rows}
+        </table>
+    </div>
+    
+    <div class="footer">
+        <p>© Churchgate Group • facilityXperience Enterprise • Confidential</p>
+        <p>This report is auto-generated. For queries contact facility management.</p>
+    </div>
+</body>
+</html>"""
                 
-                for _, row in df.head(50).iterrows():
-                    html_report += f"""
-                        <tr>
-                            <td>{row.get('permit_number','')}</td>
-                            <td>{row.get('permit_type','')}</td>
-                            <td>{row.get('raised_by_name','')}</td>
-                            <td>{row.get('department','')}</td>
-                            <td>{row.get('work_location','')}</td>
-                            <td><b>{row.get('workflow_stage','').upper()}</b></td>
-                            <td>{format_wat_time(row.get('submitted_at',''))}</td>
-                        </tr>
-                    """
+                # Display preview
+                st.components.v1.html(html_report, height=700, scrolling=True)
                 
-                html_report += """
-                    </table>
-                    <div class="footer">
-                        <p>© Churchgate Group | facilityXperience | Generated by Work Permit System</p>
-                    </div>
-                </body>
-                </html>
-                """
-                
-                st.components.v1.html(html_report, height=600, scrolling=True)
-                st.success("📄 Report preview generated! Use Ctrl+P (or Cmd+P) → Save as PDF to download.")
-                st.info("💡 Tip: Set margins to 'None' and enable 'Background Graphics' for best results.")
+                # Download button
+                st.download_button(
+                    label="📥 Download PDF Report",
+                    data=html_report,
+                    file_name=f"Work_Permit_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    type="primary"
+                )
+                st.caption("💡 The downloaded HTML file can be opened in any browser. Use Print → Save as PDF for a proper PDF file.")
+                st.success("✅ Report generated with full analytics, audit trail, and lead time analysis!")
             
             # Quick CSV download
             st.markdown("---")
@@ -930,37 +1009,90 @@ def page_wp():
             st.info("📋 No work permits to report yet. Raise your first permit to see analytics here.")
     
     # ============================================
-    # TAB 4: WORKFLOW CONFIG
+    # TAB 4: WORKFLOW CONFIG (MULTI-SELECT)
     # ============================================
     with tab4:
         st.markdown("### ⚙️ Workflow Configuration")
         st.caption("Manage who authorizes, confirms, and approves work permits")
         
+        # Show current config in nice cards
         for level in [1, 2, 3]:
-            names = {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}
-            st.markdown(f"**{names[level]}**")
+            level_names = {1: "Level 1 — Authorization (Team Lead/Supervisor)", 
+                          2: "Level 2 — Confirmation (HSE Coordinator)", 
+                          3: "Level 3 — Approval (Facility Manager)"}
+            level_icons = {1: "🔐", 2: "✅", 3: "🟢"}
+            
+            st.markdown(f"**{level_icons[level]} {level_names[level]}**")
             people = get_workflow_people(fc, level)
             if people:
                 for p in people:
-                    dept_str = ", ".join(p.get("department_filter", [])) if p.get("department_filter") else "All Departments"
-                    st.markdown(f"- 👤 {p.get('person_name', '')} — 📧 {p.get('person_email', '')} — 🏢 {dept_str}")
+                    dept_filter = p.get("department_filter", [])
+                    if dept_filter == ["All Departments"] or not dept_filter:
+                        dept_str = "All Departments"
+                    else:
+                        dept_str = ", ".join(dept_filter)
+                    
+                    st.markdown(f"""
+                    <div style="background:white; border:1px solid #ddd; border-radius:8px; padding:0.6rem 1rem; margin:0.3rem 0; display:flex; align-items:center; gap:1rem;">
+                        <div style="font-size:1.5rem;">👤</div>
+                        <div style="flex:1;">
+                            <div style="font-weight:600; font-size:0.85rem;">{p.get('person_name','')}</div>
+                            <div style="font-size:0.7rem; color:#666;">📧 {p.get('person_email','')}</div>
+                            <div style="font-size:0.65rem; color:#888;">🏢 {dept_str}</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
-                st.caption("No people configured")
+                st.caption("No people configured for this level")
             st.markdown("---")
         
+        # Add Person Form with Multi-Select Departments
         with st.form("wf_add_person"):
-            st.markdown("**➕ Add Person to Workflow**")
+            st.markdown("### ➕ Add Person to Workflow")
+            
             c1, c2 = st.columns(2)
             with c1:
-                new_level = st.selectbox("Level", [1, 2, 3], format_func=lambda x: {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}[x])
-                new_name = st.text_input("Full Name*")
+                new_level = st.selectbox("Level", [1, 2, 3], 
+                    format_func=lambda x: {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}[x])
+                new_name = st.text_input("Full Name*", placeholder="e.g. Francis Asuquo")
             with c2:
-                new_email = st.text_input("Email Address*")
-                new_dept = st.selectbox("Department (or All)", ["All Departments", "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing", "Engineering — Vertical Transportation (Lifts)", "Facility Management — Hard Services", "Facility Management — FM Operations & Helpdesk", "Facility Management — HSSE Safety & Compliance", "Security — Man Guarding Operations"])
+                new_email = st.text_input("Email Address*", placeholder="e.g. fasuquo@churchgate.com")
             
-            if st.form_submit_button("➕ Add Person", use_container_width=True, type="primary"):
+            # Multi-select departments like PPE selector
+            all_departments = [
+                "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
+                "Engineering — Vertical Transportation (Lifts)", "Engineering — Fire Fighting",
+                "Engineering — Civil & Structural", "Engineering — Utilities & Energy",
+                "Engineering — Fabrication & Foundry", "Engineering — Design & Specification",
+                "Facility Management — Hard Services", "Facility Management — Soft Services (Housekeeping)",
+                "Facility Management — Soft Services (Waste Management)", 
+                "Facility Management — Front of House & Reception",
+                "Facility Management — Landscaping & Grounds", "Facility Management — Transport & Fleet",
+                "Facility Management — First Aid & Clinical", "Facility Management — FM Operations & Helpdesk",
+                "Facility Management — HSSE Safety & Compliance", "Facility Management — HSSE Risk & BCP",
+                "Facility Management — HSSE Incident Investigation", "Facility Management — Fitout Works & Finishing",
+                "Technology Group — Network & Connectivity", "Technology Group — IT Service Desk",
+                "Technology Group — ERP & Business Systems", "Technology Group — Cloud & Infrastructure",
+                "Technology Group — Building Technology (BMS/CCTV/ACS)", "Technology Group — Software Development",
+                "Technology Group — AI & Innovation", "Technology Group — Cybersecurity",
+                "Security — Man Guarding Operations", "Security — Command Center (24/7)",
+                "Security — Gatehouse & Access Control", "Security — Executive Protection",
+                "Procurement — Strategic Sourcing", "Procurement — Contract Management",
+                "Central Stores — Inventory Management", "Central Stores — Critical Spares",
+                "Sales & Marketing — Business Development", "Sales & Marketing — Bid & Tender Management",
+                "Contractor — Clyde Engineering", "Contractor — Gates and Shield",
+                "Contractor — TXB Enterprise Ltd", "Contractor — Brainworks", "Contractor — Metalplex",
+                "Contractor — Berger Paints", "Contractor — ENI-AGIP General Services",
+                "Vendor — Augkenos Options", "Vendor — Blue Group", "Vendor — T & T Synergy"
+            ]
+            
+            new_depts = st.multiselect("Department Access (leave empty for All Departments)", 
+                                       all_departments,
+                                       placeholder="Choose departments or leave empty for All")
+            
+            if st.form_submit_button("➕ Add Person to Workflow", use_container_width=True, type="primary"):
                 if new_name and new_email:
-                    dept_filter = [] if new_dept == "All Departments" else [new_dept]
+                    dept_filter = new_depts if new_depts else ["All Departments"]
                     DB.insert("workflow_config", {
                         "facility_code": fc,
                         "workflow_type": "work_permit",
@@ -971,9 +1103,10 @@ def page_wp():
                         "department_filter": dept_filter
                     })
                     st.success(f"✅ {new_name} added to Level {new_level}!")
+                    st.balloons()
                     st.rerun()
                 else:
-                    st.error("Name and Email are required")
+                    st.error("⚠️ Name and Email are required")
 
 # ============================================
 # TICKETS + HELPDESK
