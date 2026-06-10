@@ -352,7 +352,71 @@ def page_wp():
             c1,c2=st.columns(2)
             with c1:
                 title=st.text_input("Title*");ptype=st.selectbox("Permit Type",["General","Hot Work","Confined Space","Height Work","ELV Systems","Electrical","Energy Isolation"])
-                dept=st.selectbox("Department",["MEP-ELECTRICAL","MEP-HVAC","MEP-LIFTS","MEP-PLUMBING","FACILITY MANAGEMENT","FACILITIES MANAGEMENT OPERATIONS","HSE - RISK & INCIDENCE","PROJECT DEVELOPMENT","CLYDE ENGINEERING"])
+                dept=st.selectbox("Department*",[
+    # Engineering (DEP-01)
+    "Engineering — Civil & Structural",
+    "Engineering — Electrical",
+    "Engineering — HVAC",
+    "Engineering — Plumbing",
+    "Engineering — Vertical Transportation (Lifts)",
+    "Engineering — Fire Fighting",
+    "Engineering — Utilities & Energy",
+    "Engineering — Fabrication & Foundry",
+    "Engineering — Design & Specification",
+    # Facility Management (DEP-02)
+    "Facility Management — Hard Services (Building Fabric)",
+    "Facility Management — Soft Services (Housekeeping)",
+    "Facility Management — Soft Services (Waste Management)",
+    "Facility Management — Soft Services (Front of House)",
+    "Facility Management — Soft Services (Landscaping)",
+    "Facility Management — Transport & Fleet",
+    "Facility Management — First Aid & Clinical",
+    "Facility Management — FM Operations & Helpdesk",
+    "Facility Management — HSSE Safety & Compliance",
+    "Facility Management — HSSE Risk & BCP",
+    "Facility Management — HSSE Incident Investigation",
+    "Facility Management — Fitout Works & Finishing",
+    # Technology Group (DEP-03)
+    "Technology Group — Network & Connectivity",
+    "Technology Group — IT Service Desk",
+    "Technology Group — ERP & Business Systems",
+    "Technology Group — Cloud & Infrastructure",
+    "Technology Group — Building Technology (BMS/CCTV/ACS)",
+    "Technology Group — Software Development",
+    "Technology Group — AI & Innovation",
+    "Technology Group — Cybersecurity",
+    # Security (DEP-04)
+    "Security — Man Guarding Operations",
+    "Security — Command Center (24/7)",
+    "Security — Gatehouse & Access Control",
+    "Security — Executive Protection",
+    # Procurement (DEP-05)
+    "Procurement — Strategic Sourcing",
+    "Procurement — Contract Management",
+    "Procurement — Purchase & Requisition",
+    # Central Stores (DEP-06)
+    "Central Stores — Inventory Management",
+    "Central Stores — Goods Inwards & QA",
+    "Central Stores — Critical Spares",
+    # Sales & Marketing (DEP-08)
+    "Sales & Marketing — Business Development",
+    "Sales & Marketing — Bid & Tender Management",
+    # External Contractors
+    "Contractor — Clyde Engineering",
+    "Contractor — Gates and Shield",
+    "Contractor — TXB Enterprise Ltd",
+    "Contractor — Brainworks",
+    "Contractor — Metalplex",
+    "Contractor — Berger Paints",
+    "Contractor — ENI-AGIP General Services",
+    "Vendor — Augkenos Options",
+    "Vendor — Blue Group",
+    "Vendor — T & T Synergy",
+    "Vendor — Regal Krees Engineering",
+    "Vendor — Jotbofs Technologies",
+    "Vendor — 21st Century Evolution",
+    "Vendor — HICL S&P Contractor"
+])
                 rname=st.text_input("Your Name*");rdesig=st.text_input("Your Designation")
             with c2:
                 loc=st.text_input("Work Location*");cont=st.text_input("Contractor Company (if applicable)")
@@ -375,7 +439,23 @@ def page_rt():
     with tab1:
         locs=DB.get_locations(fc)
         loc_names=["Choose one"]+[l.get("location_name","") for l in locs]
-        cats=[{"department":"ELECTRICAL","category":"Electrical"},{"department":"HVAC","category":"HVAC"},{"department":"PLUMBING","category":"Plumbing"},{"department":"CLEANING","category":"Cleaning"},{"department":"SECURITY","category":"Security"},{"department":"INTERNET/VOICE","category":"Internet/Voice"},{"department":"AUTOMATION","category":"Automation"},{"department":"FM FINISHING","category":"FM Finishing"}]
+        cats=[
+    {"department":"Engineering — Electrical","category":"Electrical"},
+    {"department":"Engineering — HVAC","category":"HVAC"},
+    {"department":"Engineering — Plumbing","category":"Plumbing"},
+    {"department":"Engineering — Fire Fighting","category":"Fire Safety"},
+    {"department":"Engineering — Vertical Transportation","category":"Elevators/Lifts"},
+    {"department":"Facility Management — Hard Services","category":"Building Fabric"},
+    {"department":"Facility Management — Soft Services","category":"Cleaning/Housekeeping"},
+    {"department":"Facility Management — HSSE","category":"Safety"},
+    {"department":"Technology Group — Network","category":"Internet/Voice"},
+    {"department":"Technology Group — Building Technology","category":"Access Control/CCTV/BMS"},
+    {"department":"Technology Group — IT Service Desk","category":"IT Support"},
+    {"department":"Security","category":"Security"},
+    {"department":"Facility Management — FM Operations","category":"General Maintenance"},
+    {"department":"Facility Management — Fitout","category":"Finishing/Fitout"},
+    {"department":"Facility Management — Transport","category":"Parking/Fleet"},
+]
         with st.form("tix_form"):
             c1,c2=st.columns(2)
             with c1:
@@ -450,7 +530,63 @@ def page_ic():
             st.markdown("### Report New Incident")
             c1,c2=st.columns(2)
             with c1:
-                title=st.text_input("Title*");dept=st.selectbox("Department",["MEP-ELECTRICAL","MEP-HVAC","MEP-LIFTS","MEP-PLUMBING","FACILITY MANAGEMENT","HSE - RISK & INCIDENCE","SECURITY"])
+                title=st.text_input("Title*");dept=st.selectbox("Department*",[
+    "Engineering — Civil & Structural",
+    "Engineering — Electrical",
+    "Engineering — HVAC",
+    "Engineering — Plumbing",
+    "Engineering — Vertical Transportation (Lifts)",
+    "Engineering — Fire Fighting",
+    "Engineering — Utilities & Energy",
+    "Engineering — Fabrication & Foundry",
+    "Engineering — Design & Specification",
+    "Facility Management — Hard Services",
+    "Facility Management — Soft Services (Housekeeping)",
+    "Facility Management — Soft Services (Waste Management)",
+    "Facility Management — Front of House & Reception",
+    "Facility Management — Landscaping & Grounds",
+    "Facility Management — Transport & Fleet",
+    "Facility Management — First Aid & Clinical",
+    "Facility Management — FM Operations & Helpdesk",
+    "Facility Management — HSSE Safety & Compliance",
+    "Facility Management — HSSE Risk & BCP",
+    "Facility Management — HSSE Incident Investigation",
+    "Facility Management — Fitout Works & Finishing",
+    "Technology Group — Network & Connectivity",
+    "Technology Group — IT Service Desk",
+    "Technology Group — ERP & Business Systems",
+    "Technology Group — Cloud & Infrastructure",
+    "Technology Group — Building Technology (BMS/CCTV/ACS)",
+    "Technology Group — Software Development",
+    "Technology Group — AI & Innovation",
+    "Technology Group — Cybersecurity",
+    "Security — Man Guarding Operations",
+    "Security — Command Center (24/7)",
+    "Security — Gatehouse & Access Control",
+    "Security — Executive Protection",
+    "Procurement — Strategic Sourcing",
+    "Procurement — Contract Management",
+    "Procurement — Purchase & Requisition",
+    "Central Stores — Inventory Management",
+    "Central Stores — Goods Inwards & QA",
+    "Central Stores — Critical Spares",
+    "Sales & Marketing — Business Development",
+    "Sales & Marketing — Bid & Tender Management",
+    "Contractor — Clyde Engineering",
+    "Contractor — Gates and Shield",
+    "Contractor — TXB Enterprise Ltd",
+    "Contractor — Brainworks",
+    "Contractor — Metalplex",
+    "Contractor — Berger Paints",
+    "Contractor — ENI-AGIP General Services",
+    "Vendor — Augkenos Options",
+    "Vendor — Blue Group",
+    "Vendor — T & T Synergy",
+    "Vendor — Regal Krees Engineering",
+    "Vendor — Jotbofs Technologies",
+    "Vendor — 21st Century Evolution",
+    "Vendor — HICL S&P Contractor"
+])
                 itype=st.selectbox("Incident Type",["Safety","Security","Environmental","Equipment Failure","Fire","Water Leak","Power Outage","Other"])
                 sev=st.selectbox("Severity",["low","medium","high","critical"])
                 pri=st.selectbox("Priority",["low","medium","high","critical"])
