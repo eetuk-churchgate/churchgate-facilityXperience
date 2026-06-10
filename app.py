@@ -295,363 +295,501 @@ def page_ar():
         st.dataframe(df[[c for c in ["asset_tag","name","department","manufacturer","model","serial_number","location_building","location_floor","status","condition_rating"] if c in df.columns]],use_container_width=True,hide_index=True,height=500)
 
 # ============================================
-# WORK PERMIT — MULTI-PERSON WORKFLOW
+# WORK PERMIT — COMPLETE FIXED MODULE
 # ============================================
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 def format_wat_time(dt_str):
+    """Convert to Lagos WAT timezone"""
     try:
         from datetime import timezone, timedelta
         if not dt_str: return "N/A"
-        dt_str_clean=str(dt_str).replace('Z','+00:00')
-        if 'T' in dt_str_clean and '+' not in dt_str_clean:
-            dt_str_clean=dt_str_clean+'+00:00'
-        dt=datetime.fromisoformat(dt_str_clean)
-        wat=dt.astimezone(timezone(timedelta(hours=1)))
+        dt = datetime.fromisoformat(str(dt_str).replace('Z', '+00:00'))
+        wat = dt.astimezone(timezone(timedelta(hours=1)))
         return wat.strftime("%d-%b-%Y %I:%M %p") + " WAT"
     except:
-        return str(dt_str)[:19]
+        return str(dt_str)[:19] if dt_str else "N/A"
 
 def send_email_notification(to_email, subject, body):
-    """Send real email via SMTP"""
+    """Send real email and log to database"""
     try:
-        config=supabase.table("email_config").select("*").eq("is_active",True).single().execute()
+        config = supabase.table("email_config").select("*").eq("is_active", True).single().execute()
         if config and config.data:
-            cfg=config.data
-            msg=MIMEMultipart()
-            msg['From']=cfg.get('sender_email','eetuk@churchgate.com')
-            msg['To']=to_email
-            msg['Subject']=subject
-            msg.attach(MIMEText(body,'html'))
+            cfg = config.data
+            msg = MIMEMultipart()
+            msg['From'] = cfg.get('sender_email', 'eetuk@churchgate.com')
+            msg['To'] = to_email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'html'))
             
-            with smtplib.SMTP(cfg.get('smtp_host','smtp.gmail.com'),cfg.get('smtp_port',587)) as server:
+            with smtplib.SMTP(cfg.get('smtp_host', 'smtp.gmail.com'), cfg.get('smtp_port', 587)) as server:
                 server.starttls()
-                server.login(cfg.get('sender_email','eetuk@churchgate.com'),cfg.get('sender_password',''))
+                server.login(cfg.get('sender_email', 'eetuk@churchgate.com'), cfg.get('sender_password', ''))
                 server.send_message(msg)
             
-            # Log to database
             supabase.table("email_log").insert({
-                "facility_code":"WTC","email_to":to_email,"email_subject":subject,
-                "email_body":body,"email_type":"work_permit","status":"sent",
-                "sent_at":datetime.now().isoformat()
+                "facility_code": "WTC", "email_to": to_email, "email_subject": subject,
+                "email_body": body, "email_type": "work_permit", "status": "sent",
+                "sent_at": datetime.now().isoformat()
             }).execute()
             return True
     except Exception as e:
-        # Still log even if send fails (for testing)
         try:
             supabase.table("email_log").insert({
-                "facility_code":"WTC","email_to":to_email,"email_subject":subject,
-                "email_body":f"{body}\n\n[Email send attempted: {str(e)}]",
-                "email_type":"work_permit","status":"queued",
-                "sent_at":datetime.now().isoformat()
+                "facility_code": "WTC", "email_to": to_email, "email_subject": subject,
+                "email_body": f"{body}\n\n[Note: {str(e)}]", "email_type": "work_permit",
+                "status": "queued", "sent_at": datetime.now().isoformat()
             }).execute()
         except: pass
-        return False
+    return False
 
-def get_workflow_people(fc,level,department=None):
-    """Get people for a workflow level, optionally filtered by department"""
+def get_workflow_people(fc, level, department=None):
+    """Get people for a workflow level"""
     try:
-        query=supabase.table("workflow_config").select("*").eq("facility_code",fc).eq("workflow_type","work_permit").eq("level_number",level).eq("is_active",True)
-        res=query.execute()
-        people=res.data if res.data else []
+        query = supabase.table("workflow_config").select("*").eq("facility_code", fc).eq("workflow_type", "work_permit").eq("level_number", level).eq("is_active", True)
+        res = query.execute()
+        people = res.data if res.data else []
         if department and people:
-            # Filter by department if specified
-            filtered=[p for p in people if not p.get("department_filter") or p["department_filter"]==[] or department in p["department_filter"]]
+            filtered = [p for p in people if not p.get("department_filter") or p["department_filter"] == [] or p["department_filter"] == ["All Departments"] or department in p["department_filter"]]
             return filtered if filtered else people
         return people
     except: return []
 
-def get_sub_locations_for_building(fc,building_code):
+def get_sub_locations_for_building(fc, building_code):
     """Get sub-locations for a building"""
     try:
-        loc=supabase.table("helpdesk_locations").select("id").eq("facility_code",fc).eq("location_code",building_code).single().execute()
+        loc = supabase.table("helpdesk_locations").select("id").eq("facility_code", fc).eq("location_code", building_code).single().execute()
         if loc.data:
-            res=supabase.table("helpdesk_sub_locations").select("*").eq("location_id",loc.data["id"]).order("sub_location_name").execute()
-            return [s["sub_location_name"] for s in res.data] if res.data else []
+            res = supabase.table("helpdesk_sub_locations").select("sub_location_name").eq("location_id", loc.data["id"]).order("sub_location_name").execute()
+            if res.data:
+                return [s["sub_location_name"] for s in res.data]
     except: pass
-    return []
+    return [f"{building_code} / 0", f"{building_code} / 1"]
 
 def page_wp():
-    fc=st.session_state.get("facility","WTC")
-    info=FACILITY_INFO.get(fc,{})
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
     
-    st.markdown(f'## 🛡️ Permit-to-Work System — {info.get("full_name",fc)}')
+    st.markdown(f'## 🛡️ Permit-to-Work System — {info.get("full_name", fc)}')
     
-    tab1,tab2,tab3,tab4=st.tabs(["📋 All Permits","➕ Raise Permit","📊 Reports","⚙️ Workflow Config"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 All Permits", "➕ Raise Permit", "📊 Reports", "⚙️ Workflow Config"])
     
     # ============================================
     # TAB 1: ALL PERMITS
     # ============================================
     with tab1:
-        wp=DB.get_all("work_permits",fc,200)
-        if wp:
-            df=pd.DataFrame(wp)
-            c1,c2,c3,c4,c5=st.columns(5)
-            with c1:st.metric("📋 Total",len(df))
-            with c2:st.metric("⏳ Submitted",len(df[df["workflow_stage"]=="submitted"]) if "workflow_stage" in df.columns else 0)
-            with c3:st.metric("🔐 Authorized",len(df[df["workflow_stage"]=="authorized"]) if "workflow_stage" in df.columns else 0)
-            with c4:st.metric("✅ Confirmed",len(df[df["workflow_stage"]=="confirmed"]) if "workflow_stage" in df.columns else 0)
-            with c5:st.metric("🟢 Approved",len(df[df["workflow_stage"]=="approved"]) if "workflow_stage" in df.columns else 0)
+        st.markdown("### 📋 Work Permit Register")
+        
+        # Fetch permits - no date filter that could hide results
+        wp = DB.get_all("work_permits", fc, 500)
+        
+        if wp and len(wp) > 0:
+            df = pd.DataFrame(wp)
+            
+            # KPI Cards
+            c1, c2, c3, c4, c5 = st.columns(5)
+            with c1: st.metric("📋 Total", len(df))
+            with c2: st.metric("⏳ Submitted", len(df[df["workflow_stage"] == "submitted"]) if "workflow_stage" in df.columns else 0)
+            with c3: st.metric("🔐 Authorized", len(df[df["workflow_stage"] == "authorized"]) if "workflow_stage" in df.columns else 0)
+            with c4: st.metric("✅ Confirmed", len(df[df["workflow_stage"] == "confirmed"]) if "workflow_stage" in df.columns else 0)
+            with c5: st.metric("🟢 Approved", len(df[df["workflow_stage"] == "approved"]) if "workflow_stage" in df.columns else 0)
             
             st.markdown("---")
             
-            for i,row in df.iterrows():
-                stage=row.get("workflow_stage","submitted")
-                icons={"submitted":"⏳","authorized":"🔐","confirmed":"✅","approved":"🟢","rejected":"❌"}
-                icon=icons.get(stage,"📋")
+            # Display each permit
+            for i, row in df.iterrows():
+                stage = row.get("workflow_stage", "submitted")
+                icons = {"submitted": "⏳", "authorized": "🔐", "confirmed": "✅", "approved": "🟢", "rejected": "❌"}
+                icon = icons.get(stage, "📋")
                 
-                with st.expander(f"{icon} {row.get('permit_number','')} — {row.get('title','')[:80]} | {stage.upper()}",expanded=(stage=="submitted")):
-                    c1,c2=st.columns([3,1])
+                title = row.get('title', 'No Title')[:80]
+                permit_no = row.get('permit_number', 'N/A')
+                
+                with st.expander(f"{icon} {permit_no} — {title} | {stage.upper()}", expanded=(stage == "submitted")):
+                    c1, c2 = st.columns([3, 1])
+                    
                     with c1:
-                        st.markdown(f"**👤 Raised by:** {row.get('raised_by_name','N/A')} ({row.get('raised_by_designation','')})")
-                        st.markdown(f"**📅 Period:** {format_wat_time(row.get('start_datetime',''))} → {format_wat_time(row.get('end_datetime',''))}")
-                        st.markdown(f"**📍 Location:** {row.get('work_location','')}")
-                        st.markdown(f"**📝 Description:** {row.get('description','')[:200]}")
+                        st.markdown(f"**👤 Raised by:** {row.get('raised_by_name', 'N/A')} ({row.get('raised_by_designation', '')})")
+                        st.markdown(f"**📅 Period:** {format_wat_time(row.get('start_datetime', ''))} → {format_wat_time(row.get('end_datetime', ''))}")
+                        st.markdown(f"**📍 Location:** {row.get('work_location', '')}")
+                        st.markdown(f"**📝 Description:** {row.get('description', '')[:200]}")
+                        st.markdown(f"**🏢 Department:** {row.get('department', '')}")
                         
                         st.markdown("---")
                         st.markdown("**🔄 Audit Trail:**")
-                        st.caption(f"📤 Submitted: {format_wat_time(row.get('submitted_at',row.get('created_at','')))}")
-                        if row.get("authorized_at"):st.caption(f"🔐 Authorized: {format_wat_time(row['authorized_at'])} by {row.get('authorized_by_name','')}")
-                        if row.get("confirmed_at"):st.caption(f"✅ Confirmed: {format_wat_time(row['confirmed_at'])} by {row.get('confirmed_by_name','')}")
-                        if row.get("approved_at"):st.caption(f"🟢 Approved: {format_wat_time(row['approved_at'])} by {row.get('approved_by_name','')}")
+                        st.caption(f"📤 Submitted: {format_wat_time(row.get('submitted_at', row.get('created_at', '')))}")
+                        if row.get("authorized_at"): 
+                            st.caption(f"🔐 Authorized: {format_wat_time(row['authorized_at'])} by {row.get('authorized_by_name', '')}")
+                        if row.get("confirmed_at"): 
+                            st.caption(f"✅ Confirmed: {format_wat_time(row['confirmed_at'])} by {row.get('confirmed_by_name', '')}")
+                        if row.get("approved_at"): 
+                            st.caption(f"🟢 Approved: {format_wat_time(row['approved_at'])} by {row.get('approved_by_name', '')}")
                     
                     with c2:
                         st.markdown("**⚡ Actions:**")
-                        now=datetime.now().isoformat()
-                        dept=row.get("department","")
+                        now = datetime.now().isoformat()
+                        dept = row.get("department", "")
                         
-                        if stage=="submitted":
-                            # Get authorizers for this department
-                            authorizers=get_workflow_people(fc,1,dept)
-                            auth_names=[a.get("person_name","") for a in authorizers]
-                            selected_auth=st.selectbox("Authorizer",auth_names,key=f"auth_sel_{row['id']}")
-                            if st.button("🔐 Authorize",key=f"auth_{row['id']}",use_container_width=True):
-                                DB.update("work_permits",row["id"],{"workflow_stage":"authorized","authorized_by_name":selected_auth,"authorized_at":now})
-                                # Email Level 2
-                                confirmers=get_workflow_people(fc,2)
-                                for c in confirmers:
-                                    send_email_notification(c.get("person_email",""),f"🔐 Permit {row['permit_number']} Requires Confirmation",f"<h3>Work Permit Authorization</h3><p>Permit <b>{row['permit_number']}</b> has been authorized by {selected_auth}.</p><p>Please review and confirm.</p>")
-                                st.success(f"🔐 Authorized by {selected_auth}!")
+                        if stage == "submitted":
+                            authorizers = get_workflow_people(fc, 1, dept)
+                            if authorizers:
+                                auth_names = [a.get("person_name", "Unknown") for a in authorizers]
+                                selected_auth = st.selectbox("Select Authorizer", auth_names, key=f"auth_sel_{row['id']}")
+                                if st.button("🔐 Authorize", key=f"auth_btn_{row['id']}", use_container_width=True, type="primary"):
+                                    DB.update("work_permits", row["id"], {
+                                        "workflow_stage": "authorized",
+                                        "authorized_by_name": selected_auth,
+                                        "authorized_at": now
+                                    })
+                                    # Notify confirmers
+                                    confirmers = get_workflow_people(fc, 2)
+                                    for c in confirmers:
+                                        send_email_notification(c.get("person_email", ""), 
+                                            f"🔐 Permit {permit_no} Requires Confirmation",
+                                            f"<h3>Permit Authorized</h3><p><b>{permit_no}</b> authorized by {selected_auth}.</p><p>Please confirm.</p>")
+                                    st.success(f"🔐 Authorized by {selected_auth}!")
+                                    st.rerun()
+                            else:
+                                st.warning("No authorizers configured for this department")
+                        
+                        if stage == "authorized":
+                            confirmers = get_workflow_people(fc, 2)
+                            if confirmers:
+                                conf_names = [c.get("person_name", "Unknown") for c in confirmers]
+                                selected_conf = st.selectbox("Select Confirmer", conf_names, key=f"conf_sel_{row['id']}")
+                                if st.button("✅ Confirm", key=f"conf_btn_{row['id']}", use_container_width=True, type="primary"):
+                                    DB.update("work_permits", row["id"], {
+                                        "workflow_stage": "confirmed",
+                                        "confirmed_by_name": selected_conf,
+                                        "confirmed_at": now
+                                    })
+                                    approvers = get_workflow_people(fc, 3)
+                                    for a in approvers:
+                                        send_email_notification(a.get("person_email", ""),
+                                            f"✅ Permit {permit_no} Requires Approval",
+                                            f"<h3>Permit Confirmed</h3><p><b>{permit_no}</b> confirmed by {selected_conf}.</p><p>Please approve.</p>")
+                                    st.success(f"✅ Confirmed by {selected_conf}!")
+                                    st.rerun()
+                            else:
+                                st.warning("No confirmers configured")
+                        
+                        if stage in ["authorized", "confirmed"]:
+                            approvers = get_workflow_people(fc, 3)
+                            if approvers:
+                                app_names = [a.get("person_name", "Unknown") for a in approvers]
+                                selected_app = st.selectbox("Select Approver", app_names, key=f"app_sel_{row['id']}")
+                                if st.button("🟢 Approve", key=f"app_btn_{row['id']}", use_container_width=True, type="primary"):
+                                    DB.update("work_permits", row["id"], {
+                                        "workflow_stage": "approved",
+                                        "status": "approved",
+                                        "approved_by_name": selected_app,
+                                        "approved_at": now
+                                    })
+                                    send_email_notification(row.get("requester_contact", ""),
+                                        f"🟢 Permit {permit_no} APPROVED",
+                                        f"<h3>Permit Approved!</h3><p>Your permit <b>{permit_no}</b> has been <b>APPROVED</b> by {selected_app}.</p><p>You may now proceed with work.</p>")
+                                    st.success(f"🟢 Approved by {selected_app}!")
+                                    st.balloons()
+                                    st.rerun()
+                            else:
+                                st.warning("No approvers configured")
+                        
+                        if stage != "rejected":
+                            if st.button("❌ Reject", key=f"rej_btn_{row['id']}", use_container_width=True):
+                                DB.update("work_permits", row["id"], {
+                                    "workflow_stage": "rejected",
+                                    "status": "rejected",
+                                    "rejected_at": now
+                                })
+                                st.error("Permit Rejected")
                                 st.rerun()
-                        
-                        if stage=="authorized":
-                            confirmers=get_workflow_people(fc,2)
-                            conf_names=[c.get("person_name","") for c in confirmers]
-                            selected_conf=st.selectbox("Confirmer",conf_names,key=f"conf_sel_{row['id']}")
-                            if st.button("✅ Confirm",key=f"conf_{row['id']}",use_container_width=True):
-                                DB.update("work_permits",row["id"],{"workflow_stage":"confirmed","confirmed_by_name":selected_conf,"confirmed_at":now})
-                                approvers=get_workflow_people(fc,3)
-                                for a in approvers:
-                                    send_email_notification(a.get("person_email",""),f"✅ Permit {row['permit_number']} Requires Approval",f"<h3>Work Permit Confirmation</h3><p>Permit <b>{row['permit_number']}</b> has been confirmed by {selected_conf}.</p><p>Please review and approve.</p>")
-                                st.success(f"✅ Confirmed by {selected_conf}!")
-                                st.rerun()
-                        
-                        if stage in ["authorized","confirmed"]:
-                            approvers=get_workflow_people(fc,3)
-                            app_names=[a.get("person_name","") for a in approvers]
-                            selected_app=st.selectbox("Approver",app_names,key=f"app_sel_{row['id']}")
-                            if st.button("🟢 Approve",key=f"app_{row['id']}",use_container_width=True):
-                                DB.update("work_permits",row["id"],{"workflow_stage":"approved","status":"approved","approved_by_name":selected_app,"approved_at":now})
-                                send_email_notification(row.get("requester_contact",""),f"🟢 Permit {row['permit_number']} Approved",f"<h3>Work Permit Approved</h3><p>Your permit <b>{row['permit_number']}</b> has been <b>APPROVED</b> by {selected_app}.</p><p>You may proceed with work.</p>")
-                                st.success(f"🟢 Approved by {selected_app}!")
-                                st.balloons()
-                                st.rerun()
-                        
-                        if stage!="rejected":
-                            if st.button("❌ Reject",key=f"rej_{row['id']}",use_container_width=True):
-                                DB.update("work_permits",row["id"],{"workflow_stage":"rejected","status":"rejected","rejected_at":now})
-                                st.error("Permit Rejected");st.rerun()
         else:
-            st.info("No work permits found. Raise your first permit!")
+            st.info("📋 No work permits found. Raise your first permit in the '➕ Raise Permit' tab!")
+            st.markdown("---")
+            st.markdown("**Debug Info:**")
+            st.code(f"Facility: {fc}\nTable: work_permits\nCheck Supabase for data.")
     
     # ============================================
     # TAB 2: RAISE PERMIT
     # ============================================
     with tab2:
-        # Get buildings
-        buildings=DB.get_locations(fc)
-        building_codes=[b.get("location_code","") for b in buildings] if buildings else ["CT","SAT","RC","IP"]
-        building_names=[b.get("location_name","") for b in buildings] if buildings else ["CT — Office Tower","SAT — Residential Tower","RC — Recreation Center","IP — Intermediate Parking"]
+        st.markdown("### 📝 Raise New Work Permit")
         
-        with st.form("wp_form",clear_on_submit=True):
-            st.markdown("### 📝 Raise New Work Permit")
-            
-            c1,c2=st.columns(2)
+        # Get buildings
+        buildings = DB.get_locations(fc)
+        
+        # Build proper display mapping
+        building_options = {}
+        for b in buildings:
+            building_options[b.get("location_code", "")] = b.get("location_name", "")
+        
+        if not building_options:
+            building_options = {"CT": "CT — Office Tower", "SAT": "SAT — Residential Tower", "RC": "RC — Recreation Center", "IP": "IP — Intermediate Parking"}
+        
+        with st.form("wp_raise_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
             with c1:
-                permit_type=st.selectbox("Permit Type*",["General Work Permit","Hot Work Permit","Confined Space Entry Permit","Working at Height Permit","Electrical/Mechanical/LOTO Permit","Energy Isolation Permit","ELV Systems Work Permit","Excavation Permit"])
-                dept=st.selectbox("Department*",["Engineering — Electrical","Engineering — HVAC","Engineering — Plumbing","Engineering — Vertical Transportation (Lifts)","Engineering — Fire Fighting","Engineering — Civil & Structural","Engineering — Utilities & Energy","Facility Management — Hard Services","Facility Management — Soft Services (Housekeeping)","Facility Management — FM Operations & Helpdesk","Facility Management — Fitout Works","Facility Management — HSSE Safety & Compliance","Technology Group — Network & Connectivity","Technology Group — Building Technology","Security — Man Guarding Operations","Contractor — Clyde Engineering","Contractor — Gates and Shield"])
+                permit_type = st.selectbox("Permit Type*", [
+                    "General Work Permit", "Hot Work Permit", "Confined Space Entry Permit",
+                    "Working at Height Permit", "Electrical/Mechanical/LOTO Permit",
+                    "Energy Isolation Permit", "ELV Systems Work Permit", "Excavation Permit"
+                ])
+                dept = st.selectbox("Department*", [
+                    "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
+                    "Engineering — Vertical Transportation (Lifts)", "Engineering — Fire Fighting",
+                    "Engineering — Civil & Structural", "Engineering — Utilities & Energy",
+                    "Facility Management — Hard Services", "Facility Management — Soft Services (Housekeeping)",
+                    "Facility Management — FM Operations & Helpdesk", "Facility Management — Fitout Works",
+                    "Facility Management — HSSE Safety & Compliance",
+                    "Technology Group — Network & Connectivity", "Technology Group — Building Technology",
+                    "Security — Man Guarding Operations",
+                    "Contractor — Clyde Engineering", "Contractor — Gates and Shield"
+                ])
             with c2:
-                document_no=st.text_input("Document No",value=f"IMS-WTC-WP-{datetime.now().strftime('%Y%m%d')}")
-                selected_building=st.selectbox("Building*",options=building_codes,format_func=lambda x: dict(zip(building_codes,building_names)).get(x,x))
+                document_no = st.text_input("Document No", value=f"IMS-WTC-WP-{datetime.now().strftime('%Y%m%d')}")
+                selected_building = st.selectbox("Building*", 
+                    options=list(building_options.keys()),
+                    format_func=lambda x: building_options.get(x, x))
             
-            # Dynamic sub-location based on building
-            sub_locs=get_sub_locations_for_building(fc,selected_building)
-            sub_location=st.selectbox("Sub-Location*",sub_locs if sub_locs else ["Select building first"])
+            # Dynamic sub-locations
+            sub_locs = get_sub_locations_for_building(fc, selected_building)
+            if not sub_locs:
+                sub_locs = [f"{selected_building} / 0"]
+            sub_location = st.selectbox("Sub-Location*", sub_locs)
             
-            full_location=f"{selected_building} — {sub_location}" if sub_location and sub_location!="Select building first" else selected_building
+            full_location = f"{building_options.get(selected_building, selected_building)} → {sub_location}"
             
             st.markdown("---")
             st.markdown("**👤 Requester Details**")
-            c1,c2,c3=st.columns(3)
-            with c1:rname=st.text_input("Requester Name*");rdesignation=st.text_input("Requester Designation*")
-            with c2:rcontact=st.text_input("Requester Contact No*");powner=st.text_input("Process Owner Name*")
-            with c3:pcontact=st.text_input("Process Owner Contact*");scoordinator=st.text_input("Site Coordinator*")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                rname = st.text_input("Requester Name*")
+                rdesignation = st.text_input("Requester Designation*")
+            with c2:
+                rcontact = st.text_input("Requester Contact No*")
+                powner = st.text_input("Process Owner Name*")
+            with c3:
+                pcontact = st.text_input("Process Owner Contact*")
+                scoordinator = st.text_input("Site Coordinator*")
             
             st.markdown("---")
             st.markdown("**📅 Work Schedule**")
-            c1,c2=st.columns(2)
-            with c1:sd=st.date_input("Proposed Start Date*",date.today());stime=st.time_input("Start Time*",time(8,0))
-            with c2:ed=st.date_input("Proposed End Date*",date.today());etime=st.time_input("End Time*",time(17,0))
-            workers=st.number_input("No. of Workers Expected*",min_value=1,max_value=100,value=2)
+            c1, c2 = st.columns(2)
+            with c1:
+                sd = st.date_input("Proposed Start Date*", date.today())
+                stime = st.time_input("Start Time*", time(8, 0))
+            with c2:
+                ed = st.date_input("Proposed End Date*", date.today())
+                etime = st.time_input("End Time*", time(17, 0))
+            
+            workers = st.number_input("No. of Workers Expected*", min_value=1, max_value=100, value=2)
             
             st.markdown("---")
-            description=st.text_area("Brief Description of Work*",height=80)
+            description = st.text_area("Brief Description of Work*", height=80, placeholder="Describe the work to be performed...")
             
             st.markdown("**🦺 PPE Required**")
-            ppe_options=["Hard Hat","Face Shield","Welder Gloves","Electrical Gloves","Body Harness","Foot Protection","Ear Plug/Earmuffs","Chemical Goggles","Safety Shoes","Respirator","Safety Glass","Fall Protection"]
-            ppe_selected=st.multiselect("Select PPE",ppe_options)
+            ppe_selected = st.multiselect("Select PPE", [
+                "Hard Hat", "Face Shield", "Welder Gloves", "Electrical Gloves", "Body Harness",
+                "Foot Protection", "Ear Plug/Earmuffs", "Chemical Goggles", "Safety Shoes",
+                "Respirator", "Safety Glass", "Fall Protection"
+            ])
             
             st.markdown("**🔧 Equipment Required**")
-            equip_options=["Fire Extinguishers","Warning Signs","Walkie-talkie","Ladder/Scaffold","Fire Hoses","Non-Sparking Tools","Gas Detector","Additional Lighting"]
-            equip_selected=st.multiselect("Select Equipment",equip_options)
+            equip_selected = st.multiselect("Select Equipment", [
+                "Fire Extinguishers", "Warning Signs", "Walkie-talkie", "Ladder/Scaffold",
+                "Fire Hoses", "Non-Sparking Tools", "Gas Detector", "Additional Lighting"
+            ])
             
-            with st.expander("📋 General Instructions"):
-                st.markdown("1. ID card mandatory for all workers.\n2. Safety Training daily at 9:30 AM.\n3. Noisy works after 6:00 PM.\n4. Clear debris immediately after work.\n5. Only service lifts for materials.\n6. Smoking strictly prohibited.\n7. No obstruction to fire routes.\n8. Contractor liable for all injuries/damages.")
+            with st.expander("📋 General Instructions to Contractors"):
+                st.markdown("""
+                1. ID card mandatory for all workers
+                2. Safety Training daily at 9:30 AM
+                3. Noisy works after 6:00 PM only
+                4. Clear debris immediately after work
+                5. Only service lifts for materials
+                6. Smoking strictly prohibited
+                7. No obstruction to fire escape routes
+                8. Contractor liable for all injuries/damages
+                """)
             
             st.markdown("---")
-            submitted=st.form_submit_button("🛡️ Submit Work Permit",use_container_width=True,type="primary")
+            
+            submitted = st.form_submit_button("🛡️ Submit Work Permit", use_container_width=True, type="primary")
             
             if submitted:
-                if rname and rdesignation and rcontact and description and sub_location and sub_location!="Select building first":
-                    now=datetime.now().isoformat()
-                    cnt=len(DB.get_all("work_permits",fc,1000))
-                    permit_data={
-                        "facility_code":fc,"permit_number":f"PTW-{fc}-{datetime.now().year}-{str(cnt+1).zfill(4)}",
-                        "document_no":document_no,"permit_type":permit_type,"department":dept,
-                        "title":description[:100],"description":description,
-                        "raised_by_name":rname,"raised_by_designation":rdesignation,
-                        "requester_contact":rcontact,"process_owner_name":powner,
-                        "process_owner_contact":pcontact,"site_coordinator_name":scoordinator,
-                        "workers_count":workers,"work_location":full_location,
-                        "start_datetime":f"{sd}T{stime}","end_datetime":f"{ed}T{etime}",
-                        "ppe_required":ppe_selected,"equipment_required":equip_selected,
-                        "status":"pending","workflow_stage":"submitted",
-                        "submitted_at":now,"created_at":now
+                errors = []
+                if not rname: errors.append("Requester Name")
+                if not rdesignation: errors.append("Requester Designation")
+                if not rcontact: errors.append("Requester Contact No")
+                if not description: errors.append("Description of Work")
+                if not sub_location or sub_location == "Select building first": errors.append("Sub-Location")
+                
+                if errors:
+                    st.error(f"⚠️ Please fill all required fields: {', '.join(errors)}")
+                else:
+                    now = datetime.now().isoformat()
+                    cnt = len(DB.get_all("work_permits", fc, 1000))
+                    permit_number = f"PTW-{fc}-{datetime.now().year}-{str(cnt + 1).zfill(4)}"
+                    
+                    permit_data = {
+                        "facility_code": fc,
+                        "permit_number": permit_number,
+                        "document_no": document_no,
+                        "permit_type": permit_type,
+                        "department": dept,
+                        "title": description[:100],
+                        "description": description,
+                        "raised_by_name": rname,
+                        "raised_by_designation": rdesignation,
+                        "requester_contact": rcontact,
+                        "process_owner_name": powner,
+                        "process_owner_contact": pcontact,
+                        "site_coordinator_name": scoordinator,
+                        "workers_count": workers,
+                        "work_location": full_location,
+                        "start_datetime": f"{sd}T{stime}",
+                        "end_datetime": f"{ed}T{etime}",
+                        "ppe_required": ppe_selected,
+                        "equipment_required": equip_selected,
+                        "status": "pending",
+                        "workflow_stage": "submitted",
+                        "submitted_at": now,
+                        "created_at": now
                     }
-                    result=DB.insert("work_permits",permit_data)
+                    
+                    result = DB.insert("work_permits", permit_data)
+                    
                     if result:
-                        # Email Level 1 authorizers for this department
-                        authorizers=get_workflow_people(fc,1,dept)
+                        # Notify authorizers
+                        authorizers = get_workflow_people(fc, 1, dept)
                         for a in authorizers:
-                            send_email_notification(a.get("person_email",""),f"📋 New Permit {permit_data['permit_number']} Requires Authorization",f"<h3>New Work Permit Submitted</h3><p>Permit <b>{permit_data['permit_number']}</b> has been submitted by {rname}.</p><p><b>Department:</b> {dept}</p><p><b>Location:</b> {full_location}</p><p><b>Description:</b> {description[:200]}</p><p>Please review and authorize.</p>")
-                        st.success("✅ Work Permit Submitted Successfully!")
+                            send_email_notification(
+                                a.get("person_email", ""),
+                                f"📋 New Permit {permit_number} Requires Authorization",
+                                f"<h3>New Work Permit Submitted</h3>"
+                                f"<p><b>Permit:</b> {permit_number}</p>"
+                                f"<p><b>Type:</b> {permit_type}</p>"
+                                f"<p><b>Department:</b> {dept}</p>"
+                                f"<p><b>Location:</b> {full_location}</p>"
+                                f"<p><b>Raised by:</b> {rname} ({rdesignation})</p>"
+                                f"<p><b>Description:</b> {description[:300]}</p>"
+                                f"<p>Please review and authorize at your earliest convenience.</p>"
+                            )
+                        
+                        st.success(f"✅ Work Permit {permit_number} Submitted Successfully!")
                         st.info(f"📧 Authorization requests sent to {len(authorizers)} team lead(s)")
                         st.balloons()
                         st.rerun()
-                else:
-                    st.error("⚠️ Please fill all required fields marked with *")
+                    else:
+                        st.error("❌ Failed to submit permit. Please try again.")
     
     # ============================================
     # TAB 3: REPORTS
     # ============================================
     with tab3:
         st.markdown("### 📊 Work Permit Reports")
-        wp_all=DB.get_all("work_permits",fc,500)
-        if wp_all:
-            df=pd.DataFrame(wp_all)
-            c1,c2,c3,c4=st.columns(4)
-            with c1:st.metric("📋 Total",len(df))
-            with c2:st.metric("🟢 Approved",len(df[df["workflow_stage"]=="approved"]) if "workflow_stage" in df.columns else 0)
-            with c3:st.metric("⏳ Pending",len(df[df["workflow_stage"].isin(["submitted","authorized","confirmed"])]) if "workflow_stage" in df.columns else 0)
-            with c4:st.metric("❌ Rejected",len(df[df["workflow_stage"]=="rejected"]) if "workflow_stage" in df.columns else 0)
+        wp_all = DB.get_all("work_permits", fc, 500)
+        
+        if wp_all and len(wp_all) > 0:
+            df = pd.DataFrame(wp_all)
             
-            # Calculate average lead time
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("📋 Total", len(df))
+            with c2: st.metric("🟢 Approved", len(df[df["workflow_stage"] == "approved"]) if "workflow_stage" in df.columns else 0)
+            with c3: st.metric("⏳ Pending", len(df[df["workflow_stage"].isin(["submitted", "authorized", "confirmed"])]) if "workflow_stage" in df.columns else 0)
+            with c4: st.metric("❌ Rejected", len(df[df["workflow_stage"] == "rejected"]) if "workflow_stage" in df.columns else 0)
+            
+            # Average approval time
             if "submitted_at" in df.columns and "approved_at" in df.columns:
-                approved_df=df[df["approved_at"].notna()]
-                if len(approved_df)>0:
-                    lead_times=[]
-                    for _,r in approved_df.iterrows():
+                approved = df[df["approved_at"].notna()]
+                if len(approved) > 0:
+                    times = []
+                    for _, r in approved.iterrows():
                         try:
-                            sub=pd.to_datetime(r["submitted_at"])
-                            app=pd.to_datetime(r["approved_at"])
-                            lead_times.append((app-sub).total_seconds()/3600)
+                            s = pd.to_datetime(r["submitted_at"])
+                            a = pd.to_datetime(r["approved_at"])
+                            times.append((a - s).total_seconds() / 3600)
                         except: pass
-                    avg_lead=sum(lead_times)/len(lead_times) if lead_times else 0
-                    st.metric("⏱️ Avg Approval Time",f"{avg_lead:.1f} hrs")
+                    if times:
+                        st.metric("⏱️ Avg Approval Time", f"{sum(times)/len(times):.1f} hrs")
             
             st.markdown("---")
-            st.markdown("### 📅 Monthly Reports")
-            months=["January","February","March","April","May","June","July","August","September","October","November","December"]
+            st.markdown("### 📅 Monthly Breakdown")
+            months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
             
-            cols=st.columns(6)
-            for i,m in enumerate(months[:6]):
+            cols = st.columns(6)
+            for i in range(6):
                 with cols[i]:
-                    m_idx=i+1
-                    count=len(df[pd.to_datetime(df["created_at"]).dt.month==m_idx]) if "created_at" in df.columns else 0
-                    st.markdown(f"**{m[:3]}**")
+                    m_idx = i + 1
+                    count = len(df[pd.to_datetime(df["created_at"]).dt.month == m_idx]) if "created_at" in df.columns else 0
+                    st.markdown(f"**{months[i]}**")
                     st.markdown(f"### {count}")
-                    if st.button("📥",key=f"rpt_{m}"):
-                        month_df=df[pd.to_datetime(df["created_at"]).dt.month==m_idx] if "created_at" in df.columns else df
-                        csv=month_df.to_csv(index=False)
-                        st.download_button("⬇️ Download CSV",csv,f"permits_{m}_{2026}.csv","text/csv")
             
-            cols2=st.columns(6)
-            for i,m in enumerate(months[6:]):
+            cols2 = st.columns(6)
+            for i in range(6):
                 with cols2[i]:
-                    m_idx=i+7
-                    count=len(df[pd.to_datetime(df["created_at"]).dt.month==m_idx]) if "created_at" in df.columns else 0
-                    st.markdown(f"**{m[:3]}**")
+                    m_idx = i + 7
+                    count = len(df[pd.to_datetime(df["created_at"]).dt.month == m_idx]) if "created_at" in df.columns else 0
+                    st.markdown(f"**{months[i+6]}**")
                     st.markdown(f"### {count}")
-                    if st.button("📥",key=f"rpt2_{m}"):
-                        month_df=df[pd.to_datetime(df["created_at"]).dt.month==m_idx] if "created_at" in df.columns else df
-                        csv=month_df.to_csv(index=False)
-                        st.download_button("⬇️ Download CSV",csv,f"permits_{m}_{2026}.csv","text/csv")
             
             st.markdown("---")
-            if st.button("📄 Preview Full Report",use_container_width=True):
-                show_cols=[c for c in ["permit_number","permit_type","raised_by_name","department","work_location","workflow_stage","submitted_at","authorized_at","confirmed_at","approved_at"] if c in df.columns]
-                st.dataframe(df[show_cols],use_container_width=True,hide_index=True)
+            if st.button("📄 Preview Full Report", use_container_width=True):
+                show_cols = [c for c in ["permit_number", "permit_type", "raised_by_name", "department", "work_location", "workflow_stage", "submitted_at", "authorized_at", "confirmed_at", "approved_at"] if c in df.columns]
+                st.dataframe(df[show_cols], use_container_width=True, hide_index=True)
+            
+            csv = df.to_csv(index=False)
+            st.download_button("⬇️ Download CSV Report", csv, f"work_permits_report_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
+        else:
+            st.info("No permits to report yet.")
     
     # ============================================
     # TAB 4: WORKFLOW CONFIG
     # ============================================
     with tab4:
         st.markdown("### ⚙️ Workflow Configuration")
-        st.caption("Configure who authorizes, confirms, and approves permits")
+        st.caption("Manage who authorizes, confirms, and approves work permits")
         
-        # Show current config
-        for level in [1,2,3]:
-            level_names={1:"Level 1 — Authorization",2:"Level 2 — Confirmation",3:"Level 3 — Approval"}
-            people=get_workflow_people(fc,level)
-            st.markdown(f"**{level_names[level]}**")
+        for level in [1, 2, 3]:
+            names = {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}
+            st.markdown(f"**{names[level]}**")
+            people = get_workflow_people(fc, level)
             if people:
                 for p in people:
-                    dept_filter=p.get("department_filter",[])
-                    dept_str=", ".join(dept_filter) if dept_filter else "All Departments"
-                    st.markdown(f"- {p.get('person_name','')} ({p.get('person_email','')}) — {dept_str}")
+                    dept_str = ", ".join(p.get("department_filter", [])) if p.get("department_filter") else "All Departments"
+                    st.markdown(f"- 👤 {p.get('person_name', '')} — 📧 {p.get('person_email', '')} — 🏢 {dept_str}")
             else:
                 st.caption("No people configured")
             st.markdown("---")
         
-        with st.form("wf_add_form"):
+        with st.form("wf_add_person"):
             st.markdown("**➕ Add Person to Workflow**")
-            c1,c2,c3=st.columns(3)
+            c1, c2 = st.columns(2)
             with c1:
-                new_level=st.selectbox("Level",[1,2,3],format_func=lambda x:{1:"Level 1 — Authorization",2:"Level 2 — Confirmation",3:"Level 3 — Approval"}[x])
-                new_name=st.text_input("Name*")
+                new_level = st.selectbox("Level", [1, 2, 3], format_func=lambda x: {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}[x])
+                new_name = st.text_input("Full Name*")
             with c2:
-                new_email=st.text_input("Email*")
-                new_dept=st.selectbox("Department Filter (optional)",["All Departments","Engineering — Electrical","Engineering — HVAC","Engineering — Plumbing","Engineering — Vertical Transportation (Lifts)","Facility Management — Hard Services","Facility Management — FM Operations & Helpdesk","Facility Management — HSSE Safety & Compliance","Security — Man Guarding Operations"])
-            with c3:
-                st.markdown("<br>",unsafe_allow_html=True)
+                new_email = st.text_input("Email Address*")
+                new_dept = st.selectbox("Department (or All)", ["All Departments", "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing", "Engineering — Vertical Transportation (Lifts)", "Facility Management — Hard Services", "Facility Management — FM Operations & Helpdesk", "Facility Management — HSSE Safety & Compliance", "Security — Man Guarding Operations"])
             
-            if st.form_submit_button("➕ Add Person",use_container_width=True):
+            if st.form_submit_button("➕ Add Person", use_container_width=True, type="primary"):
                 if new_name and new_email:
-                    dept_filter=["All Departments"] if new_dept=="All Departments" else [new_dept]
-                    DB.insert("workflow_config",{"facility_code":fc,"workflow_type":"work_permit","level_number":new_level,"level_name":{1:"Authorizer",2:"Confirmer",3:"Approver"}[new_level],"person_name":new_name,"person_email":new_email,"department_filter":dept_filter})
-                    st.success(f"✅ {new_name} added to Level {new_level}!");st.rerun()
+                    dept_filter = [] if new_dept == "All Departments" else [new_dept]
+                    DB.insert("workflow_config", {
+                        "facility_code": fc,
+                        "workflow_type": "work_permit",
+                        "level_number": new_level,
+                        "level_name": {1: "Authorizer", 2: "Confirmer", 3: "Approver"}[new_level],
+                        "person_name": new_name,
+                        "person_email": new_email,
+                        "department_filter": dept_filter
+                    })
+                    st.success(f"✅ {new_name} added to Level {new_level}!")
+                    st.rerun()
+                else:
+                    st.error("Name and Email are required")
 
 # ============================================
 # TICKETS + HELPDESK
