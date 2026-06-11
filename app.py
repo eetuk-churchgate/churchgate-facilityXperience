@@ -1914,7 +1914,26 @@ def main():
         with open(wm_path, "rb") as f:
             wm_b64 = base64.b64encode(f.read()).decode()
         wm_ext = "jpeg" if fc == "WTC" else "png"
-        st.markdown(f"""<style>.main > div::before {{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;background-image:url(data:image/{wm_ext};base64,{wm_b64});background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.06;z-index:0;pointer-events:none;}}</style>""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <style>
+            .stApp::after {{
+                content: '';
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 500px;
+                height: 500px;
+                background-image: url(data:image/{wm_ext};base64,{wm_b64});
+                background-size: contain;
+                background-repeat: no-repeat;
+                background-position: center;
+                opacity: 0.06;
+                z-index: 0;
+                pointer-events: none;
+            }}
+        </style>
+        """, unsafe_allow_html=True)
     
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
