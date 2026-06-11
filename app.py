@@ -10,10 +10,15 @@ import pandas as pd
 import base64
 from pathlib import Path
 import os
+import hashlib
+import secrets
 from dotenv import load_dotenv
 from supabase import create_client
 import plotly.express as px
 import plotly.graph_objects as go
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 load_dotenv()
 
