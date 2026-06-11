@@ -1813,7 +1813,7 @@ def check_password(password, stored_hash):
     return hashlib.sha256(password.encode()).hexdigest() == stored_hash
 
 def login_page():
-    """Show login form with split layout"""
+    """Show login form with background image"""
     
     bg_path = Path("WTC Abuja 7 (1).jpg")
     bg_base64 = ""
@@ -1821,41 +1821,40 @@ def login_page():
         with open(bg_path, "rb") as f:
             bg_base64 = base64.b64encode(f.read()).decode()
     
-    # CSS
+    # Full page background with centered login box near the bottom
     st.markdown(f"""
     <style>
-        .login-split {{ display: flex; min-height: 100vh; }}
-        .login-left {{ flex: 1; background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#1a1a1a'}; display: flex; align-items: flex-end; padding: 3rem; position: relative; }}
-        .login-left::before {{ content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.8) 100%); }}
-        .login-left-content {{ position: relative; z-index: 1; color: white; }}
-        .login-left-content h2 {{ font-size: 2rem; font-weight: 800; margin: 0; }}
-        .login-left-content p {{ font-size: 1rem; opacity: 0.8; margin-top: 0.5rem; }}
-        .login-right {{ flex: 0 0 450px; display: flex; align-items: center; justify-content: center; background: #e8e8e8; padding: 2rem; }}
-        @media (max-width: 900px) {{ .login-split {{ flex-direction: column; }} .login-left {{ flex: 0 0 180px; }} }}
+        .stApp {{
+            background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#e8e8e8'};
+            background-attachment: fixed;
+        }}
+        .login-wrapper {{
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            min-height: 85vh;
+            padding-bottom: 5vh;
+        }}
+        .login-card {{
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            width: 380px;
+        }}
     </style>
-    <div class="login-split">
-        <div class="login-left">
-            <div class="login-left-content">
-                <h2>World Trade Center</h2>
-                <p>Churchgate Group • Abuja</p>
-                <p style="font-size:0.85rem;opacity:0.6;">22-Floor Office Tower • 24-Floor Residential Tower • Recreation Center</p>
+    <div class="login-wrapper">
+        <div class="login-card">
+            <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;margin-bottom:0.3rem;">
+                {get_nav_logo()}
+                <div style="width:1px;height:24px;background:#ddd;"></div>
+                <h1 style="font-weight:800;color:#1a1a1a;margin:0;font-size:1.3rem;">facility<span style="color:#CC0000;">X</span>perience</h1>
             </div>
-        </div>
-        <div class="login-right">
+            <p style="color:#666;margin-bottom:1.2rem;font-size:0.85rem;">Churchgate Group</p>
     """, unsafe_allow_html=True)
     
-    # White login box
-    st.markdown(f"""
-    <div style="background:white;border-radius:16px;padding:2.5rem 2rem;box-shadow:0 10px 40px rgba(0,0,0,0.1);width:100%;max-width:400px;">
-        <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;margin-bottom:0.3rem;">
-            {get_nav_logo()}
-            <div style="width:1px;height:24px;background:#ddd;"></div>
-            <h1 style="font-weight:800;color:#1a1a1a;margin:0;font-size:1.3rem;">facility<span style="color:#CC0000;">X</span>perience</h1>
-        </div>
-        <p style="color:#666;margin-bottom:1.5rem;font-size:0.85rem;text-align:center;">Churchgate Group</p>
-    """, unsafe_allow_html=True)
-    
-    # Single form
     with st.form("fx_login"):
         email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
         password = st.text_input("🔑 Password", type="password")
@@ -1888,9 +1887,7 @@ def login_page():
         st.session_state.show_forgot = True
         st.rerun()
     
-    # Close the white box and layout divs
     st.markdown("""
-        </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
