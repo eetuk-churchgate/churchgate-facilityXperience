@@ -1909,11 +1909,18 @@ def main():
     
     # Watermark
     fc = st.session_state.get("facility", "WTC")
-    wm_path = Path("wtc-logo.jpg") if fc == "WTC" else Path("churchgate-logo.png")
+    if fc == "WTC":
+        wm_path = Path("WTC-logo.jpg")
+        if not wm_path.exists():
+            wm_path = Path("wtc-logo.jpg")
+        wm_ext = "jpeg"
+    else:
+        wm_path = Path("churchgate-logo.png")
+        wm_ext = "png"
+    
     if wm_path.exists():
         with open(wm_path, "rb") as f:
             wm_b64 = base64.b64encode(f.read()).decode()
-        wm_ext = "jpeg" if fc == "WTC" else "png"
         st.markdown(f"""
         <style>
             .stApp::after {{
@@ -1928,12 +1935,14 @@ def main():
                 background-size: contain;
                 background-repeat: no-repeat;
                 background-position: center;
-                opacity: 0.06;
+                opacity: 0.10;
                 z-index: 0;
                 pointer-events: none;
             }}
         </style>
         """, unsafe_allow_html=True)
+    else:
+        st.write(f"Debug: Watermark file not found: {wm_path}")
     
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
