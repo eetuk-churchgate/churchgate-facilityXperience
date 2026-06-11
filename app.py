@@ -276,11 +276,31 @@ def sidebar():
 # ============================================
 def page_cc():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{});k=DB.get_kpis(fc);logo=get_facility_logo(fc,70)
-    st.markdown(f'<div class="churchgate-header" style="display:flex;align-items:center;gap:1.5rem;position:relative;overflow:hidden;"><div style="flex-shrink:0;z-index:1;">{logo}</div><div style="flex:1;z-index:1;"><h1 style="margin:0;font-weight:800;font-size:1.5rem;color:{CHURCHGATE_DARK};">{info.get("full_name",fc)}</h1><p style="margin:0.2rem 0 0 0;color:{CHURCHGATE_GREY};font-size:0.8rem;">📍 {info.get("city","")} • {info.get("desc","")}</p></div><div style="text-align:right;z-index:1;"><div style="font-size:0.6rem;color:#888;">LIVE DATA</div><div style="font-size:1.1rem;font-weight:700;">{datetime.now().strftime("%H:%M:%S")}</div><div style="font-size:0.6rem;color:#888;">{datetime.now().strftime("%A, %d %B %Y")}</div></div><div style="position:absolute;right:20px;top:50%;transform:translateY(-50%);opacity:0.04;z-index:0;pointer-events:none;">{logo}</div></div>',unsafe_allow_html=True)
-    kpi=[("📋 Open WOs",k["open_wo"]),("🛂 Visitors Today",k["visitors"]),("🚨 Incidents",k["open_inc"]),("🎫 Open Tickets",k["open_tix"]),("🏗️ Assets",k["assets"]),("🔧 PPM Due",k["ppm_due"]),("🛡️ Pending Permits",k["pending_permits"])]
+    
+    st.markdown(f"""
+    <div style="background:white;border-radius:12px;padding:1.5rem 2rem;margin-bottom:1.5rem;border-left:4px solid {CHURCHGATE_RED};box-shadow:0 1px 3px rgba(0,0,0,0.06);position:relative;overflow:hidden;">
+        <div style="position:absolute;right:30px;top:50%;transform:translateY(-50%);opacity:0.04;z-index:0;pointer-events:none;width:180px;">{logo}</div>
+        <div style="display:flex;align-items:center;gap:1.5rem;position:relative;z-index:1;">
+            <div style="flex-shrink:0;">{logo}</div>
+            <div style="flex:1;">
+                <h1 style="margin:0;font-weight:800;font-size:1.5rem;color:{CHURCHGATE_DARK};">{info.get("full_name",fc)}</h1>
+                <p style="margin:0.2rem 0 0 0;color:{CHURCHGATE_GREY};font-size:0.8rem;">📍 {info.get("city","")} • {info.get("desc","")}</p>
+            </div>
+            <div style="text-align:right;">
+                <div style="font-size:0.6rem;color:#888;">LIVE DATA</div>
+                <div style="font-size:1.1rem;font-weight:700;">{datetime.now().strftime("%H:%M:%S")}</div>
+                <div style="font-size:0.6rem;color:#888;">{datetime.now().strftime("%A, %d %B %Y")}</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # KPI Row with proper spacing
+    kpi=[("📋 Open WOs",k["open_wo"]),("🛂 Visitors",k["visitors"]),("🚨 Incidents",k["open_inc"]),("🎫 Tickets",k["open_tix"]),("🏗️ Assets",k["assets"]),("🔧 PPM Due",k["ppm_due"]),("🛡️ Permits",k["pending_permits"])]
     cols=st.columns(7)
     for i,(l,v) in enumerate(kpi):
-        with cols[i]:st.markdown(f'<div class="fx-card"><div class="fx-card-label">{l}</div><div class="fx-card-value">{v}</div></div>',unsafe_allow_html=True)
+        with cols[i]:
+            st.markdown(f'<div class="fx-card"><div class="fx-card-label">{l}</div><div class="fx-card-value">{v}</div></div>',unsafe_allow_html=True)
     st.markdown("---")
     c1,c2=st.columns(2)
     with c1:
@@ -1920,7 +1940,7 @@ def main():
     greeting = "Good Morning" if hour < 12 else "Good Afternoon" if hour < 17 else "Good Evening"
     
     st.markdown(f"""
-    <div style="background:white;padding:0.8rem 1.5rem;border-radius:8px;margin:0.5rem 1rem 0 1rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+    <div style="background:white;padding:0.8rem 1.5rem;border-radius:8px;margin:0.5rem 1rem 1.5rem 1rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
         <div style="display:flex;align-items:center;gap:1rem;">
             <div style="width:42px;height:42px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1rem;">{user_name[:2].upper()}</div>
             <div>
