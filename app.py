@@ -1799,9 +1799,26 @@ ROUTER={
 
 def main():
     inject_css()
-    if "facility" not in st.session_state:st.session_state.facility="WTC"
-    if "page" not in st.session_state:st.session_state.page="cc"
-    topnav();sidebar()
-    ROUTER.get(st.session_state.page,page_cc)()
+    
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+    if "show_forgot" not in st.session_state:
+        st.session_state.show_forgot = False
+    if "facility" not in st.session_state:
+        st.session_state.facility = "WTC"
+    if "page" not in st.session_state:
+        st.session_state.page = "cc"
+    
+    if not st.session_state.authenticated:
+        if st.session_state.show_forgot:
+            forgot_password_page()
+        else:
+            login_page()
+        return
+    
+    topnav()
+    sidebar()
+    ROUTER.get(st.session_state.page, page_cc)()
 
-if __name__=="__main__":main()
+if __name__ == "__main__":
+    main()
