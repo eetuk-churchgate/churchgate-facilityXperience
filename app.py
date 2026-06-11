@@ -1821,97 +1821,18 @@ def login_page():
         with open(bg_path, "rb") as f:
             bg_base64 = base64.b64encode(f.read()).decode()
     
+    # CSS
     st.markdown(f"""
     <style>
-        .login-split {{
-            display: flex;
-            min-height: 100vh;
-            margin: 0;
-            padding: 0;
-        }}
-        .login-left {{
-            flex: 1;
-            background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#1a1a1a'};
-            display: flex;
-            align-items: flex-end;
-            padding: 3rem;
-            position: relative;
-        }}
-        .login-left::before {{
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(180deg, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.8) 100%);
-        }}
-        .login-left-content {{
-            position: relative;
-            z-index: 1;
-            color: white;
-        }}
-        .login-left-content h2 {{
-            font-size: 2rem;
-            font-weight: 800;
-            margin: 0;
-            color: white;
-        }}
-        .login-left-content p {{
-            font-size: 1rem;
-            opacity: 0.8;
-            margin-top: 0.5rem;
-        }}
-        .login-right {{
-            flex: 0 0 480px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f0f0f0;
-            padding: 2rem;
-        }}
-        .login-box {{
-            background: white;
-            border-radius: 16px;
-            padding: 2.5rem 2rem;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-        }}
-        .login-logo-row {{
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.6rem;
-            margin-bottom: 0.3rem;
-        }}
-        .login-logo-row img {{
-            height: 30px;
-        }}
-        .login-divider {{
-            width: 1px;
-            height: 24px;
-            background: #ddd;
-        }}
-        .login-title {{
-            font-weight: 800;
-            color: #1a1a1a;
-            margin: 0;
-            font-size: 1.3rem;
-        }}
-        .login-title span {{
-            color: #CC0000;
-        }}
-        .login-subtitle {{
-            color: #666;
-            margin-bottom: 1.5rem;
-            font-size: 0.85rem;
-            text-align: center;
-        }}
-        @media (max-width: 900px) {{
-            .login-split {{ flex-direction: column; }}
-            .login-left {{ flex: 0 0 180px; }}
-            .login-right {{ flex: 1; }}
-        }}
+        .login-split {{ display: flex; min-height: 100vh; }}
+        .login-left {{ flex: 1; background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#1a1a1a'}; display: flex; align-items: flex-end; padding: 3rem; position: relative; }}
+        .login-left::before {{ content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.8) 100%); }}
+        .login-left-content {{ position: relative; z-index: 1; color: white; }}
+        .login-left-content h2 {{ font-size: 2rem; font-weight: 800; margin: 0; }}
+        .login-left-content p {{ font-size: 1rem; opacity: 0.8; margin-top: 0.5rem; }}
+        .login-right {{ flex: 0 0 450px; display: flex; align-items: center; justify-content: center; background: #e8e8e8; padding: 2rem; }}
+        @media (max-width: 900px) {{ .login-split {{ flex-direction: column; }} .login-left {{ flex: 0 0 180px; }} }}
     </style>
-    
     <div class="login-split">
         <div class="login-left">
             <div class="login-left-content">
@@ -1921,17 +1842,21 @@ def login_page():
             </div>
         </div>
         <div class="login-right">
-            <div class="login-box">
-                <div class="login-logo-row">
-                    {get_nav_logo()}
-                    <div class="login-divider"></div>
-                    <h1 class="login-title">facility<span>X</span>perience</h1>
-                </div>
-                <p class="login-subtitle">Churchgate Group</p>
     """, unsafe_allow_html=True)
     
-    # Form with unique key
-    with st.form(key="fx_login_form"):
+    # White login box
+    st.markdown(f"""
+    <div style="background:white;border-radius:16px;padding:2.5rem 2rem;box-shadow:0 10px 40px rgba(0,0,0,0.1);width:100%;max-width:400px;">
+        <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;margin-bottom:0.3rem;">
+            {get_nav_logo()}
+            <div style="width:1px;height:24px;background:#ddd;"></div>
+            <h1 style="font-weight:800;color:#1a1a1a;margin:0;font-size:1.3rem;">facility<span style="color:#CC0000;">X</span>perience</h1>
+        </div>
+        <p style="color:#666;margin-bottom:1.5rem;font-size:0.85rem;text-align:center;">Churchgate Group</p>
+    """, unsafe_allow_html=True)
+    
+    # Single form
+    with st.form("fx_login"):
         email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
         password = st.text_input("🔑 Password", type="password")
         col1, col2 = st.columns(2)
@@ -1963,8 +1888,9 @@ def login_page():
         st.session_state.show_forgot = True
         st.rerun()
     
+    # Close the white box and layout divs
     st.markdown("""
-            </div>
+        </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
