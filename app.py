@@ -1822,49 +1822,53 @@ def login_page():
     if bg_base64:
         st.markdown(f"""<style>.stApp {{background: url(data:image/jpeg;base64,{bg_base64}) center/cover no-repeat; background-attachment: fixed;}}</style>""", unsafe_allow_html=True)
     
-    # Show error if previous login failed
-    if st.session_state.get("login_error"):
-        st.error(st.session_state.login_error)
-        st.session_state.login_error = None
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
     
-    st.markdown("""
-    <div style="display:flex;justify-content:center;align-items:center;min-height:100vh;">
-        <div style="width:380px;">
+    # Single HTML form - no Streamlit form at all
+    st.markdown(f"""
+    <div style="display:flex;justify-content:center;">
+        <div style="width:380px;background:white;border-radius:16px;padding:2rem;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;margin-bottom:0.5rem;">
+                {get_nav_logo()}
+                <div style="width:1px;height:24px;background:#ddd;"></div>
+                <span style="font-weight:800;color:#1a1a1a;font-size:1.2rem;">facility<span style="color:#CC0000;">X</span>perience</span>
+            </div>
+            <p style="color:#666;margin-bottom:1.5rem;font-size:0.85rem;">Churchgate Group</p>
     """, unsafe_allow_html=True)
     
-    st.markdown(f"""<div style="background:white;border-radius:16px 16px 0 0;padding:1.5rem 1.5rem 0.3rem 1.5rem;text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;">{get_nav_logo()}<div style="width:1px;height:24px;background:#ddd;"></div><span style="font-weight:800;color:#1a1a1a;font-size:1.2rem;">facility<span style="color:#CC0000;">X</span>perience</span></div><p style="color:#666;margin:0.3rem 0 0 0;font-size:0.8rem;">Churchgate Group</p></div>""", unsafe_allow_html=True)
+    email = st.text_input("📧 Email", key="login_email", label_visibility="visible")
+    password = st.text_input("🔑 Password", type="password", key="login_password", label_visibility="visible")
     
-    with st.form("fx_login", clear_on_submit=True):
-        email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
-        password = st.text_input("🔑 Password", type="password")
-        c1, c2 = st.columns(2)
-        with c1:
-            submitted = st.form_submit_button("🚀 Sign In", use_container_width=True, type="primary")
-        with c2:
-            forgot = st.form_submit_button("🔑 Forgot?", use_container_width=True)
-        
-        if submitted:
-            if email and password:
-                res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
-                if res.data:
-                    user = res.data
-                    if check_password(password, user.get("password_hash", "")):
-                        st.session_state.authenticated = True
-                        st.session_state.user = user
-                        st.session_state.user_name = user.get("name", "")
-                        st.session_state.user_role = user.get("role", "staff")
-                        supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
-                        st.rerun()
-                    else:
-                        st.session_state.login_error = "Invalid password"
-                        st.rerun()
-                else:
-                    st.session_state.login_error = "User not found"
+    c1, c2 = st.columns(2)
+    with c1:
+        login_btn = st.button("🚀 Sign In", use_container_width=True, type="primary", key="login_btn")
+    with c2:
+        forgot_btn = st.button("🔑 Forgot?", use_container_width=True, key="forgot_btn")
+    
+    st.markdown("</div></div>", unsafe_allow_html=True)
+    
+    if login_btn:
+        if email and password:
+            res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
+            if res.data:
+                user = res.data
+                if check_password(password, user.get("password_hash", "")):
+                    st.session_state.authenticated = True
+                    st.session_state.user = user
+                    st.session_state.user_name = user.get("name", "")
+                    st.session_state.user_role = user.get("role", "staff")
+                    supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
                     st.rerun()
-        
-        if forgot:
-            st.session_state.show_forgot = True
-            st.rerun()
+                else:
+                    st.error("Invalid password")
+            else:
+                st.error("User not found")
+        else:
+            st.error("Please enter email and password")
+    
+    if forgot_btn:
+        st.session_state.show_forgot = True
+        st.rerun()
     
     st.markdown("""
         </div>
