@@ -915,18 +915,19 @@ def page_wp():
                         
                         class WorkPermitPDF(FPDF):
                             def header(self):
-    logo_path = Path("churchgate-logo.png")
-    if logo_path.exists():
-        self.image(str(logo_path), x=14, y=11, h=10)
-    self.set_fill_color(26, 26, 26)
-    self.set_text_color(255, 255, 255)
-    self.set_font('Helvetica', 'B', 14)
-    self.set_xy(14, 23)
-    self.cell(260, 6, 'Work Permit Analytics Report', 0, 0, 'L')
-    self.set_font('Helvetica', '', 9)
-    self.set_xy(14, 29)
-    self.cell(260, 6, f'{info.get("full_name", fc)} | {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
-    self.set_y(38)
+                                # Churchgate logo
+                                logo_path = Path("churchgate-logo.png")
+                                if logo_path.exists():
+                                    self.image(str(logo_path), x=14, y=11, h=10)
+                                self.set_fill_color(26, 26, 26)
+                                self.set_text_color(255, 255, 255)
+                                self.set_font('Helvetica', 'B', 14)
+                                self.set_xy(14, 23)
+                                self.cell(260, 6, 'Work Permit Analytics Report', 0, 0, 'L')
+                                self.set_font('Helvetica', '', 9)
+                                self.set_xy(14, 29)
+                                self.cell(260, 6, f'{info.get("full_name", fc)} | {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
+                                self.set_y(38)
                                 self.set_font('Helvetica', '', 9)
                                 self.set_xy(18, 20)
                                 self.cell(260, 8, f'{info.get("full_name", fc)} | Generated: {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
