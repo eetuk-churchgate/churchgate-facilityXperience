@@ -1814,15 +1814,43 @@ def check_password(password, stored_hash):
 
 def login_page():
     """Show login form"""
+    
+    # Load background image
+    bg_path = Path("WTC Abuja 7 (1).jpg")
+    bg_base64 = ""
+    if bg_path.exists():
+        with open(bg_path, "rb") as f:
+            bg_base64 = base64.b64encode(f.read()).decode()
+    
     st.markdown(f"""
-    <div style="display:flex;justify-content:center;align-items:center;min-height:70vh;">
-        <div style="text-align:center;max-width:400px;width:100%;">
-             <div style="display:flex;align-items:center;justify-content:center;gap:0.8rem;margin-bottom:1rem;">
+    <style>
+        .login-container {{
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#e8e8e8'};
+        }}
+        .login-box {{
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2.5rem 2rem;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 420px;
+            width: 100%;
+            border: 1px solid rgba(255,255,255,0.3);
+        }}
+    </style>
+    <div class="login-container">
+        <div class="login-box">
+            <div style="display:flex;align-items:center;justify-content:center;gap:0.8rem;margin-bottom:1rem;">
                 {get_nav_logo()}
                 <div style="width:1px;height:28px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.5),transparent);"></div>
-                <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;font-size:1.8rem;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
+                <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;font-size:1.5rem;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
             </div>
-            <p style="color:{CHURCHGATE_GREY};margin-bottom:2rem;">Churchgate Group</p>
+            <p style="color:{CHURCHGATE_GREY};margin-bottom:1.5rem;">Churchgate Group</p>
     """, unsafe_allow_html=True)
     
     with st.form("login_form"):
