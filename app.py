@@ -1817,8 +1817,11 @@ def login_page():
     st.markdown(f"""
     <div style="display:flex;justify-content:center;align-items:center;min-height:70vh;">
         <div style="text-align:center;max-width:400px;width:100%;">
-            <div style="font-size:3rem;margin-bottom:0.5rem;">🏢</div>
-            <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
+             <div style="display:flex;align-items:center;justify-content:center;gap:0.8rem;margin-bottom:1rem;">
+                {get_nav_logo()}
+                <div style="width:1px;height:28px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.5),transparent);"></div>
+                <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;font-size:1.8rem;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
+            </div>
             <p style="color:{CHURCHGATE_GREY};margin-bottom:2rem;">Churchgate Group</p>
     """, unsafe_allow_html=True)
     
