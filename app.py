@@ -279,7 +279,7 @@ def page_cc():
     
     st.markdown(f"""
     <div style="background:white;border-radius:12px;padding:1.5rem 2rem;margin-bottom:1.5rem;border-left:4px solid {CHURCHGATE_RED};box-shadow:0 1px 3px rgba(0,0,0,0.06);position:relative;overflow:hidden;">
-        <div style="position:absolute;right:30px;top:50%;transform:translateY(-50%);opacity:0.15;z-index:0;pointer-events:none;width:180px;">{logo}</div>
+        
         <div style="display:flex;align-items:center;gap:1.5rem;position:relative;z-index:1;">
             <div style="flex-shrink:0;">{logo}</div>
             <div style="flex:1;">
@@ -1906,6 +1906,15 @@ def forgot_password_page():
 
 def main():
     inject_css()
+    
+    # Watermark
+    fc = st.session_state.get("facility", "WTC")
+    wm_path = Path("wtc-logo.jpg") if fc == "WTC" else Path("churchgate-logo.png")
+    if wm_path.exists():
+        with open(wm_path, "rb") as f:
+            wm_b64 = base64.b64encode(f.read()).decode()
+        wm_ext = "jpeg" if fc == "WTC" else "png"
+        st.markdown(f"""<style>.main > div::before {{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:400px;height:400px;background-image:url(data:image/{wm_ext};base64,{wm_b64});background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.06;z-index:0;pointer-events:none;}}</style>""", unsafe_allow_html=True)
     
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
