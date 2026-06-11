@@ -216,7 +216,9 @@ def topnav():
         <div style="display:flex;align-items:center;gap:0.8rem;">
             {cg}
             <div style="width:1px;height:22px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.6),transparent);"></div>
-            <span class="fx-brand">facility<span>X</span>perience</span>
+            {cg}
+<div style="width:1px;height:22px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.6),transparent);"></div>
+<span class="fx-brand">facility<span>X</span>perience</span>
         </div>
         <div style="display:flex;align-items:center;gap:0.8rem;">
             <div style="display:flex;align-items:center;gap:0.3rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:50px;padding:0.25rem 0.7rem;font-size:0.6rem;font-weight:600;color:#6EE7B7;">
@@ -875,62 +877,33 @@ def page_wp():
             st.markdown("---")
             
             # ============================================
-            # PDF & HTML REPORT GENERATION
+            # PDF REPORT GENERATION
             # ============================================
             st.markdown("### 📄 Generate Reports")
             
-            # Build report data (shared between both formats)
-            total = len(df)
-            approved_count = len(df[df["workflow_stage"] == "approved"]) if "workflow_stage" in df.columns else 0
-            pending_count = len(df[df["workflow_stage"].isin(["submitted", "authorized", "confirmed"])]) if "workflow_stage" in df.columns else 0
-            rejected_count = len(df[df["workflow_stage"] == "rejected"]) if "workflow_stage" in df.columns else 0
-            
-            lead_times = []
-            delayed = 0
-            if "submitted_at" in df.columns and "approved_at" in df.columns:
-                approved_df = df[df["approved_at"].notna()]
-                for _, r in approved_df.iterrows():
-                    try:
-                        s = pd.to_datetime(r["submitted_at"])
-                        a = pd.to_datetime(r["approved_at"])
-                        hrs = (a - s).total_seconds() / 3600
-                        lead_times.append(hrs)
-                        if hrs > 4: delayed += 1
-                    except: pass
-            
-            avg_lead = sum(lead_times) / len(lead_times) if lead_times else 0
-            dept_data = df["department"].value_counts().to_dict() if "department" in df.columns else {}
-            stage_data = df["workflow_stage"].value_counts().to_dict() if "workflow_stage" in df.columns else {}
-            
-            # Report format selector
             report_format = st.radio("Select Report Format", ["📄 PDF Download", "🌐 HTML Preview & Download"], horizontal=True)
             
             if report_format == "📄 PDF Download":
-                # ============================================
-                # PDF REPORT
-                # ============================================
                 if st.button("📊 Generate PDF Report", use_container_width=True, type="primary"):
                     try:
                         from fpdf import FPDF
                         
                         class WorkPermitPDF(FPDF):
                             def header(self):
-                                # Churchgate logo
                                 logo_path = Path("churchgate-logo.png")
                                 if logo_path.exists():
-                                    self.image(str(logo_path), x=14, y=11, h=10)
+                                    self.image(str(logo_path), x=14, y=8, h=12)
                                 self.set_fill_color(26, 26, 26)
                                 self.set_text_color(255, 255, 255)
                                 self.set_font('Helvetica', 'B', 14)
-                                self.set_xy(14, 23)
+                                self.set_xy(14, 22)
                                 self.cell(260, 6, 'Work Permit Analytics Report', 0, 0, 'L')
-                                self.set_font('Helvetica', '', 9)
-                                self.set_xy(14, 29)
-                                self.cell(260, 6, f'{info.get("full_name", fc)} | {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
-                                self.set_y(38)
-                                self.set_font('Helvetica', '', 9)
-                                self.set_xy(18, 20)
-                                self.cell(260, 8, f'{info.get("full_name", fc)} | Generated: {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
+                                self.set_font('Helvetica', '', 8)
+                                self.set_xy(14, 28)
+                                self.cell(260, 6, f'{info.get("full_name", fc)} | Generated: {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
+                                self.set_draw_color(204, 0, 0)
+                                self.set_line_width(0.5)
+                                self.line(14, 34, 283, 34)
                                 self.set_y(38)
                             
                             def footer(self):
@@ -945,10 +918,10 @@ def page_wp():
                         pdf.set_auto_page_break(auto=True, margin=25)
                         
                         # KPI Section
-                        pdf.set_font('Helvetica', 'B', 13)
+                        pdf.set_font('Helvetica', 'B', 12)
                         pdf.set_text_color(26, 26, 26)
-                        pdf.cell(0, 10, 'Key Performance Indicators', 0, 1)
-                        pdf.ln(3)
+                        pdf.cell(0, 8, 'Key Performance Indicators', 0, 1)
+                        pdf.ln(2)
                         
                         kpis = [
                             ("Total Permits", str(total), 204, 0, 0),
@@ -965,99 +938,115 @@ def page_wp():
                             pdf.set_xy(x, y_start)
                             pdf.set_fill_color(245, 245, 245)
                             pdf.set_draw_color(r, g, b)
-                            pdf.rect(x, y_start, 50, 22, 'DF')
+                            pdf.set_line_width(0.3)
+                            pdf.rect(x, y_start, 50, 20, 'DF')
                             pdf.set_fill_color(r, g, b)
-                            pdf.rect(x, y_start, 3, 22, 'F')
+                            pdf.rect(x, y_start, 3, 20, 'F')
                             pdf.set_xy(x + 6, y_start + 2)
                             pdf.set_font('Helvetica', '', 7)
                             pdf.set_text_color(100, 100, 100)
-                            pdf.cell(40, 5, label.upper(), 0, 0, 'C')
-                            pdf.set_xy(x + 6, y_start + 9)
-                            pdf.set_font('Helvetica', 'B', 16)
+                            pdf.cell(40, 4, label.upper(), 0, 0, 'C')
+                            pdf.set_xy(x + 6, y_start + 8)
+                            pdf.set_font('Helvetica', 'B', 14)
                             pdf.set_text_color(r, g, b)
-                            pdf.cell(40, 8, value, 0, 0, 'C')
+                            pdf.cell(40, 7, value, 0, 0, 'C')
                         
-                        pdf.set_y(y_start + 28)
-                        pdf.ln(5)
+                        pdf.set_y(y_start + 26)
+                        pdf.ln(4)
                         
+                        # Delayed Alert
                         if delayed > 0:
                             pdf.set_fill_color(255, 243, 205)
                             pdf.set_draw_color(245, 158, 11)
                             pdf.set_font('Helvetica', 'B', 9)
                             pdf.set_text_color(146, 76, 14)
-                            pdf.cell(0, 10, f'  WARNING: {delayed} permit(s) exceeded 4-hour approval target.', 1, 1, 'L', True)
-                            pdf.ln(5)
+                            pdf.cell(0, 8, f'  WARNING: {delayed} permit(s) exceeded 4-hour approval target. Review workflow bottlenecks.', 1, 1, 'L', True)
+                            pdf.ln(3)
                         
                         # Department Breakdown
-                        pdf.set_font('Helvetica', 'B', 12)
+                        pdf.set_font('Helvetica', 'B', 11)
                         pdf.set_text_color(26, 26, 26)
-                        pdf.cell(0, 10, 'Department Breakdown', 0, 1)
-                        pdf.set_font('Helvetica', 'B', 8)
-                        pdf.set_fill_color(204, 0, 0)
-                        pdf.set_text_color(255, 255, 255)
-                        pdf.cell(170, 7, '  Department', 1, 0, 'L', True)
-                        pdf.cell(30, 7, 'Permits', 1, 0, 'C', True)
-                        pdf.cell(0, 7, '', 0, 1)
-                        pdf.set_font('Helvetica', '', 8)
-                        pdf.set_text_color(26, 26, 26)
-                        for dept, count in list(dept_data.items())[:15]:
-                            safe_dept = dept.replace('\u2014','-').replace('\u2019',"'").replace('\u201c','"').replace('\u201d','"')[:70]
-                            pdf.cell(170, 6, f'  {safe_dept}', 1, 0, 'L')
-                            pdf.cell(30, 6, str(count), 1, 0, 'C')
-                            pdf.cell(0, 6, '', 0, 1)
-                        pdf.ln(5)
+                        pdf.cell(0, 8, 'Department Breakdown', 0, 1)
+                        pdf.ln(1)
                         
-                        # Stage Distribution
-                        pdf.set_font('Helvetica', 'B', 12)
-                        pdf.set_text_color(26, 26, 26)
-                        pdf.cell(0, 10, 'Workflow Stage Distribution', 0, 1)
-                        pdf.set_font('Helvetica', 'B', 8)
-                        pdf.set_fill_color(204, 0, 0)
-                        pdf.set_text_color(255, 255, 255)
-                        pdf.cell(100, 7, '  Stage', 1, 0, 'L', True)
-                        pdf.cell(30, 7, 'Count', 1, 0, 'C', True)
-                        pdf.cell(0, 7, '', 0, 1)
-                        pdf.set_font('Helvetica', '', 8)
-                        pdf.set_text_color(26, 26, 26)
-                        for stage, count in stage_data.items():
-                            safe_stage = stage.replace('\u2014','-').upper()
-                            pdf.cell(100, 6, f'  {safe_stage}', 1, 0, 'L')
-                            pdf.cell(30, 6, str(count), 1, 0, 'C')
-                            pdf.cell(0, 6, '', 0, 1)
-                        pdf.ln(5)
-                        
-                        # Audit Trail
-                        pdf.set_font('Helvetica', 'B', 12)
-                        pdf.set_text_color(26, 26, 26)
-                        pdf.cell(0, 10, 'Complete Audit Trail', 0, 1)
                         pdf.set_font('Helvetica', 'B', 7)
                         pdf.set_fill_color(204, 0, 0)
                         pdf.set_text_color(255, 255, 255)
-                        col_widths = [38, 30, 45, 38, 38, 38, 38, 22]
+                        pdf.cell(170, 6, '  Department', 1, 0, 'L', True)
+                        pdf.cell(30, 6, 'Permits', 1, 0, 'C', True)
+                        pdf.cell(0, 6, '', 0, 1)
+                        
+                        pdf.set_font('Helvetica', '', 7)
+                        pdf.set_text_color(26, 26, 26)
+                        for dept, count in list(dept_data.items())[:15]:
+                            safe_dept = dept.replace('\u2014','-').replace('\u2019',"'").replace('\u201c','"').replace('\u201d','"')[:65]
+                            pdf.cell(170, 5.5, f'  {safe_dept}', 1, 0, 'L')
+                            pdf.cell(30, 5.5, str(count), 1, 0, 'C')
+                            pdf.cell(0, 5.5, '', 0, 1)
+                        pdf.ln(3)
+                        
+                        # Stage Distribution
+                        pdf.set_font('Helvetica', 'B', 11)
+                        pdf.set_text_color(26, 26, 26)
+                        pdf.cell(0, 8, 'Workflow Stage Distribution', 0, 1)
+                        pdf.ln(1)
+                        
+                        pdf.set_font('Helvetica', 'B', 7)
+                        pdf.set_fill_color(204, 0, 0)
+                        pdf.set_text_color(255, 255, 255)
+                        pdf.cell(100, 6, '  Stage', 1, 0, 'L', True)
+                        pdf.cell(30, 6, 'Count', 1, 0, 'C', True)
+                        pdf.cell(0, 6, '', 0, 1)
+                        
+                        pdf.set_font('Helvetica', '', 7)
+                        pdf.set_text_color(26, 26, 26)
+                        for stage, count in stage_data.items():
+                            safe_stage = stage.replace('\u2014','-').upper()
+                            pdf.cell(100, 5.5, f'  {safe_stage}', 1, 0, 'L')
+                            pdf.cell(30, 5.5, str(count), 1, 0, 'C')
+                            pdf.cell(0, 5.5, '', 0, 1)
+                        pdf.ln(3)
+                        
+                        # Complete Audit Trail
+                        pdf.set_font('Helvetica', 'B', 11)
+                        pdf.set_text_color(26, 26, 26)
+                        pdf.cell(0, 8, 'Complete Audit Trail', 0, 1)
+                        pdf.ln(1)
+                        
+                        pdf.set_font('Helvetica', 'B', 6.5)
+                        pdf.set_fill_color(204, 0, 0)
+                        pdf.set_text_color(255, 255, 255)
+                        col_widths = [35, 28, 42, 36, 36, 36, 36, 22]
                         headers = ['Permit No', 'Raised By', 'Department', 'Submitted', 'Authorized', 'Confirmed', 'Approved', 'Status']
                         for header, width in zip(headers, col_widths):
-                            pdf.cell(width, 7, f' {header}', 1, 0, 'L', True)
+                            pdf.cell(width, 6, f' {header}', 1, 0, 'L', True)
                         pdf.ln()
-                        pdf.set_font('Helvetica', '', 6.5)
+                        
+                        pdf.set_font('Helvetica', '', 6)
                         for _, row in df.iterrows():
                             stage = row.get('workflow_stage', '')
-                            if stage == 'approved': pdf.set_text_color(6, 95, 70)
-                            elif stage == 'rejected': pdf.set_text_color(153, 27, 27)
-                            else: pdf.set_text_color(26, 26, 26)
+                            if stage == 'approved':
+                                pdf.set_text_color(6, 95, 70)
+                            elif stage == 'rejected':
+                                pdf.set_text_color(153, 27, 27)
+                            else:
+                                pdf.set_text_color(26, 26, 26)
+                            
                             values = [
-                                str(row.get('permit_number', ''))[:18],
-                                str(row.get('raised_by_name', ''))[:14],
-                                str(row.get('department', '')).replace('\u2014','-')[:22],
+                                str(row.get('permit_number', ''))[:16],
+                                str(row.get('raised_by_name', ''))[:13],
+                                str(row.get('department', '')).replace('\u2014','-')[:20],
                                 str(format_wat_time(row.get('submitted_at', '')))[:16],
                                 str(format_wat_time(row.get('authorized_at', '')))[:16],
                                 str(format_wat_time(row.get('confirmed_at', '')))[:16],
                                 str(format_wat_time(row.get('approved_at', '')))[:16],
-                                stage.upper()[:8],
+                                stage.upper()[:7],
                             ]
                             for value, width in zip(values, col_widths):
-                                pdf.cell(width, 5.5, f' {value}', 1, 0, 'L')
+                                pdf.cell(width, 5, f' {value}', 1, 0, 'L')
                             pdf.ln()
                         
+                        # Save and download
                         pdf_file = f"/tmp/work_permit_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
                         pdf.output(pdf_file)
                         
@@ -1074,8 +1063,7 @@ def page_wp():
                             type="primary"
                         )
                     except Exception as e:
-                        st.error(f"PDF generation error: {str(e)}")
-                        st.info("Falling back to HTML format...")
+                        st.error(f"PDF Error: {str(e)}")
             
             else:
                 # ============================================
@@ -1126,7 +1114,7 @@ def page_wp():
                     .footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #ddd;padding-top:12px}}
                 </style></head><body>
                <div class="header" style="display:flex;align-items:center;gap:15px;">
-                    <img src="data:image/png;base64,{get_logo_base64()}" height="40" style="filter:brightness(0) invert(1);">
+                    <img src="data:image/png;base64,{get_logo_base64()}" height="40">
                     <div>
                         <h1 style="margin:0;">Work Permit Analytics Report</h1>
                         <p style="margin:5px 0 0 0;font-size:10px;opacity:0.8;">{info.get('full_name',fc)} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p>
