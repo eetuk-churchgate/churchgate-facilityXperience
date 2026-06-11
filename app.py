@@ -1802,6 +1802,90 @@ ROUTER={
     "ac":page_ac,"ic":page_ic,"hot":page_generic,"uc":page_uc,"mis":page_generic,
 }
 
+
+# ============================================
+# LOGIN PAGE
+# ============================================
+def check_password(password, stored_hash):
+    """Verify password"""
+    if not stored_hash:
+        return False
+    return hashlib.sha256(password.encode()).hexdigest() == stored_hash
+
+def login_page():
+    """Show login form"""
+    st.markdown(f"""
+    <div style="display:flex;justify-content:center;align-items:center;min-height:70vh;">
+        <div style="text-align:center;max-width:400px;width:100%;">
+            <div style="font-size:3rem;margin-bottom:0.5rem;">🏢</div>
+            <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
+            <p style="color:{CHURCHGATE_GREY};margin-bottom:2rem;">Churchgate Group</p>
+    """, unsafe_allow_html=True)
+    
+    with st.form("login_form"):
+        email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
+        password = st.text_input("🔑 Password", type="password")
+        col1, col2 = st.columns(2)
+        with col1:
+            login_btn = st.form_submit_button("🚀 Sign In", use_container_width=True, type="primary")
+        with col2:
+            forgot_btn = st.form_submit_button("🔑 Forgot Password?", use_container_width=True)
+    
+    if login_btn and email and password:
+        try:
+            res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
+            if res.data:
+                user = res.data
+                if check_password(password, user.get("password_hash", "")):
+                    st.session_state.authenticated = True
+                    st.session_state.user = user
+                    st.session_state.user_name = user.get("name", "")
+                    st.session_state.user_role = user.get("role", "staff")
+                    supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
+                    st.rerun()
+                else:
+                    st.error("Invalid password")
+            else:
+                st.error("User not found")
+        except Exception as e:
+            st.error(f"Login error: {e}")
+    
+    if forgot_btn:
+        st.session_state.show_forgot = True
+        st.rerun()
+    
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+def forgot_password_page():
+    """Forgot password"""
+    st.markdown(f"""
+    <div style="display:flex;justify-content:center;align-items:center;min-height:70vh;">
+        <div style="text-align:center;max-width:400px;width:100%;">
+            <h2 style="color:{CHURCHGATE_DARK};">Forgot Password</h2>
+            <p style="color:{CHURCHGATE_GREY};">Enter your email</p>
+    """, unsafe_allow_html=True)
+    
+    with st.form("forgot_form"):
+        email = st.text_input("Registered Email")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.form_submit_button("Send Reset Link", use_container_width=True, type="primary"):
+                if email:
+                    res = supabase.table("app_users").select("*").eq("email", email).single().execute()
+                    if res.data:
+                        token = secrets.token_urlsafe(32)
+                        expiry = (datetime.now() + timedelta(hours=1)).isoformat()
+                        DB.update("app_users", res.data["id"], {"reset_token": token, "reset_token_expiry": expiry})
+                        st.success(f"Reset link sent to {email}")
+                    else:
+                        st.error("Email not found")
+        with c2:
+            if st.form_submit_button("Back to Login", use_container_width=True):
+                st.session_state.show_forgot = False
+                st.rerun()
+    
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
 def main():
     inject_css()
     
