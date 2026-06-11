@@ -1810,7 +1810,13 @@ def check_password(password, stored_hash):
     """Verify password"""
     if not stored_hash:
         return False
-    return hashlib.sha256(password.encode()).hexdigest() == stored_hash
+    # Try hex digest
+    if hashlib.sha256(password.encode()).hexdigest() == stored_hash:
+        return True
+    # Try digest
+    if hashlib.sha256(password.encode()).digest() == stored_hash:
+        return True
+    return False
 
 def login_page():
     bg_path = Path("WTC Abuja 7 (1).jpg")
