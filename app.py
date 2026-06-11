@@ -1821,47 +1821,66 @@ def login_page():
         with open(bg_path, "rb") as f:
             bg_base64 = base64.b64encode(f.read()).decode()
     
-    # Full page background with centered login box near the bottom
-    st.markdown(f"""
-    <style>
-        .stApp {{
-            background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#e8e8e8'};
-            background-attachment: fixed;
-        }}
-        .login-wrapper {{
-            display: flex;
-            justify-content: center;
-            align-items: flex-end;
-            min-height: 85vh;
-            padding-bottom: 5vh;
-        }}
-        .login-card {{
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 2rem;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            text-align: center;
-            width: 380px;
-        }}
-    </style>
-    <div class="login-wrapper">
-        <div class="login-card">
-            <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;margin-bottom:0.3rem;">
-                {get_nav_logo()}
-                <div style="width:1px;height:24px;background:#ddd;"></div>
-                <h1 style="font-weight:800;color:#1a1a1a;margin:0;font-size:1.3rem;">facility<span style="color:#CC0000;">X</span>perience</h1>
-            </div>
-            <p style="color:#666;margin-bottom:1.2rem;font-size:0.85rem;">Churchgate Group</p>
-    """, unsafe_allow_html=True)
+    # Full page background
+    if bg_base64:
+        st.markdown(f"""
+        <style>
+            .stApp {{
+                background: url(data:image/jpeg;base64,{bg_base64}) center/cover no-repeat;
+                background-attachment: fixed;
+            }}
+            .login-container {{
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                min-height: 100vh;
+            }}
+            .login-card {{
+                background: rgba(255,255,255,0.95);
+                border-radius: 16px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                width: 380px;
+                overflow: hidden;
+            }}
+            .login-header {{
+                background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+                padding: 1.5rem;
+                text-align: center;
+            }}
+            .login-body {{
+                padding: 1.5rem;
+            }}
+        </style>
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;">
+                        {get_nav_logo()}
+                        <div style="width:1px;height:24px;background:rgba(255,255,255,0.3);"></div>
+                        <span style="font-weight:800;color:white;font-size:1.2rem;">facility<span style="color:#CC0000;">X</span>perience</span>
+                    </div>
+                    <p style="color:rgba(255,255,255,0.7);margin:0.3rem 0 0 0;font-size:0.8rem;">Churchgate Group</p>
+                </div>
+                <div class="login-body">
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-header">
+                    <span style="font-weight:800;color:white;font-size:1.2rem;">facility<span style="color:#CC0000;">X</span>perience</span>
+                    <p style="color:rgba(255,255,255,0.7);margin:0.3rem 0 0 0;font-size:0.8rem;">Churchgate Group</p>
+                </div>
+                <div class="login-body">
+        """, unsafe_allow_html=True)
     
     with st.form("fx_login"):
         email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
         password = st.text_input("🔑 Password", type="password")
-        col1, col2 = st.columns(2)
-        with col1:
+        col_a, col_b = st.columns(2)
+        with col_a:
             login_btn = st.form_submit_button("🚀 Sign In", use_container_width=True, type="primary")
-        with col2:
+        with col_b:
             forgot_btn = st.form_submit_button("🔑 Forgot?", use_container_width=True)
     
     if login_btn and email and password:
@@ -1888,8 +1907,9 @@ def login_page():
         st.rerun()
     
     st.markdown("""
+                </div>
+            </div>
         </div>
-    </div>
     """, unsafe_allow_html=True)
     
     with st.form("login_form"):
