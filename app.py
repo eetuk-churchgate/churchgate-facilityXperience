@@ -1967,4 +1967,4 @@ def main():
     ROUTER.get(st.session_state.page, page_cc)()
 
 if __name__ == "__main__":
-    main(
+    main()
