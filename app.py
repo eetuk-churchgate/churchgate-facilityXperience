@@ -1618,16 +1618,43 @@ def page_users():
                     
                     c1, c2 = st.columns(2)
                     with c1:
-                        if st.form_submit_button("💾 Save Changes", use_container_width=True, type="primary"):
-                            DB.update("app_users", user_id, {
-                                "name": edit_name, "employee_id": edit_emp, "email": edit_email,
-                                "mobile": edit_mobile, "designation": edit_desig,
-                                "level_hierarchy": edit_level, "reporting_to": edit_report,
-                                "role": edit_role
-                            })
-                            st.success("✅ User updated!")
-                            st.session_state.edit_user_id = None
-                            st.rerun()
+                        st.markdown("**📋 Module Permissions**")
+                            module_groups = {
+                                "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
+                                "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"],
+                                "Assets & PPM": ["Asset Register", "Add Assets", "Enroll Checklist", "52-Week Calendar", "Checklist Status"],
+                                "People": ["Visitor Management", "User Management"],
+                                "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
+                                "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
+                                "Utility": ["Utility Dashboard"],
+                            }
+                            existing_perms = user.get("extra_permissions", [])
+                            if isinstance(existing_perms, str):
+                                try: existing_perms = eval(existing_perms)
+                                except: existing_perms = []
+                            for group, modules in module_groups.items():
+                                with st.expander(f"📁 {group}"):
+                                    cols = st.columns(2)
+                                    for i, mod in enumerate(modules):
+                                        with cols[i % 2]:
+                                            st.checkbox(mod, value=mod in existing_perms, key=f"edit_mod_{group}_{mod}")
+                            st.markdown("---")
+                            if st.form_submit_button("💾 Save Changes", use_container_width=True, type="primary"):
+                                selected = []
+                                for group, modules in module_groups.items():
+                                    for mod in modules:
+                                        if st.session_state.get(f"edit_mod_{group}_{mod}", False):
+                                            selected.append(mod)
+                                DB.update("app_users", user_id, {
+                                    "name": edit_name, "employee_id": edit_emp, "email": edit_email,
+                                    "mobile": edit_mobile, "designation": edit_desig,
+                                    "level_hierarchy": edit_level, "reporting_to": edit_report,
+                                    "role": edit_role,
+                                    "extra_permissions": selected
+                                })
+                                st.success("✅ User updated!")
+                                st.session_state.edit_user_id = None
+                                st.rerun()
                     with c2:
                         if st.form_submit_button("❌ Cancel", use_container_width=True):
                             st.session_state.edit_user_id = None
