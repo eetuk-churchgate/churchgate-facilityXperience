@@ -275,6 +275,7 @@ def sidebar():
             st.session_state.authenticated = False
             st.session_state.user = None
             st.session_state.user_name = None
+            st.query_params.clear()
             st.rerun()
 
 # ============================================
@@ -1874,6 +1875,9 @@ def login_page():
                     st.session_state.user_name = res.data.get("name", "")
                     st.session_state.user_role = res.data.get("role", "staff")
                     supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", res.data["id"]).execute()
+                    # Set query params for session persistence
+                    st.query_params["auth"] = "true"
+                    st.query_params["user_key"] = res.data.get("email", "")
                     st.rerun()
                 else:
                     st.error("Invalid email or password")
@@ -1913,11 +1917,26 @@ def forgot_password_page():
 def main():
     inject_css()
     
-    # Persist session on refresh
+    # Initialize session state
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
     if "show_forgot" not in st.session_state:
         st.session_state.show_forgot = False
+    
+    # Check URL params for auto-login (persists across refreshes)
+    params = st.query_params
+    if params.get("auth") == "true" and not st.session_state.authenticated:
+        # Restore session from query param
+        st.session_state.authenticated = True
+        # Try to restore user from stored key
+        if "user_key" in params:
+            try:
+                res = supabase.table("app_users").select("*").eq("email", params.get("user_key")).eq("is_active", True).single().execute()
+                if res.data:
+                    st.session_state.user = res.data
+                    st.session_state.user_name = res.data.get("name", "")
+                    st.session_state.user_role = res.data.get("role", "staff")
+            except: pass
     
     if not st.session_state.authenticated:
         if st.session_state.show_forgot:
@@ -1931,7 +1950,7 @@ def main():
     if "page" not in st.session_state:
         st.session_state.page = "cc"
     
-    # WATERMARK — only shows when logged in
+    # Watermark
     fc = st.session_state.get("facility", "WTC")
     if fc == "WTC":
         wm_path = Path("WTC-logo.jpg")
@@ -1949,7 +1968,7 @@ def main():
     
     topnav()
     
-    # Greeting...
+    # Greeting
     user = st.session_state.get("user", {})
     user_name = user.get("name", "User")
     designation = user.get("designation", "")
