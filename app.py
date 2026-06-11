@@ -49,7 +49,7 @@ FACILITY_INFO = {
     "WAREHOUSES": {"full_name": "Warehouse Network", "city": "Lagos", "logo": "churchgate-logo.png", "desc": "Logistics & Storage Network", "color": "#475569", "clight": "#F1F5F9"},
 }
 
-st.set_page_config(page_title="facilityXperience | Churchgate Group", page_icon="⬡", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="facilityXperience | Churchgate Group", page_icon="churchgate-logo.png", layout="wide", initial_sidebar_state="expanded")
 
 # ============================================
 # CSS
@@ -183,6 +183,14 @@ def get_nav_logo():
         return f'<img src="data:image/png;base64,{b64}" height="26px" style="filter:brightness(0) invert(1);">'
     return '<span style="font-weight:800;color:white;">CHURCHGATE</span>'
 
+def get_logo_base64():
+    """Convert churchgate-logo.png to base64 for embedding in reports"""
+    p = Path("churchgate-logo.png")
+    if p.exists():
+        with open(p, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return ""
+
 def status_badge(s):
     badges={
         "active":'<span class="fx-badge badge-success">✅ Active</span>',
@@ -201,15 +209,27 @@ def status_badge(s):
 # TOP NAV
 # ============================================
 def topnav():
-    cg=get_nav_logo()
+    cg = get_nav_logo()
+    
     st.markdown(f"""
     <div class="fx-topnav">
-        <div style="display:flex;align-items:center;gap:0.8rem;">{cg}<div style="width:1px;height:22px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.6),transparent);"></div><span class="fx-brand">facility<span>X</span>perience</span></div>
-        <div style="display:flex;align-items:center;gap:0.8rem;"><div style="display:flex;align-items:center;gap:0.3rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:50px;padding:0.25rem 0.7rem;font-size:0.6rem;font-weight:600;color:#6EE7B7;"><div style="width:5px;height:5px;border-radius:50%;background:#10B981;animation:fxPulse 2s infinite;"></div>AI ACTIVE</div><span style="color:rgba(255,255,255,0.5);font-size:0.65rem;" id="lt"></span><div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;">EE</div></div>
+        <div style="display:flex;align-items:center;gap:0.8rem;">
+            {cg}
+            <div style="width:1px;height:22px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.6),transparent);"></div>
+            <span class="fx-brand">facility<span>X</span>perience</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.8rem;">
+            <div style="display:flex;align-items:center;gap:0.3rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:50px;padding:0.25rem 0.7rem;font-size:0.6rem;font-weight:600;color:#6EE7B7;">
+                <div style="width:5px;height:5px;border-radius:50%;background:#10B981;animation:fxPulse 2s infinite;"></div>AI ACTIVE
+            </div>
+            <span style="color:rgba(255,255,255,0.5);font-size:0.65rem;" id="lt"></span>
+            <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;">EE</div>
+        </div>
     </div>
     <script>function t(){{document.getElementById('lt').textContent=new Date().toLocaleTimeString('en-US',{{hour12:false}});}}t();setInterval(t,1000);</script>
     <style>@keyframes fxPulse{{0%,100%{{opacity:1}}50%{{opacity:0.4}}}}</style>
     """, unsafe_allow_html=True)
+
 
 # ============================================
 # SIDEBAR
@@ -895,14 +915,18 @@ def page_wp():
                         
                         class WorkPermitPDF(FPDF):
                             def header(self):
-                                self.set_fill_color(26, 26, 26)
-                                self.rect(10, 10, 277, 22, 'F')
-                                self.set_fill_color(204, 0, 0)
-                                self.rect(10, 10, 4, 22, 'F')
-                                self.set_text_color(255, 255, 255)
-                                self.set_font('Helvetica', 'B', 16)
-                                self.set_xy(18, 12)
-                                self.cell(260, 8, 'facilityXperience - Work Permit Report', 0, 0, 'L')
+    logo_path = Path("churchgate-logo.png")
+    if logo_path.exists():
+        self.image(str(logo_path), x=14, y=11, h=10)
+    self.set_fill_color(26, 26, 26)
+    self.set_text_color(255, 255, 255)
+    self.set_font('Helvetica', 'B', 14)
+    self.set_xy(14, 23)
+    self.cell(260, 6, 'Work Permit Analytics Report', 0, 0, 'L')
+    self.set_font('Helvetica', '', 9)
+    self.set_xy(14, 29)
+    self.cell(260, 6, f'{info.get("full_name", fc)} | {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
+    self.set_y(38)
                                 self.set_font('Helvetica', '', 9)
                                 self.set_xy(18, 20)
                                 self.cell(260, 8, f'{info.get("full_name", fc)} | Generated: {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
@@ -1100,7 +1124,13 @@ def page_wp():
                     .alert-box{{background:#FFF3CD;border:1px solid #F59E0B;border-radius:8px;padding:12px;margin:10px 0}}
                     .footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #ddd;padding-top:12px}}
                 </style></head><body>
-                <div class="header"><h1>facility<span>X</span>perience</h1><p style="margin:5px 0 0 0">Work Permit Analytics Report</p><p style="margin:3px 0 0 0;font-size:10px;opacity:0.8">{info.get('full_name',fc)} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p></div>
+               <div class="header" style="display:flex;align-items:center;gap:15px;">
+                    <img src="data:image/png;base64,{get_logo_base64()}" height="40" style="filter:brightness(0) invert(1);">
+                    <div>
+                        <h1 style="margin:0;">Work Permit Analytics Report</h1>
+                        <p style="margin:5px 0 0 0;font-size:10px;opacity:0.8;">{info.get('full_name',fc)} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p>
+                    </div>
+                </div><p style="margin:3px 0 0 0;font-size:10px;opacity:0.8">{info.get('full_name',fc)} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p></div>
                 <div class="kpi-row">
                     <div class="kpi-card"><div class="kpi-value">{total}</div><div class="kpi-label">Total Permits</div></div>
                     <div class="kpi-card green"><div class="kpi-value">{approved_count}</div><div class="kpi-label">Approved</div></div>
