@@ -1813,9 +1813,8 @@ def check_password(password, stored_hash):
     return hashlib.sha256(password.encode()).hexdigest() == stored_hash
 
 def login_page():
-    """Show login form"""
+    """Show login form with split layout"""
     
-    # Load background image
     bg_path = Path("WTC Abuja 7 (1).jpg")
     bg_base64 = ""
     if bg_path.exists():
@@ -1824,33 +1823,120 @@ def login_page():
     
     st.markdown(f"""
     <style>
-        .login-container {{
+        .login-split {{
             display: flex;
-            justify-content: center;
-            align-items: center;
             min-height: 100vh;
-            background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#e8e8e8'};
+            margin: 0;
+            padding: 0;
+        }}
+        .login-left {{
+            flex: 1;
+            background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#1a1a1a'};
+            display: flex;
+            align-items: flex-end;
+            padding: 3rem;
+            position: relative;
+        }}
+        .login-left::before {{
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(180deg, rgba(10,10,10,0.3) 0%, rgba(10,10,10,0.8) 100%);
+        }}
+        .login-left-content {{
+            position: relative;
+            z-index: 1;
+            color: white;
+        }}
+        .login-left-content h2 {{
+            font-size: 2rem;
+            font-weight: 800;
+            margin: 0;
+            color: white;
+        }}
+        .login-left-content p {{
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-top: 0.5rem;
+        }}
+        .login-right {{
+            flex: 0 0 480px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+            padding: 2rem;
         }}
         .login-box {{
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
+            background: white;
             border-radius: 16px;
             padding: 2.5rem 2rem;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
             text-align: center;
-            max-width: 420px;
             width: 100%;
-            border: 1px solid rgba(255,255,255,0.3);
+            max-width: 400px;
+        }}
+        @media (max-width: 900px) {{
+            .login-split {{ flex-direction: column; }}
+            .login-left {{ flex: 0 0 200px; }}
+            .login-right {{ flex: 1; }}
         }}
     </style>
-    <div class="login-container">
-        <div class="login-box">
-            <div style="display:flex;align-items:center;justify-content:center;gap:0.8rem;margin-bottom:1rem;">
-                {get_nav_logo()}
-                <div style="width:1px;height:28px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.5),transparent);"></div>
-                <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;font-size:1.5rem;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
+    
+    <div class="login-split">
+        <div class="login-left">
+            <div class="login-left-content">
+                <h2>World Trade Center</h2>
+                <p>Churchgate Group • Abuja</p>
+                <p style="font-size:0.85rem;opacity:0.6;">22-Floor Office Tower • 24-Floor Residential Tower • Recreation Center</p>
             </div>
-            <p style="color:{CHURCHGATE_GREY};margin-bottom:1.5rem;">Churchgate Group</p>
+        </div>
+        <div class="login-right">
+            <div class="login-box">
+                <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;margin-bottom:0.5rem;">
+                    {get_nav_logo()}
+                    <div style="width:1px;height:24px;background:#ddd;"></div>
+                    <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;font-size:1.3rem;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
+                </div>
+                <p style="color:{CHURCHGATE_GREY};margin-bottom:1.5rem;font-size:0.85rem;">Churchgate Group</p>
+    """, unsafe_allow_html=True)
+    
+    with st.form("login_form"):
+        email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
+        password = st.text_input("🔑 Password", type="password")
+        col1, col2 = st.columns(2)
+        with col1:
+            login_btn = st.form_submit_button("🚀 Sign In", use_container_width=True, type="primary")
+        with col2:
+            forgot_btn = st.form_submit_button("🔑 Forgot?", use_container_width=True)
+    
+    if login_btn and email and password:
+        try:
+            res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
+            if res.data:
+                user = res.data
+                if check_password(password, user.get("password_hash", "")):
+                    st.session_state.authenticated = True
+                    st.session_state.user = user
+                    st.session_state.user_name = user.get("name", "")
+                    st.session_state.user_role = user.get("role", "staff")
+                    supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
+                    st.rerun()
+                else:
+                    st.error("Invalid password")
+            else:
+                st.error("User not found")
+        except Exception as e:
+            st.error(f"Login error: {e}")
+    
+    if forgot_btn:
+        st.session_state.show_forgot = True
+        st.rerun()
+    
+    st.markdown("""
+            </div>
+        </div>
+    </div>
     """, unsafe_allow_html=True)
     
     with st.form("login_form"):
