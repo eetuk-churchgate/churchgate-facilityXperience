@@ -1841,7 +1841,7 @@ def login_page():
             content: '';
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(180deg, rgba(10,10,10,0.3) 0%, rgba(10,10,10,0.8) 100%);
+            background: linear-gradient(180deg, rgba(10,10,10,0.2) 0%, rgba(10,10,10,0.8) 100%);
         }}
         .login-left-content {{
             position: relative;
@@ -1864,7 +1864,7 @@ def login_page():
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #f5f5f5;
+            background: #f0f0f0;
             padding: 2rem;
         }}
         .login-box {{
@@ -1872,13 +1872,42 @@ def login_page():
             border-radius: 16px;
             padding: 2.5rem 2rem;
             box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-            text-align: center;
             width: 100%;
             max-width: 400px;
         }}
+        .login-logo-row {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.6rem;
+            margin-bottom: 0.3rem;
+        }}
+        .login-logo-row img {{
+            height: 30px;
+        }}
+        .login-divider {{
+            width: 1px;
+            height: 24px;
+            background: #ddd;
+        }}
+        .login-title {{
+            font-weight: 800;
+            color: #1a1a1a;
+            margin: 0;
+            font-size: 1.3rem;
+        }}
+        .login-title span {{
+            color: #CC0000;
+        }}
+        .login-subtitle {{
+            color: #666;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            text-align: center;
+        }}
         @media (max-width: 900px) {{
             .login-split {{ flex-direction: column; }}
-            .login-left {{ flex: 0 0 200px; }}
+            .login-left {{ flex: 0 0 180px; }}
             .login-right {{ flex: 1; }}
         }}
     </style>
@@ -1893,15 +1922,16 @@ def login_page():
         </div>
         <div class="login-right">
             <div class="login-box">
-                <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;margin-bottom:0.5rem;">
+                <div class="login-logo-row">
                     {get_nav_logo()}
-                    <div style="width:1px;height:24px;background:#ddd;"></div>
-                    <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;font-size:1.3rem;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
+                    <div class="login-divider"></div>
+                    <h1 class="login-title">facility<span>X</span>perience</h1>
                 </div>
-                <p style="color:{CHURCHGATE_GREY};margin-bottom:1.5rem;font-size:0.85rem;">Churchgate Group</p>
+                <p class="login-subtitle">Churchgate Group</p>
     """, unsafe_allow_html=True)
     
-    with st.form("login_form"):
+    # Form with unique key
+    with st.form(key="fx_login_form"):
         email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
         password = st.text_input("🔑 Password", type="password")
         col1, col2 = st.columns(2)
