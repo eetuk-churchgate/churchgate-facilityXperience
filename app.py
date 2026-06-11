@@ -275,16 +275,18 @@ def sidebar():
 # COMMAND CENTER
 # ============================================
 def page_cc():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{});k=DB.get_kpis(fc);logo=get_facility_logo(fc,70)
+    fc=st.session_state.get("facility","WTC")
+    info=FACILITY_INFO.get(fc,{})
+    k=DB.get_kpis(fc)
+    logo=get_facility_logo(fc,70)
     
     st.markdown(f"""
-    <div style="background:white;border-radius:12px;padding:1.5rem 2rem;margin-bottom:1.5rem;border-left:4px solid {CHURCHGATE_RED};box-shadow:0 1px 3px rgba(0,0,0,0.06);position:relative;overflow:hidden;">
-        
-        <div style="display:flex;align-items:center;gap:1.5rem;position:relative;z-index:1;">
+    <div class="churchgate-header">
+        <div style="display:flex;align-items:center;gap:1.5rem;">
             <div style="flex-shrink:0;">{logo}</div>
             <div style="flex:1;">
-                <h1 style="margin:0;font-weight:800;font-size:1.5rem;color:{CHURCHGATE_DARK};">{info.get("full_name",fc)}</h1>
-                <p style="margin:0.2rem 0 0 0;color:{CHURCHGATE_GREY};font-size:0.8rem;">📍 {info.get("city","")} • {info.get("desc","")}</p>
+                <h1 style="margin:0;font-weight:800;font-size:1.5rem;color:#1a1a1a;">{info.get("full_name",fc)}</h1>
+                <p style="margin:0.2rem 0 0 0;color:#4a4a4a;font-size:0.8rem;">📍 {info.get("city","")} • {info.get("desc","")}</p>
             </div>
             <div style="text-align:right;">
                 <div style="font-size:0.6rem;color:#888;">LIVE DATA</div>
@@ -295,12 +297,10 @@ def page_cc():
     </div>
     """, unsafe_allow_html=True)
     
-    # KPI Row with proper spacing
     kpi=[("📋 Open WOs",k["open_wo"]),("🛂 Visitors",k["visitors"]),("🚨 Incidents",k["open_inc"]),("🎫 Tickets",k["open_tix"]),("🏗️ Assets",k["assets"]),("🔧 PPM Due",k["ppm_due"]),("🛡️ Permits",k["pending_permits"])]
     cols=st.columns(7)
     for i,(l,v) in enumerate(kpi):
-        with cols[i]:
-            st.markdown(f'<div class="fx-card"><div class="fx-card-label">{l}</div><div class="fx-card-value">{v}</div></div>',unsafe_allow_html=True)
+        with cols[i]:st.markdown(f'<div class="fx-card"><div class="fx-card-label">{l}</div><div class="fx-card-value">{v}</div></div>',unsafe_allow_html=True)
     st.markdown("---")
     c1,c2=st.columns(2)
     with c1:
