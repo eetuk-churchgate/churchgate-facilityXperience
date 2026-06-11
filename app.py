@@ -279,7 +279,7 @@ def page_cc():
     
     st.markdown(f"""
     <div style="background:white;border-radius:12px;padding:1.5rem 2rem;margin-bottom:1.5rem;border-left:4px solid {CHURCHGATE_RED};box-shadow:0 1px 3px rgba(0,0,0,0.06);position:relative;overflow:hidden;">
-        <div style="position:absolute;right:30px;top:50%;transform:translateY(-50%);opacity:0.04;z-index:0;pointer-events:none;width:180px;">{logo}</div>
+        <div style="position:absolute;right:30px;top:50%;transform:translateY(-50%);opacity:0.15;z-index:0;pointer-events:none;width:180px;">{logo}</div>
         <div style="display:flex;align-items:center;gap:1.5rem;position:relative;z-index:1;">
             <div style="flex-shrink:0;">{logo}</div>
             <div style="flex:1;">
