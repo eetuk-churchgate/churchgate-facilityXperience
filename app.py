@@ -1822,41 +1822,46 @@ def login_page():
     if bg_base64:
         st.markdown(f"""<style>.stApp {{background: url(data:image/jpeg;base64,{bg_base64}) center/cover no-repeat; background-attachment: fixed;}}</style>""", unsafe_allow_html=True)
     
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    _, col, _ = st.columns([1, 1.2, 1])
+    # Center using HTML/CSS only - no Streamlit columns
+    st.markdown("""
+    <div style="display:flex;justify-content:center;align-items:center;min-height:100vh;">
+        <div style="width:380px;">
+    """, unsafe_allow_html=True)
     
-    with col:
-        st.markdown(f"""<div style="background:white;border-radius:16px 16px 0 0;padding:1.5rem 1.5rem 0.3rem 1.5rem;text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;">{get_nav_logo()}<div style="width:1px;height:24px;background:#ddd;"></div><span style="font-weight:800;color:#1a1a1a;font-size:1.2rem;">facility<span style="color:#CC0000;">X</span>perience</span></div><p style="color:#666;margin:0.3rem 0 0 0;font-size:0.8rem;">Churchgate Group</p></div>""", unsafe_allow_html=True)
-        
-        email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com", key="fx_email")
-        password = st.text_input("🔑 Password", type="password", key="fx_pass")
-        c1, c2 = st.columns(2)
-        with c1:
-            login_clicked = st.button("🚀 Sign In", use_container_width=True, type="primary", key="fx_login_btn")
-        with c2:
-            forgot_clicked = st.button("🔑 Forgot?", use_container_width=True, key="fx_forgot_btn")
-        
-        if login_clicked and email and password:
-            res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
-            if res.data:
-                user = res.data
-                if check_password(password, user.get("password_hash", "")):
-                    st.session_state.authenticated = True
-                    st.session_state.user = user
-                    st.session_state.user_name = user.get("name", "")
-                    st.session_state.user_role = user.get("role", "staff")
-                    supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
-                    st.rerun()
-                else:
-                    st.error("Invalid password")
+    st.markdown(f"""<div style="background:white;border-radius:16px 16px 0 0;padding:1.5rem 1.5rem 0.3rem 1.5rem;text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;">{get_nav_logo()}<div style="width:1px;height:24px;background:#ddd;"></div><span style="font-weight:800;color:#1a1a1a;font-size:1.2rem;">facility<span style="color:#CC0000;">X</span>perience</span></div><p style="color:#666;margin:0.3rem 0 0 0;font-size:0.8rem;">Churchgate Group</p></div>""", unsafe_allow_html=True)
+    
+    email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com", key="fx_em")
+    password = st.text_input("🔑 Password", type="password", key="fx_pw")
+    c1, c2 = st.columns(2)
+    with c1:
+        login_clicked = st.button("🚀 Sign In", use_container_width=True, type="primary", key="fx_li")
+    with c2:
+        forgot_clicked = st.button("🔑 Forgot?", use_container_width=True, key="fx_fg")
+    
+    if login_clicked and email and password:
+        res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
+        if res.data:
+            user = res.data
+            if check_password(password, user.get("password_hash", "")):
+                st.session_state.authenticated = True
+                st.session_state.user = user
+                st.session_state.user_name = user.get("name", "")
+                st.session_state.user_role = user.get("role", "staff")
+                supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
+                st.rerun()
             else:
-                st.error("User not found")
-        
-        if forgot_clicked:
-            st.session_state.show_forgot = True
-            st.rerun()
-        
-        st.markdown("""<div style="background:white;border-radius:0 0 16px 16px;height:8px;"></div>""", unsafe_allow_html=True)
+                st.error("Invalid password")
+        else:
+            st.error("User not found")
+    
+    if forgot_clicked:
+        st.session_state.show_forgot = True
+        st.rerun()
+    
+    st.markdown("""
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     with st.form("login_form"):
         email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
