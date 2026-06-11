@@ -177,11 +177,14 @@ def get_facility_logo(fc, h=60):
     return f'<span style="font-size:2.5rem;">🏢</span>'
 
 def get_nav_logo():
-    p=Path("churchgate-logo.png")
+    """Churchgate logo for top navigation - white version for dark background"""
+    p = Path("churchgate-logo.png")
     if p.exists():
-        with open(p,"rb") as f: b64=base64.b64encode(f.read()).decode()
-        return f'<img src="data:image/png;base64,{b64}" height="26px" style="filter:brightness(0) invert(1);">'
-    return '<span style="font-weight:800;color:white;">CHURCHGATE</span>'
+        with open(p, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        return f'<img src="data:image/png;base64,{b64}" height="28px" style="display:inline-block;vertical-align:middle;">'
+    # Fallback if logo missing
+    return '<span style="font-weight:800;color:white;font-size:1rem;display:inline-block;vertical-align:middle;">CHURCHGATE</span>'
 
 def get_logo_base64():
     """Convert churchgate-logo.png to base64 for embedding in reports"""
@@ -213,17 +216,19 @@ def topnav():
     
     st.markdown(f"""
     <div class="fx-topnav">
-        <div style="display:flex;align-items:center;gap:0.8rem;">
-            {cg}
-            <div style="width:1px;height:22px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.6),transparent);"></div>
-            <span class="fx-brand">facility<span>X</span>perience</span>
+        <div style="display:flex;align-items:center;gap:1rem;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+                {cg}
+                <div style="width:1px;height:24px;background:rgba(255,255,255,0.3);"></div>
+                <span class="fx-brand">facility<span>X</span>perience</span>
+            </div>
         </div>
         <div style="display:flex;align-items:center;gap:0.8rem;">
             <div style="display:flex;align-items:center;gap:0.3rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:50px;padding:0.25rem 0.7rem;font-size:0.6rem;font-weight:600;color:#6EE7B7;">
                 <div style="width:5px;height:5px;border-radius:50%;background:#10B981;animation:fxPulse 2s infinite;"></div>AI ACTIVE
             </div>
-            <span style="color:rgba(255,255,255,0.5);font-size:0.65rem;" id="lt"></span>
-            <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;">EE</div>
+            <span style="color:rgba(255,255,255,0.5);font-size:0.65rem;font-family:monospace;" id="lt"></span>
+            <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;border:2px solid rgba(255,255,255,0.2);">EE</div>
         </div>
     </div>
     <script>function t(){{document.getElementById('lt').textContent=new Date().toLocaleTimeString('en-US',{{hour12:false}});}}t();setInterval(t,1000);</script>
