@@ -233,8 +233,7 @@ def topnav():
                 <div style="width:5px;height:5px;border-radius:50%;background:#10B981;animation:fxPulse 2s infinite;"></div>AI ACTIVE
             </div>
             <span style="color:rgba(255,255,255,0.5);font-size:0.65rem;font-family:monospace;" id="lt"></span>
-            <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;border:2px solid rgba(255,255,255,0.2);">EE</div>
-        </div>
+            div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;border:2px solid rgba(255,255,255,0.2);">{st.session_state.get('user_name','User')[:2].upper()}</div>
     </div>
     <script>function t(){{document.getElementById('lt').textContent=new Date().toLocaleTimeString('en-US',{{hour12:false}});}}t();setInterval(t,1000);</script>
     <style>@keyframes fxPulse{{0%,100%{{opacity:1}}50%{{opacity:0.4}}}}</style>
@@ -1903,6 +1902,31 @@ def main():
         st.session_state.page = "cc"
     
     topnav()
+    
+    # Greeting banner
+    user = st.session_state.get("user", {})
+    user_name = user.get("name", "User")
+    designation = user.get("designation", "")
+    emp_id = user.get("employee_id", "")
+    hour = datetime.now().hour
+    greeting = "Good Morning" if hour < 12 else "Good Afternoon" if hour < 17 else "Good Evening"
+    
+    st.markdown(f"""
+    <div style="background:white;padding:0.8rem 1.5rem;border-radius:8px;margin:0.5rem 1rem 0 1rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+        <div style="display:flex;align-items:center;gap:1rem;">
+            <div style="width:42px;height:42px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1rem;">{user_name[:2].upper()}</div>
+            <div>
+                <div style="font-weight:700;font-size:1rem;color:#1a1a1a;">👋 {greeting}, {user_name}!</div>
+                <div style="font-size:0.75rem;color:#666;">{designation} • ID: {emp_id}</div>
+            </div>
+        </div>
+        <div style="font-size:0.7rem;color:#888;text-align:right;">
+            <div>{datetime.now().strftime('%A, %d %B %Y')}</div>
+            <div>{st.session_state.get('user_role','Staff').upper()}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     sidebar()
     ROUTER.get(st.session_state.page, page_cc)()
 
