@@ -235,7 +235,7 @@ def topnav():
             <span style="color:rgba(255,255,255,0.5);font-size:0.65rem;font-family:monospace;" id="lt"></span>
             <div style="display:flex;align-items:center;gap:0.5rem;">
     <span style="color:rgba(255,255,255,0.7);font-size:0.7rem;">{st.session_state.get('user_name','User').split()[-1]}</span>
-    <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;border:2px solid rgba(255,255,255,0.2);">{st.session_state.get('user_name','User')[:2].upper()}</div>
+    <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;border:2px solid rgba(255,255,255,0.2);cursor:pointer;" title="Click to logout" onclick="logout()">{st.session_state.get('user_name','User')[:2].upper()}</div>
 </div>
     </div>
     <script>function t(){{var d=new Date();var wat=new Date(d.getTime()+3600000);document.getElementById('lt').textContent=wat.toLocaleTimeString('en-US',{{hour12:false}});}}t();setInterval(t,1000);</script>
@@ -270,6 +270,12 @@ def sidebar():
             st.markdown(f'<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.5rem 0 0.1rem 0;">{s}</p>',unsafe_allow_html=True)
             for l,p in items:
                 if st.button(l,key=p,use_container_width=True):st.session_state.page=p;st.rerun()
+        st.markdown("---")
+        if st.button("🚪 Log Out", use_container_width=True, type="primary"):
+            st.session_state.authenticated = False
+            st.session_state.user = None
+            st.session_state.user_name = None
+            st.rerun()
 
 # ============================================
 # COMMAND CENTER
@@ -1907,43 +1913,7 @@ def forgot_password_page():
 def main():
     inject_css()
     
-    # Watermark
-    fc = st.session_state.get("facility", "WTC")
-    if fc == "WTC":
-        wm_path = Path("WTC-logo.jpg")
-        if not wm_path.exists():
-            wm_path = Path("wtc-logo.jpg")
-        wm_ext = "jpeg"
-    else:
-        wm_path = Path("churchgate-logo.png")
-        wm_ext = "png"
-    
-    if wm_path.exists():
-        with open(wm_path, "rb") as f:
-            wm_b64 = base64.b64encode(f.read()).decode()
-        st.markdown(f"""
-        <style>
-            .stApp::after {{
-                content: '';
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                width: 70vw;
-                height: 70vh;
-                background-image: url(data:image/{wm_ext};base64,{wm_b64});
-                background-size: contain;
-                background-repeat: no-repeat;
-                background-position: center;
-                opacity: 0.10;
-                z-index: 0;
-                pointer-events: none;
-            }}
-        </style>
-        """, unsafe_allow_html=True)
-    else:
-        st.write(f"Debug: Watermark file not found: {wm_path}")
-    
+    # Persist session on refresh
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
     if "show_forgot" not in st.session_state:
@@ -1961,37 +1931,35 @@ def main():
     if "page" not in st.session_state:
         st.session_state.page = "cc"
     
+    # WATERMARK — only shows when logged in
+    fc = st.session_state.get("facility", "WTC")
+    if fc == "WTC":
+        wm_path = Path("WTC-logo.jpg")
+        if not wm_path.exists():
+            wm_path = Path("wtc-logo.jpg")
+        wm_ext = "jpeg"
+    else:
+        wm_path = Path("churchgate-logo.png")
+        wm_ext = "png"
+    
+    if wm_path.exists():
+        with open(wm_path, "rb") as f:
+            wm_b64 = base64.b64encode(f.read()).decode()
+        st.markdown(f"""<style>.stApp::after {{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:70vw;height:70vh;background-image:url(data:image/{wm_ext};base64,{wm_b64});background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.10;z-index:0;pointer-events:none;}}</style>""", unsafe_allow_html=True)
+    
     topnav()
     
-    # Greeting banner
+    # Greeting...
     user = st.session_state.get("user", {})
     user_name = user.get("name", "User")
     designation = user.get("designation", "")
     emp_id = user.get("employee_id", "")
-    hour = datetime.now().hour
-    greeting = "Good Morning" if hour < 12 else "Good Afternoon" if hour < 17 else "Good Evening"
-    
     from datetime import timezone, timedelta
     wat = datetime.now(timezone(timedelta(hours=1)))
     hour = wat.hour
     greeting = "Good Morning" if hour < 12 else "Good Afternoon" if hour < 17 else "Good Evening"
     
-    st.markdown(f"""
-    <div style="background:white;padding:0.8rem 1.5rem;border-radius:8px;margin:0.5rem 1rem 1.5rem 1rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-        <div style="display:flex;align-items:center;gap:1rem;">
-            <div style="width:42px;height:42px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1rem;">{user_name[:2].upper()}</div>
-            <div>
-                <div style="font-weight:700;font-size:1rem;color:#1a1a1a;">👋 {greeting}, {user_name}!</div>
-                <div style="font-size:0.75rem;color:#666;">{designation} • ID: {emp_id}</div>
-            </div>
-        </div>
-        <div style="font-size:0.7rem;color:#888;text-align:right;">
-            <div>{wat.strftime('%A, %d %B %Y')}</div>
-            <div>{wat.strftime('%I:%M %p')} WAT</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
+    st.markdown(f"""<div style="background:white;padding:0.8rem 1.5rem;border-radius:8px;margin:0.5rem 1rem 1.5rem 1rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.06);"><div style="display:flex;align-items:center;gap:1rem;"><div style="width:42px;height:42px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1rem;">{user_name[:2].upper()}</div><div><div style="font-weight:700;font-size:1rem;color:#1a1a1a;">👋 {greeting}, {user_name}!</div><div style="font-size:0.75rem;color:#666;">{designation} • ID: {emp_id}</div></div></div><div style="font-size:0.7rem;color:#888;text-align:right;"><div>{wat.strftime('%A, %d %B %Y')}</div><div>{wat.strftime('%I:%M %p')} WAT</div></div></div>""", unsafe_allow_html=True)
     
     sidebar()
     ROUTER.get(st.session_state.page, page_cc)()
