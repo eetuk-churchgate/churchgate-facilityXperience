@@ -1813,117 +1813,42 @@ def check_password(password, stored_hash):
     return hashlib.sha256(password.encode()).hexdigest() == stored_hash
 
 def login_page():
-    """Show login form"""
-    
-    # Load background image
     bg_path = Path("WTC Abuja 7 (1).jpg")
     bg_base64 = ""
     if bg_path.exists():
         with open(bg_path, "rb") as f:
             bg_base64 = base64.b64encode(f.read()).decode()
     
-    st.markdown(f"""
-    <style>
-        .login-container {{
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: {'url(data:image/jpeg;base64,' + bg_base64 + ') center/cover no-repeat' if bg_base64 else '#e8e8e8'};
-        }}
-        .login-box {{
-            background: rgba(255,255,255,0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 2.5rem 2rem;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            text-align: center;
-            max-width: 420px;
-            width: 100%;
-            border: 1px solid rgba(255,255,255,0.3);
-        }}
-    </style>
-    <div class="login-container">
-        <div class="login-box">
-            <div style="display:flex;align-items:center;justify-content:center;gap:0.8rem;margin-bottom:1rem;">
-                {get_nav_logo()}
-                <div style="width:1px;height:28px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.5),transparent);"></div>
-                <h1 style="font-weight:800;color:{CHURCHGATE_DARK};margin:0;font-size:1.5rem;">facility<span style="color:{CHURCHGATE_RED};">X</span>perience</h1>
-            </div>
-            <p style="color:{CHURCHGATE_GREY};margin-bottom:1.5rem;">Churchgate Group</p>
-    """, unsafe_allow_html=True)
+    if bg_base64:
+        st.markdown(f"""<style>.stApp {{background: url(data:image/jpeg;base64,{bg_base64}) center/cover no-repeat fixed;}}</style>""", unsafe_allow_html=True)
     
-    with st.form("login_form"):
-        email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
-        password = st.text_input("🔑 Password", type="password")
-        col1, col2 = st.columns(2)
-        with col1:
-            login_btn = st.form_submit_button("🚀 Sign In", use_container_width=True, type="primary")
-        with col2:
-            forgot_btn = st.form_submit_button("🔑 Forgot Password?", use_container_width=True)
+    st.markdown("<br><br><br><br>", unsafe_allow_html=True)
+    _, col, _ = st.columns([1, 2, 1])
     
-    if login_btn and email and password:
-        try:
-            res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
-            if res.data:
-                user = res.data
-                if check_password(password, user.get("password_hash", "")):
+    with col:
+        st.markdown(f"""<div style="background:white;border-radius:16px;padding:2rem;box-shadow:0 20px 50px rgba(0,0,0,0.3);text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.3rem;">{get_nav_logo()}<div style="width:1px;height:22px;background:#ddd;"></div><span style="font-weight:800;color:#1a1a1a;font-size:1.1rem;">facility<span style="color:#CC0000;">X</span>perience</span></div><p style="color:#888;font-size:0.8rem;">Churchgate Group</p></div>""", unsafe_allow_html=True)
+        
+        email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com", key="fx_em")
+        password = st.text_input("🔑 Password", type="password", key="fx_pw")
+        
+        if st.button("🚀 Sign In", use_container_width=True, type="primary", key="fx_btn"):
+            if email and password:
+                res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
+                if res.data and check_password(password, res.data.get("password_hash", "")):
                     st.session_state.authenticated = True
-                    st.session_state.user = user
-                    st.session_state.user_name = user.get("name", "")
-                    st.session_state.user_role = user.get("role", "staff")
-                    st.session_state.user_depts = user.get("department_permissions", [])
-                    if isinstance(st.session_state.user_depts, str):
-                        try: st.session_state.user_depts = eval(st.session_state.user_depts)
-                        except: st.session_state.user_depts = [st.session_state.user_depts]
-                    supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
+                    st.session_state.user = res.data
+                    st.session_state.user_name = res.data.get("name", "")
+                    st.session_state.user_role = res.data.get("role", "staff")
+                    supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", res.data["id"]).execute()
                     st.rerun()
                 else:
-                    st.error("❌ Invalid password")
+                    st.error("Invalid email or password")
             else:
-                st.error("❌ User not found")
-        except Exception as e:
-            st.error(f"Login error: {e}")
-    
-    if forgot_btn:
-        st.session_state.show_forgot = True
-        st.rerun()
-    
-    st.markdown("</div></div>", unsafe_allow_html=True)
-    
-    with st.form("login_form"):
-        email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
-        password = st.text_input("🔑 Password", type="password")
-        col1, col2 = st.columns(2)
-        with col1:
-            login_btn = st.form_submit_button("🚀 Sign In", use_container_width=True, type="primary")
-        with col2:
-            forgot_btn = st.form_submit_button("🔑 Forgot Password?", use_container_width=True)
-    
-    if login_btn and email and password:
-        try:
-            res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
-            if res.data:
-                user = res.data
-                if check_password(password, user.get("password_hash", "")):
-                    st.session_state.authenticated = True
-                    st.session_state.user = user
-                    st.session_state.user_name = user.get("name", "")
-                    st.session_state.user_role = user.get("role", "staff")
-                    supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
-                    st.rerun()
-                else:
-                    st.error("Invalid password")
-            else:
-                st.error("User not found")
-        except Exception as e:
-            st.error(f"Login error: {e}")
-    
-    if forgot_btn:
-        st.session_state.show_forgot = True
-        st.rerun()
-    
-    st.markdown("</div></div>", unsafe_allow_html=True)
+                st.error("Please enter email and password")
+        
+        if st.button("🔑 Forgot Password?", use_container_width=True, key="fx_fg"):
+            st.session_state.show_forgot = True
+            st.rerun()
 
 def forgot_password_page():
     st.markdown("""<style>#MainMenu,header,footer{visibility:hidden;}section[data-testid="stSidebar"]{display:none;}</style>""", unsafe_allow_html=True)
