@@ -1813,74 +1813,51 @@ def check_password(password, stored_hash):
     return hashlib.sha256(password.encode()).hexdigest() == stored_hash
 
 def login_page():
-    # Kill ALL Streamlit default UI
-    st.markdown("""
-    <style>
-        #MainMenu {visibility: hidden;}
-        header {visibility: hidden;}
-        footer {visibility: hidden;}
-        .stApp {overflow: hidden;}
-        div[data-testid="stToolbar"] {display: none;}
-        div[data-testid="stDecoration"] {display: none;}
-        div[data-testid="stStatusWidget"] {display: none;}
-        section[data-testid="stSidebar"] {display: none;}
-    </style>
-    """, unsafe_allow_html=True)
-    
     bg_path = Path("WTC Abuja 7 (1).jpg")
     bg_base64 = ""
     if bg_path.exists():
         with open(bg_path, "rb") as f:
             bg_base64 = base64.b64encode(f.read()).decode()
     
-    bg_style = f"background: url(data:image/jpeg;base64,{bg_base64}) center/cover no-repeat;" if bg_base64 else "background: #e8e8e8;"
+    if bg_base64:
+        st.markdown(f"""<style>.stApp {{background: url(data:image/jpeg;base64,{bg_base64}) center/cover no-repeat fixed;}}</style>""", unsafe_allow_html=True)
     
-    st.markdown(f"""
-    <style>
-        .stApp {{ {bg_style} background-attachment: fixed; }}
-        .stMainBlockContainer {{ display: flex; justify-content: center; align-items: center; min-height: 100vh; }}
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown("<div style='display:flex;justify-content:center;align-items:center;min-height:90vh;'>", unsafe_allow_html=True)
+    st.markdown("<div style='width:360px;'>", unsafe_allow_html=True)
     
-    # Single centered container
-    c = st.container()
-    with c:
-        _, col, _ = st.columns([0.3, 0.4, 0.3])
-        with col:
-            st.markdown(f"""<div style="background:white;border-radius:16px;padding:2rem;box-shadow:0 20px 50px rgba(0,0,0,0.4);text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.3rem;">{get_nav_logo()}<div style="width:1px;height:22px;background:#ddd;"></div><span style="font-weight:800;color:#1a1a1a;font-size:1.1rem;">facility<span style="color:#CC0000;">X</span>perience</span></div><p style="color:#888;font-size:0.8rem;">Churchgate Group</p></div>""", unsafe_allow_html=True)
-            
-            email = st.text_input("Email", placeholder="e.g. eetuk@churchgate.com", label_visibility="collapsed")
-            password = st.text_input("Password", placeholder="Password", type="password", label_visibility="collapsed")
-            
-            btn_col1, btn_col2 = st.columns(2)
-            with btn_col1:
-                login_btn = st.button("Sign In", use_container_width=True, type="primary")
-            with btn_col2:
-                forgot_btn = st.button("Forgot?", use_container_width=True)
-            
-            if login_btn:
-                if email and password:
-                    res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
-                    if res.data and check_password(password, res.data.get("password_hash", "")):
-                        st.session_state.authenticated = True
-                        st.session_state.user = res.data
-                        st.session_state.user_name = res.data.get("name", "")
-                        st.session_state.user_role = res.data.get("role", "staff")
-                        supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", res.data["id"]).execute()
-                        st.rerun()
-                    else:
-                        st.error("Invalid credentials")
-                else:
-                    st.error("Enter email and password")
-            
-            if forgot_btn:
-                st.session_state.show_forgot = True
+    st.markdown(f"""<div style="background:white;border-radius:16px 16px 0 0;padding:1.5rem 1.5rem 0.5rem 1.5rem;text-align:center;box-shadow:0 -5px 20px rgba(0,0,0,0.15);"><div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;">{get_nav_logo()}<div style="width:1px;height:22px;background:#ddd;"></div><span style="font-weight:800;color:#1a1a1a;font-size:1.1rem;">facility<span style="color:#CC0000;">X</span>perience</span></div><p style="color:#888;font-size:0.8rem;margin-top:0.3rem;">Churchgate Group</p></div>""", unsafe_allow_html=True)
+    
+    st.markdown("""<div style="background:white;border-radius:0 0 16px 16px;padding:0 1.5rem 1.5rem 1.5rem;box-shadow:0 5px 20px rgba(0,0,0,0.15);">""", unsafe_allow_html=True)
+    
+    email = st.text_input("Email", placeholder="e.g. eetuk@churchgate.com", label_visibility="collapsed")
+    password = st.text_input("Password", type="password", placeholder="Password", label_visibility="collapsed")
+    
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        login_btn = st.button("Sign In", use_container_width=True, type="primary")
+    with col2:
+        forgot_btn = st.button("Forgot?", use_container_width=True)
+    
+    if login_btn:
+        if email and password:
+            res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
+            if res.data and check_password(password, res.data.get("password_hash", "")):
+                st.session_state.authenticated = True
+                st.session_state.user = res.data
+                st.session_state.user_name = res.data.get("name", "")
+                st.session_state.user_role = res.data.get("role", "staff")
+                supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", res.data["id"]).execute()
                 st.rerun()
+            else:
+                st.error("Invalid email or password")
+        else:
+            st.error("Please enter email and password")
     
-    st.markdown("""
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    if forgot_btn:
+        st.session_state.show_forgot = True
+        st.rerun()
+    
+    st.markdown("</div></div></div>", unsafe_allow_html=True)
     
     with st.form("login_form"):
         email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
