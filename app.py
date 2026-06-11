@@ -1821,7 +1821,6 @@ def login_page():
         with open(bg_path, "rb") as f:
             bg_base64 = base64.b64encode(f.read()).decode()
     
-    # Background image
     if bg_base64:
         st.markdown(f"""
         <style>
@@ -1832,13 +1831,16 @@ def login_page():
         </style>
         """, unsafe_allow_html=True)
     
-    # Center the login card
-    _, center_col, _ = st.columns([1, 2, 1])
+    # Space from top
+    st.markdown("<br><br>", unsafe_allow_html=True)
     
-    with center_col:
-        # Brand header
+    # Center column
+    _, col, _ = st.columns([1, 1.5, 1])
+    
+    with col:
+        # Header
         st.markdown(f"""
-        <div style="background:white;border-radius:16px 16px 0 0;padding:1.5rem;text-align:center;margin-top:20vh;box-shadow:0 -5px 30px rgba(0,0,0,0.2);">
+        <div style="background:white;border-radius:16px 16px 0 0;padding:1.5rem 1.5rem 0.5rem 1.5rem;text-align:center;">
             <div style="display:flex;align-items:center;justify-content:center;gap:0.6rem;">
                 {get_nav_logo()}
                 <div style="width:1px;height:24px;background:#ddd;"></div>
@@ -1848,44 +1850,44 @@ def login_page():
         </div>
         """, unsafe_allow_html=True)
         
-        # Login form in matching box
-        st.markdown("""
-        <div style="background:white;border-radius:0 0 16px 16px;padding:0 1.5rem 1.5rem 1.5rem;box-shadow:0 5px 30px rgba(0,0,0,0.2);">
-        """, unsafe_allow_html=True)
-        
-        with st.form("fx_login"):
+        # Form - no HTML wrapper
+        with st.form("fx_login", clear_on_submit=False):
             email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
             password = st.text_input("🔑 Password", type="password")
-            col_a, col_b = st.columns(2)
-            with col_a:
+            c1, c2 = st.columns(2)
+            with c1:
                 login_btn = st.form_submit_button("🚀 Sign In", use_container_width=True, type="primary")
-            with col_b:
+            with c2:
                 forgot_btn = st.form_submit_button("🔑 Forgot?", use_container_width=True)
         
-        if login_btn and email and password:
-            try:
-                res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
-                if res.data:
-                    user = res.data
-                    if check_password(password, user.get("password_hash", "")):
-                        st.session_state.authenticated = True
-                        st.session_state.user = user
-                        st.session_state.user_name = user.get("name", "")
-                        st.session_state.user_role = user.get("role", "staff")
-                        supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
-                        st.rerun()
-                    else:
-                        st.error("Invalid password")
+        # Close the white box
+        st.markdown("""
+        <div style="background:white;border-radius:0 0 16px 16px;height:10px;"></div>
+        """, unsafe_allow_html=True)
+    
+    # Handle login
+    if login_btn and email and password:
+        try:
+            res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
+            if res.data:
+                user = res.data
+                if check_password(password, user.get("password_hash", "")):
+                    st.session_state.authenticated = True
+                    st.session_state.user = user
+                    st.session_state.user_name = user.get("name", "")
+                    st.session_state.user_role = user.get("role", "staff")
+                    supabase.table("app_users").update({"last_login": datetime.now().isoformat()}).eq("id", user["id"]).execute()
+                    st.rerun()
                 else:
-                    st.error("User not found")
-            except Exception as e:
-                st.error(f"Login error: {e}")
-        
-        if forgot_btn:
-            st.session_state.show_forgot = True
-            st.rerun()
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+                    st.error("Invalid password")
+            else:
+                st.error("User not found")
+        except Exception as e:
+            st.error(f"Login error: {e}")
+    
+    if forgot_btn:
+        st.session_state.show_forgot = True
+        st.rerun()
     
     with st.form("login_form"):
         email = st.text_input("📧 Email", placeholder="e.g. eetuk@churchgate.com")
