@@ -216,9 +216,7 @@ def topnav():
         <div style="display:flex;align-items:center;gap:0.8rem;">
             {cg}
             <div style="width:1px;height:22px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.6),transparent);"></div>
-            {cg}
-<div style="width:1px;height:22px;background:linear-gradient(180deg,transparent,rgba(204,0,0,0.6),transparent);"></div>
-<span class="fx-brand">facility<span>X</span>perience</span>
+            <span class="fx-brand">facility<span>X</span>perience</span>
         </div>
         <div style="display:flex;align-items:center;gap:0.8rem;">
             <div style="display:flex;align-items:center;gap:0.3rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:50px;padding:0.25rem 0.7rem;font-size:0.6rem;font-weight:600;color:#6EE7B7;">
@@ -721,7 +719,7 @@ def page_wp():
                         st.error("❌ Failed to submit permit. Please try again.")
     
     # ============================================
-    # TAB 3: REPORTS (FULLY FUNCTIONAL)
+    # TAB 3: REPORTS
     # ============================================
     with tab3:
         st.markdown("### 📊 Work Permit Analytics & Reports")
@@ -730,27 +728,36 @@ def page_wp():
         if wp_all and len(wp_all) > 0:
             df = pd.DataFrame(wp_all)
             
+            # SHARED METRICS (used by both PDF and HTML)
+            total = len(df)
+            approved_count = len(df[df["workflow_stage"] == "approved"]) if "workflow_stage" in df.columns else 0
+            pending_count = len(df[df["workflow_stage"].isin(["submitted", "authorized", "confirmed"])]) if "workflow_stage" in df.columns else 0
+            rejected_count = len(df[df["workflow_stage"] == "rejected"]) if "workflow_stage" in df.columns else 0
+            
+            lead_times = []
+            delayed = 0
+            if "submitted_at" in df.columns and "approved_at" in df.columns:
+                approved_df = df[df["approved_at"].notna()]
+                for _, r in approved_df.iterrows():
+                    try:
+                        s = pd.to_datetime(r["submitted_at"])
+                        a = pd.to_datetime(r["approved_at"])
+                        hrs = (a - s).total_seconds() / 3600
+                        lead_times.append(hrs)
+                        if hrs > 4: delayed += 1
+                    except: pass
+            
+            avg_lead = sum(lead_times) / len(lead_times) if lead_times else 0
+            dept_data = df["department"].value_counts().to_dict() if "department" in df.columns else {}
+            stage_data = df["workflow_stage"].value_counts().to_dict() if "workflow_stage" in df.columns else {}
+            
             # KPI Row
             c1, c2, c3, c4, c5 = st.columns(5)
-            with c1: st.metric("📋 Total", len(df))
-            with c2: st.metric("🟢 Approved", len(df[df["workflow_stage"] == "approved"]) if "workflow_stage" in df.columns else 0)
-            with c3: st.metric("⏳ Pending", len(df[df["workflow_stage"].isin(["submitted", "authorized", "confirmed"])]) if "workflow_stage" in df.columns else 0)
-            with c4: st.metric("❌ Rejected", len(df[df["workflow_stage"] == "rejected"]) if "workflow_stage" in df.columns else 0)
-            
-            # Average approval time
-            if "submitted_at" in df.columns and "approved_at" in df.columns:
-                approved = df[df["approved_at"].notna()]
-                if len(approved) > 0:
-                    times = []
-                    for _, r in approved.iterrows():
-                        try:
-                            s = pd.to_datetime(r["submitted_at"])
-                            a = pd.to_datetime(r["approved_at"])
-                            times.append((a - s).total_seconds() / 3600)
-                        except: pass
-                    if times:
-                        avg_time = sum(times) / len(times)
-                        with c5: st.metric("⏱️ Avg Approval", f"{avg_time:.1f} hrs")
+            with c1: st.metric("📋 Total", total)
+            with c2: st.metric("🟢 Approved", approved_count)
+            with c3: st.metric("⏳ Pending", pending_count)
+            with c4: st.metric("❌ Rejected", rejected_count)
+            with c5: st.metric("⏱️ Avg Approval", f"{avg_lead:.1f} hrs")
             
             st.markdown("---")
             
@@ -759,90 +766,40 @@ def page_wp():
             # ============================================
             st.markdown("### 📅 Monthly Breakdown (Click to Filter)")
             
-            # Initialize month filter in session state
             if "report_month_filter" not in st.session_state:
                 st.session_state.report_month_filter = None
             
-            months = ["January", "February", "March", "April", "May", "June", 
-                      "July", "August", "September", "October", "November", "December"]
-            months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            months_full = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
             
-            # Row 1: Jan - Jun
             cols = st.columns(6)
             for i in range(6):
                 m_idx = i + 1
-                month_df = df[pd.to_datetime(df["created_at"]).dt.month == m_idx] if "created_at" in df.columns else pd.DataFrame()
-                count = len(month_df)
-                
+                count = len(df[pd.to_datetime(df["created_at"]).dt.month == m_idx]) if "created_at" in df.columns else 0
+                is_active = st.session_state.report_month_filter == m_idx
                 with cols[i]:
-                    # Make it clickable
-                    is_active = st.session_state.report_month_filter == m_idx
-                    card_style = f"background: {CHURCHGATE_RED}; color: white;" if is_active else "background: white;"
-                    
-                    st.markdown(f"""
-                    <div style="{card_style} border-radius: 10px; padding: 0.8rem; text-align: center; 
-                         border: 2px solid {'#aa0000' if is_active else '#ddd'}; cursor: pointer; margin-bottom: 0.3rem;"
-                         onclick="console.log('clicked')">
-                        <div style="font-size: 0.7rem; font-weight: 600;">{months_short[i]}</div>
-                        <div style="font-size: 1.8rem; font-weight: 800;">{count}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button(f"{'🔴' if is_active else '📋'} {months_short[i]}", key=f"month_btn_{m_idx}", use_container_width=True):
-                        if st.session_state.report_month_filter == m_idx:
-                            st.session_state.report_month_filter = None  # Deselect
-                        else:
-                            st.session_state.report_month_filter = m_idx  # Select
+                    if st.button(f"{'🔴' if is_active else '📋'} {months_short[i]}: {count}", key=f"mbtn_{m_idx}", use_container_width=True):
+                        st.session_state.report_month_filter = None if is_active else m_idx
                         st.rerun()
             
-            # Row 2: Jul - Dec
             cols2 = st.columns(6)
             for i in range(6):
                 m_idx = i + 7
-                month_df = df[pd.to_datetime(df["created_at"]).dt.month == m_idx] if "created_at" in df.columns else pd.DataFrame()
-                count = len(month_df)
-                
+                count = len(df[pd.to_datetime(df["created_at"]).dt.month == m_idx]) if "created_at" in df.columns else 0
+                is_active = st.session_state.report_month_filter == m_idx
                 with cols2[i]:
-                    is_active = st.session_state.report_month_filter == m_idx
-                    card_style = f"background: {CHURCHGATE_RED}; color: white;" if is_active else "background: white;"
-                    
-                    st.markdown(f"""
-                    <div style="{card_style} border-radius: 10px; padding: 0.8rem; text-align: center; 
-                         border: 2px solid {'#aa0000' if is_active else '#ddd'}; margin-bottom: 0.3rem;">
-                        <div style="font-size: 0.7rem; font-weight: 600;">{months_short[i+6]}</div>
-                        <div style="font-size: 1.8rem; font-weight: 800;">{count}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    if st.button(f"{'🔴' if is_active else '📋'} {months_short[i+6]}", key=f"month_btn_{m_idx}", use_container_width=True):
-                        if st.session_state.report_month_filter == m_idx:
-                            st.session_state.report_month_filter = None
-                        else:
-                            st.session_state.report_month_filter = m_idx
+                    if st.button(f"{'🔴' if is_active else '📋'} {months_short[i+6]}: {count}", key=f"mbtn_{m_idx}", use_container_width=True):
+                        st.session_state.report_month_filter = None if is_active else m_idx
                         st.rerun()
             
-            st.markdown("---")
-            
-            # ============================================
-            # FILTERED VIEW
-            # ============================================
             if st.session_state.report_month_filter:
                 month_idx = st.session_state.report_month_filter
                 filtered_df = df[pd.to_datetime(df["created_at"]).dt.month == month_idx] if "created_at" in df.columns else df
-                st.markdown(f"### 📋 {months[month_idx-1]} Permits ({len(filtered_df)} records)")
-                
-                show_cols = [c for c in ["permit_number", "permit_type", "raised_by_name", "department", 
-                                          "work_location", "workflow_stage", "submitted_at", 
-                                          "authorized_at", "approved_at"] if c in filtered_df.columns]
+                st.markdown(f"### 📋 {months_full[month_idx-1]} Permits ({len(filtered_df)} records)")
+                show_cols = [c for c in ["permit_number", "permit_type", "raised_by_name", "department", "work_location", "workflow_stage", "submitted_at"] if c in filtered_df.columns]
                 st.dataframe(filtered_df[show_cols], use_container_width=True, hide_index=True)
-                
-                # Download filtered month
                 csv = filtered_df.to_csv(index=False)
-                st.download_button(f"⬇️ Download {months[month_idx-1]} CSV", csv, 
-                                   f"permits_{months[month_idx-1]}_{datetime.now().year}.csv", "text/csv")
-            else:
-                st.info("👆 Click a month above to filter permits")
+                st.download_button(f"⬇️ Download {months_full[month_idx-1]} CSV", csv, f"permits_{months_full[month_idx-1]}.csv", "text/csv")
             
             st.markdown("---")
             
@@ -850,38 +807,22 @@ def page_wp():
             # ANALYTICS SUMMARY
             # ============================================
             st.markdown("### 📈 Analytics Summary")
-            
-            # By Permit Type
             if "permit_type" in df.columns:
-                type_counts = df["permit_type"].value_counts()
                 st.markdown("**By Permit Type:**")
-                cols = st.columns(len(type_counts) if len(type_counts) <= 4 else 4)
-                for i, (ptype, count) in enumerate(type_counts.items()):
-                    with cols[i % 4]:
-                        st.metric(ptype[:25], count)
-            
-            # By Department  
+                for ptype, count in df["permit_type"].value_counts().items():
+                    st.markdown(f"- {ptype}: **{count}**")
             if "department" in df.columns:
-                dept_counts = df["department"].value_counts().head(5)
-                st.markdown("**Top 5 Departments:**")
-                for dept, count in dept_counts.items():
-                    st.markdown(f"- {dept}: **{count}** permits")
-            
-            # By Stage
-            if "workflow_stage" in df.columns:
-                stage_counts = df["workflow_stage"].value_counts()
-                st.markdown("**By Workflow Stage:**")
-                for stage, count in stage_counts.items():
-                    st.markdown(f"- {stage.upper()}: **{count}** permits")
+                st.markdown("**Top Departments:**")
+                for dept, count in list(dept_data.items())[:5]:
+                    st.markdown(f"- {dept}: **{count}**")
             
             st.markdown("---")
             
             # ============================================
-            # PDF REPORT GENERATION
+            # PDF & HTML REPORT GENERATION
             # ============================================
             st.markdown("### 📄 Generate Reports")
-            
-            report_format = st.radio("Select Report Format", ["📄 PDF Download", "🌐 HTML Preview & Download"], horizontal=True)
+            report_format = st.radio("Select Format", ["📄 PDF Download", "🌐 HTML Preview & Download"], horizontal=True)
             
             if report_format == "📄 PDF Download":
                 if st.button("📊 Generate PDF Report", use_container_width=True, type="primary"):
@@ -893,270 +834,173 @@ def page_wp():
                                 logo_path = Path("churchgate-logo.png")
                                 if logo_path.exists():
                                     self.image(str(logo_path), x=14, y=8, h=12)
-                                self.set_fill_color(26, 26, 26)
                                 self.set_text_color(255, 255, 255)
-                                self.set_font('Helvetica', 'B', 14)
-                                self.set_xy(14, 22)
-                                self.cell(260, 6, 'Work Permit Analytics Report', 0, 0, 'L')
+                                self.set_fill_color(26, 26, 26)
+                                self.rect(10, 22, 277, 14, 'F')
+                                self.set_fill_color(204, 0, 0)
+                                self.rect(10, 22, 4, 14, 'F')
+                                self.set_font('Helvetica', 'B', 12)
+                                self.set_xy(18, 24)
+                                self.cell(260, 5, 'Work Permit Analytics Report', 0, 0, 'L')
                                 self.set_font('Helvetica', '', 8)
-                                self.set_xy(14, 28)
-                                self.cell(260, 6, f'{info.get("full_name", fc)} | Generated: {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
-                                self.set_draw_color(204, 0, 0)
-                                self.set_line_width(0.5)
-                                self.line(14, 34, 283, 34)
-                                self.set_y(38)
+                                self.set_xy(18, 29)
+                                self.cell(260, 5, f'{info.get("full_name", fc)} | {datetime.now().strftime("%d %B %Y, %I:%M %p WAT")}', 0, 0, 'L')
+                                self.set_y(40)
                             
                             def footer(self):
-                                self.set_y(-20)
+                                self.set_y(-18)
                                 self.set_font('Helvetica', 'I', 7)
                                 self.set_text_color(150, 150, 150)
-                                self.cell(0, 10, f'Page {self.page_no()}/{{nb}} | Churchgate Group | facilityXperience | Confidential', 0, 0, 'C')
+                                self.cell(0, 8, f'Page {self.page_no()}/{{nb}} | Churchgate Group | Confidential', 0, 0, 'C')
                         
                         pdf = WorkPermitPDF('L', 'mm', 'A4')
                         pdf.alias_nb_pages()
                         pdf.add_page()
-                        pdf.set_auto_page_break(auto=True, margin=25)
+                        pdf.set_auto_page_break(auto=True, margin=22)
                         
-                        # KPI Section
-                        pdf.set_font('Helvetica', 'B', 12)
+                        # KPIs
+                        pdf.set_font('Helvetica', 'B', 11)
                         pdf.set_text_color(26, 26, 26)
-                        pdf.cell(0, 8, 'Key Performance Indicators', 0, 1)
+                        pdf.cell(0, 7, 'Key Performance Indicators', 0, 1)
                         pdf.ln(2)
                         
                         kpis = [
-                            ("Total Permits", str(total), 204, 0, 0),
+                            ("Total", str(total), 204, 0, 0),
                             ("Approved", str(approved_count), 16, 185, 129),
                             ("Pending", str(pending_count), 245, 158, 11),
                             ("Rejected", str(rejected_count), 100, 100, 100),
                             ("Avg Lead Time", f"{avg_lead:.1f} hrs", 37, 99, 235),
                         ]
-                        
-                        x_start = pdf.get_x()
-                        y_start = pdf.get_y()
+                        xs = pdf.get_x()
+                        ys = pdf.get_y()
                         for i, (label, value, r, g, b) in enumerate(kpis):
-                            x = x_start + (i * 55)
-                            pdf.set_xy(x, y_start)
+                            x = xs + (i * 55)
                             pdf.set_fill_color(245, 245, 245)
                             pdf.set_draw_color(r, g, b)
-                            pdf.set_line_width(0.3)
-                            pdf.rect(x, y_start, 50, 20, 'DF')
+                            pdf.rect(x, ys, 50, 18, 'DF')
                             pdf.set_fill_color(r, g, b)
-                            pdf.rect(x, y_start, 3, 20, 'F')
-                            pdf.set_xy(x + 6, y_start + 2)
-                            pdf.set_font('Helvetica', '', 7)
+                            pdf.rect(x, ys, 3, 18, 'F')
+                            pdf.set_xy(x + 5, ys + 2)
+                            pdf.set_font('Helvetica', '', 6)
                             pdf.set_text_color(100, 100, 100)
-                            pdf.cell(40, 4, label.upper(), 0, 0, 'C')
-                            pdf.set_xy(x + 6, y_start + 8)
-                            pdf.set_font('Helvetica', 'B', 14)
+                            pdf.cell(42, 4, label.upper(), 0, 0, 'C')
+                            pdf.set_xy(x + 5, ys + 8)
+                            pdf.set_font('Helvetica', 'B', 13)
                             pdf.set_text_color(r, g, b)
-                            pdf.cell(40, 7, value, 0, 0, 'C')
-                        
-                        pdf.set_y(y_start + 26)
+                            pdf.cell(42, 7, value, 0, 0, 'C')
+                        pdf.set_y(ys + 24)
                         pdf.ln(4)
                         
-                        # Delayed Alert
                         if delayed > 0:
                             pdf.set_fill_color(255, 243, 205)
-                            pdf.set_draw_color(245, 158, 11)
-                            pdf.set_font('Helvetica', 'B', 9)
+                            pdf.set_font('Helvetica', 'B', 8)
                             pdf.set_text_color(146, 76, 14)
-                            pdf.cell(0, 8, f'  WARNING: {delayed} permit(s) exceeded 4-hour approval target. Review workflow bottlenecks.', 1, 1, 'L', True)
+                            pdf.cell(0, 7, f'  WARNING: {delayed} permit(s) exceeded 4-hour target', 1, 1, 'L', True)
                             pdf.ln(3)
                         
-                        # Department Breakdown
-                        pdf.set_font('Helvetica', 'B', 11)
+                        # Department Table
+                        pdf.set_font('Helvetica', 'B', 10)
                         pdf.set_text_color(26, 26, 26)
-                        pdf.cell(0, 8, 'Department Breakdown', 0, 1)
-                        pdf.ln(1)
-                        
+                        pdf.cell(0, 7, 'Department Breakdown', 0, 1)
                         pdf.set_font('Helvetica', 'B', 7)
                         pdf.set_fill_color(204, 0, 0)
                         pdf.set_text_color(255, 255, 255)
-                        pdf.cell(170, 6, '  Department', 1, 0, 'L', True)
-                        pdf.cell(30, 6, 'Permits', 1, 0, 'C', True)
-                        pdf.cell(0, 6, '', 0, 1)
-                        
+                        pdf.cell(170, 5.5, '  Department', 1, 0, 'L', True)
+                        pdf.cell(30, 5.5, 'Permits', 1, 0, 'C', True)
+                        pdf.ln()
                         pdf.set_font('Helvetica', '', 7)
                         pdf.set_text_color(26, 26, 26)
                         for dept, count in list(dept_data.items())[:15]:
-                            safe_dept = dept.replace('\u2014','-').replace('\u2019',"'").replace('\u201c','"').replace('\u201d','"')[:65]
-                            pdf.cell(170, 5.5, f'  {safe_dept}', 1, 0, 'L')
-                            pdf.cell(30, 5.5, str(count), 1, 0, 'C')
-                            pdf.cell(0, 5.5, '', 0, 1)
+                            sd = dept.replace('\u2014','-').replace('\u2019',"'")[:65]
+                            pdf.cell(170, 5, f'  {sd}', 1, 0, 'L')
+                            pdf.cell(30, 5, str(count), 1, 0, 'C')
+                            pdf.ln()
                         pdf.ln(3)
                         
                         # Stage Distribution
-                        pdf.set_font('Helvetica', 'B', 11)
+                        pdf.set_font('Helvetica', 'B', 10)
                         pdf.set_text_color(26, 26, 26)
-                        pdf.cell(0, 8, 'Workflow Stage Distribution', 0, 1)
-                        pdf.ln(1)
-                        
+                        pdf.cell(0, 7, 'Workflow Stage Distribution', 0, 1)
                         pdf.set_font('Helvetica', 'B', 7)
                         pdf.set_fill_color(204, 0, 0)
                         pdf.set_text_color(255, 255, 255)
-                        pdf.cell(100, 6, '  Stage', 1, 0, 'L', True)
-                        pdf.cell(30, 6, 'Count', 1, 0, 'C', True)
-                        pdf.cell(0, 6, '', 0, 1)
-                        
+                        pdf.cell(100, 5.5, '  Stage', 1, 0, 'L', True)
+                        pdf.cell(30, 5.5, 'Count', 1, 0, 'C', True)
+                        pdf.ln()
                         pdf.set_font('Helvetica', '', 7)
                         pdf.set_text_color(26, 26, 26)
                         for stage, count in stage_data.items():
-                            safe_stage = stage.replace('\u2014','-').upper()
-                            pdf.cell(100, 5.5, f'  {safe_stage}', 1, 0, 'L')
-                            pdf.cell(30, 5.5, str(count), 1, 0, 'C')
-                            pdf.cell(0, 5.5, '', 0, 1)
+                            pdf.cell(100, 5, f'  {stage.upper()}', 1, 0, 'L')
+                            pdf.cell(30, 5, str(count), 1, 0, 'C')
+                            pdf.ln()
                         pdf.ln(3)
                         
-                        # Complete Audit Trail
-                        pdf.set_font('Helvetica', 'B', 11)
+                        # Audit Trail
+                        pdf.set_font('Helvetica', 'B', 10)
                         pdf.set_text_color(26, 26, 26)
-                        pdf.cell(0, 8, 'Complete Audit Trail', 0, 1)
-                        pdf.ln(1)
-                        
-                        pdf.set_font('Helvetica', 'B', 6.5)
+                        pdf.cell(0, 7, 'Complete Audit Trail', 0, 1)
+                        pdf.set_font('Helvetica', 'B', 6)
                         pdf.set_fill_color(204, 0, 0)
                         pdf.set_text_color(255, 255, 255)
-                        col_widths = [35, 28, 42, 36, 36, 36, 36, 22]
-                        headers = ['Permit No', 'Raised By', 'Department', 'Submitted', 'Authorized', 'Confirmed', 'Approved', 'Status']
-                        for header, width in zip(headers, col_widths):
-                            pdf.cell(width, 6, f' {header}', 1, 0, 'L', True)
+                        cw = [35, 28, 42, 36, 36, 36, 36, 22]
+                        for h, w in zip(['Permit No','Raised By','Department','Submitted','Authorized','Confirmed','Approved','Status'], cw):
+                            pdf.cell(w, 5.5, f' {h}', 1, 0, 'L', True)
                         pdf.ln()
-                        
-                        pdf.set_font('Helvetica', '', 6)
+                        pdf.set_font('Helvetica', '', 5.5)
                         for _, row in df.iterrows():
-                            stage = row.get('workflow_stage', '')
-                            if stage == 'approved':
-                                pdf.set_text_color(6, 95, 70)
-                            elif stage == 'rejected':
-                                pdf.set_text_color(153, 27, 27)
-                            else:
-                                pdf.set_text_color(26, 26, 26)
-                            
-                            values = [
-                                str(row.get('permit_number', ''))[:16],
-                                str(row.get('raised_by_name', ''))[:13],
-                                str(row.get('department', '')).replace('\u2014','-')[:20],
-                                str(format_wat_time(row.get('submitted_at', '')))[:16],
-                                str(format_wat_time(row.get('authorized_at', '')))[:16],
-                                str(format_wat_time(row.get('confirmed_at', '')))[:16],
-                                str(format_wat_time(row.get('approved_at', '')))[:16],
-                                stage.upper()[:7],
+                            stg = row.get('workflow_stage','')
+                            if stg == 'approved': pdf.set_text_color(6,95,70)
+                            elif stg == 'rejected': pdf.set_text_color(153,27,27)
+                            else: pdf.set_text_color(26,26,26)
+                            vals = [
+                                str(row.get('permit_number',''))[:16],
+                                str(row.get('raised_by_name',''))[:13],
+                                str(row.get('department','')).replace('\u2014','-')[:20],
+                                str(format_wat_time(row.get('submitted_at','')))[:16],
+                                str(format_wat_time(row.get('authorized_at','')))[:16],
+                                str(format_wat_time(row.get('confirmed_at','')))[:16],
+                                str(format_wat_time(row.get('approved_at','')))[:16],
+                                stg.upper()[:7],
                             ]
-                            for value, width in zip(values, col_widths):
-                                pdf.cell(width, 5, f' {value}', 1, 0, 'L')
+                            for v, w in zip(vals, cw):
+                                pdf.cell(w, 4.5, f' {v}', 1, 0, 'L')
                             pdf.ln()
                         
-                        # Save and download
-                        pdf_file = f"/tmp/work_permit_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                        pdf_file = f"/tmp/wp_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
                         pdf.output(pdf_file)
-                        
                         with open(pdf_file, "rb") as f:
                             pdf_bytes = f.read()
-                        
-                        st.success("✅ PDF Report Generated Successfully!")
-                        st.download_button(
-                            label="📥 Download PDF Report",
-                            data=pdf_bytes,
-                            file_name=f"Work_Permit_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True,
-                            type="primary"
-                        )
+                        st.success("✅ PDF Generated!")
+                        st.download_button("📥 Download PDF", pdf_bytes, f"Work_Permit_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf", "application/pdf", use_container_width=True, type="primary")
                     except Exception as e:
-                        st.error(f"PDF Error: {str(e)}")
+                        st.error(f"PDF Error: {e}")
             
             else:
-                # ============================================
-                # HTML REPORT PREVIEW & DOWNLOAD
-                # ============================================
+                # HTML Report
                 st.markdown("### 🌐 HTML Report Preview")
-                
-                # Build HTML
+                logo_b64 = get_logo_base64()
                 dept_rows = "".join([f"<tr><td>{d}</td><td>{c}</td></tr>" for d, c in list(dept_data.items())[:15]])
                 stage_rows = "".join([f"<tr><td>{s.upper()}</td><td>{c}</td></tr>" for s, c in stage_data.items()])
-                
                 audit_rows = ""
                 for _, row in df.iterrows():
-                    stage = row.get('workflow_stage','')
-                    badge_class = "badge-approved" if stage=="approved" else ("badge-rejected" if stage=="rejected" else "badge-pending")
-                    audit_rows += f"""
-                    <tr>
-                        <td>{row.get('permit_number','')}</td>
-                        <td>{row.get('raised_by_name','')}</td>
-                        <td>{row.get('department','')[:30]}</td>
-                        <td>{format_wat_time(row.get('submitted_at',''))}</td>
-                        <td>{format_wat_time(row.get('authorized_at',''))}</td>
-                        <td>{format_wat_time(row.get('confirmed_at',''))}</td>
-                        <td>{format_wat_time(row.get('approved_at',''))}</td>
-                        <td><span class="{badge_class}">{stage.upper()}</span></td>
-                    </tr>"""
+                    stg = row.get('workflow_stage','')
+                    bc = "badge-approved" if stg=="approved" else ("badge-rejected" if stg=="rejected" else "badge-pending")
+                    audit_rows += f"""<tr><td>{row.get('permit_number','')}</td><td>{row.get('raised_by_name','')}</td><td>{row.get('department','')[:30]}</td><td>{format_wat_time(row.get('submitted_at',''))}</td><td>{format_wat_time(row.get('authorized_at',''))}</td><td>{format_wat_time(row.get('confirmed_at',''))}</td><td>{format_wat_time(row.get('approved_at',''))}</td><td><span class="{bc}">{stg.upper()}</span></td></tr>"""
                 
-                html_report = f"""
-                <!DOCTYPE html>
-                <html><head><meta charset="UTF-8">
-                <style>
-                    body{{font-family:'Inter',Arial,sans-serif;color:#1a1a1a;font-size:11px;margin:20px}}
-                    .header{{background:linear-gradient(105deg,#1a1a1a,#2a2a2a);color:white;padding:20px;border-radius:10px;margin-bottom:20px}}
-                    .header h1{{margin:0;font-size:22px}}.header span{{color:#CC0000}}
-                    .kpi-row{{display:flex;gap:12px;margin:15px 0}}
-                    .kpi-card{{flex:1;background:white;border:1px solid #ddd;border-radius:8px;padding:12px;text-align:center;border-left:4px solid #CC0000}}
-                    .kpi-card.green{{border-left-color:#10B981}}.kpi-card.orange{{border-left-color:#F59E0B}}
-                    .kpi-value{{font-size:26px;font-weight:800}}.kpi-label{{font-size:10px;color:#666;text-transform:uppercase}}
-                    .section{{background:white;border:1px solid #ddd;border-radius:8px;padding:15px;margin:15px 0}}
-                    .section h2{{font-size:16px;color:#CC0000;margin-top:0;border-bottom:2px solid #CC0000;padding-bottom:8px}}
-                    table{{width:100%;border-collapse:collapse;font-size:10px;margin:10px 0}}
-                    th{{background:#CC0000;color:white;padding:8px 6px;text-align:left;font-size:9px;text-transform:uppercase}}
-                    td{{padding:6px;border-bottom:1px solid #eee}}tr:nth-child(even){{background:#fafafa}}
-                    .badge-approved{{background:#ECFDF5;color:#065F46;padding:3px 8px;border-radius:12px;font-weight:600}}
-                    .badge-pending{{background:#FFFBEB;color:#92400E;padding:3px 8px;border-radius:12px;font-weight:600}}
-                    .badge-rejected{{background:#FEF2F2;color:#991B1B;padding:3px 8px;border-radius:12px;font-weight:600}}
-                    .alert-box{{background:#FFF3CD;border:1px solid #F59E0B;border-radius:8px;padding:12px;margin:10px 0}}
-                    .footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #ddd;padding-top:12px}}
-                </style></head><body>
-               <div class="header" style="display:flex;align-items:center;gap:15px;">
-                    <img src="data:image/png;base64,{get_logo_base64()}" height="40">
-                    <div>
-                        <h1 style="margin:0;">Work Permit Analytics Report</h1>
-                        <p style="margin:5px 0 0 0;font-size:10px;opacity:0.8;">{info.get('full_name',fc)} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p>
-                    </div>
-                </div><p style="margin:3px 0 0 0;font-size:10px;opacity:0.8">{info.get('full_name',fc)} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p></div>
-                <div class="kpi-row">
-                    <div class="kpi-card"><div class="kpi-value">{total}</div><div class="kpi-label">Total Permits</div></div>
-                    <div class="kpi-card green"><div class="kpi-value">{approved_count}</div><div class="kpi-label">Approved</div></div>
-                    <div class="kpi-card orange"><div class="kpi-value">{pending_count}</div><div class="kpi-label">Pending</div></div>
-                    <div class="kpi-card"><div class="kpi-value">{rejected_count}</div><div class="kpi-label">Rejected</div></div>
-                    <div class="kpi-card green"><div class="kpi-value">{avg_lead:.1f} hrs</div><div class="kpi-label">Avg Lead Time</div></div>
-                </div>
-                {f'<div class="alert-box"><b>DELAYED PERMITS:</b> {delayed} permit(s) exceeded 4-hour approval target.</div>' if delayed > 0 else ''}
-                <div class="section"><h2>Department Breakdown</h2><table><tr><th>Department</th><th>Permits</th></tr>{dept_rows}</table></div>
-                <div class="section"><h2>Workflow Stage Distribution</h2><table><tr><th>Stage</th><th>Count</th></tr>{stage_rows}</table></div>
-                <div class="section"><h2>Complete Audit Trail</h2><table><tr><th>Permit No</th><th>Raised By</th><th>Department</th><th>Submitted</th><th>Authorized</th><th>Confirmed</th><th>Approved</th><th>Status</th></tr>{audit_rows}</table></div>
-                <div class="footer"><p>Churchgate Group | facilityXperience Enterprise | Confidential</p><p>Auto-generated report. For queries contact facility management.</p></div>
-                </body></html>"""
+                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:'Inter',Arial,sans-serif;color:#1a1a1a;font-size:11px;margin:20px}}.header{{background:#1a1a1a;color:white;padding:20px;border-radius:10px;display:flex;align-items:center;gap:15px;margin-bottom:20px}}.header h1{{margin:0;font-size:18px}}.kpi-row{{display:flex;gap:10px;margin:15px 0}}.kpi-card{{flex:1;background:white;border:1px solid #ddd;border-radius:8px;padding:10px;text-align:center;border-left:4px solid #CC0000}}.kpi-card.green{{border-left-color:#10B981}}.kpi-val{{font-size:22px;font-weight:800}}.kpi-label{{font-size:9px;color:#666;text-transform:uppercase}}table{{width:100%;border-collapse:collapse;font-size:10px;margin:10px 0}}th{{background:#CC0000;color:white;padding:6px;text-align:left;font-size:9px}}td{{padding:5px;border-bottom:1px solid #eee}}.badge-approved{{background:#ECFDF5;color:#065F46;padding:2px 8px;border-radius:10px;font-weight:600}}.badge-pending{{background:#FFFBEB;color:#92400E;padding:2px 8px;border-radius:10px;font-weight:600}}.badge-rejected{{background:#FEF2F2;color:#991B1B;padding:2px 8px;border-radius:10px;font-weight:600}}.footer{{text-align:center;font-size:9px;color:#999;margin-top:20px;border-top:1px solid #ddd;padding-top:10px}}</style></head><body>
+                <div class="header">{'<img src="data:image/png;base64,'+logo_b64+'" height="40">' if logo_b64 else ''}<div><h1>Work Permit Analytics Report</h1><p style="margin:3px 0 0 0;font-size:10px;opacity:0.8">{info.get('full_name',fc)} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p></div></div>
+                <div class="kpi-row"><div class="kpi-card"><div class="kpi-val">{total}</div><div class="kpi-label">Total</div></div><div class="kpi-card green"><div class="kpi-val">{approved_count}</div><div class="kpi-label">Approved</div></div><div class="kpi-card"><div class="kpi-val">{pending_count}</div><div class="kpi-label">Pending</div></div><div class="kpi-card"><div class="kpi-val">{rejected_count}</div><div class="kpi-label">Rejected</div></div><div class="kpi-card green"><div class="kpi-val">{avg_lead:.1f}h</div><div class="kpi-label">Avg Lead</div></div></div>
+                {f'<div style="background:#FFF3CD;border:1px solid #F59E0B;border-radius:8px;padding:10px;margin:10px 0"><b>DELAYED:</b> {delayed} permit(s) exceeded 4-hour target.</div>' if delayed>0 else ''}
+                <h2>Department Breakdown</h2><table><tr><th>Department</th><th>Permits</th></tr>{dept_rows}</table>
+                <h2>Stage Distribution</h2><table><tr><th>Stage</th><th>Count</th></tr>{stage_rows}</table>
+                <h2>Audit Trail</h2><table><tr><th>Permit No</th><th>Raised By</th><th>Department</th><th>Submitted</th><th>Authorized</th><th>Confirmed</th><th>Approved</th><th>Status</th></tr>{audit_rows}</table>
+                <div class="footer">Churchgate Group | facilityXperience | Confidential</div></body></html>"""
                 
-                # Preview
-                st.components.v1.html(html_report, height=600, scrolling=True)
-                
-                # Download button
-                st.download_button(
-                    label="📥 Download HTML Report",
-                    data=html_report,
-                    file_name=f"Work_Permit_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
-                    mime="text/html",
-                    use_container_width=True,
-                    type="primary"
-                )
-                st.caption("💡 Open the downloaded HTML file in any browser. Use Print → Save as PDF to convert.")
-
-            
-            # Quick CSV download
-            st.markdown("---")
-            csv_all = df.to_csv(index=False)
-            st.download_button("⬇️ Download Full CSV Report", csv_all, 
-                              f"work_permits_full_{datetime.now().strftime('%Y%m%d')}.csv", "text/csv")
+                st.components.v1.html(html, height=600, scrolling=True)
+                st.download_button("📥 Download HTML Report", html, f"Work_Permit_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.html", "text/html", use_container_width=True, type="primary")
         
         else:
-            st.info("📋 No work permits to report yet. Raise your first permit to see analytics here.")
+            st.info("📋 No work permits to report yet.")
     
     # ============================================
     # TAB 4: WORKFLOW CONFIG (MULTI-SELECT)
