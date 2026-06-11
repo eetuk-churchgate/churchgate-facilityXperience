@@ -979,7 +979,8 @@ def page_wp():
                 pdf.set_font('Helvetica', '', 8)
                 pdf.set_text_color(26, 26, 26)
                 for dept, count in list(dept_data.items())[:15]:
-                    pdf.cell(170, 6, f'  {dept[:70]}', 1, 0, 'L')
+                    safe_dept = dept.replace('—', '-').replace('’', "'").replace('"', '"').replace('"', '"')[:70]
+                    pdf.cell(170, 6, f'  {safe_dept}', 1, 0, 'L')
                     pdf.cell(30, 6, str(count), 1, 0, 'C')
                     pdf.cell(0, 6, '', 0, 1)
                 pdf.ln(5)
@@ -998,7 +999,8 @@ def page_wp():
                 pdf.set_font('Helvetica', '', 8)
                 pdf.set_text_color(26, 26, 26)
                 for stage, count in stage_data.items():
-                    pdf.cell(100, 6, f'  {stage.upper()}', 1, 0, 'L')
+                    safe_stage = stage.replace('—','-').upper()
+                    pdf.cell(100, 6, f'  {safe_stage}', 1, 0, 'L')
                     pdf.cell(30, 6, str(count), 1, 0, 'C')
                     pdf.cell(0, 6, '', 0, 1)
                 pdf.ln(5)
@@ -1033,7 +1035,7 @@ def page_wp():
                     values = [
                         str(row.get('permit_number', ''))[:18],
                         str(row.get('raised_by_name', ''))[:14],
-                        str(row.get('department', ''))[:22],
+                        str(row.get('department', '')).replace('—','-')[:22],
                         str(format_wat_time(row.get('submitted_at', '')))[:16],
                         str(format_wat_time(row.get('authorized_at', '')))[:16],
                         str(format_wat_time(row.get('confirmed_at', '')))[:16],
