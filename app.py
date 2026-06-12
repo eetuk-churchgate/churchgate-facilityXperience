@@ -531,16 +531,9 @@ def page_wp():
                         dept = row.get("department", "")
                         
                         if can_authorize and stage == "submitted":
-                            authorizers = get_workflow_people(fc, 1, dept)
-                            if authorizers:
-                                auth_names = [a.get("person_name", "Unknown") for a in authorizers]
-                                selected_auth = st.selectbox("Select Authorizer", auth_names, key=f"auth_sel_{row['id']}")
-                                if st.button("🔐 Authorize", key=f"auth_btn_{row['id']}", use_container_width=True, type="primary"):
-                                    DB.update("work_permits", row["id"], {
-                                        "workflow_stage": "authorized",
-                                        "authorized_by_name": selected_auth,
-                                        "authorized_at": now
-                                    })
+                            if st.button("🔐 Authorize", key=f"auth_btn_{row['id']}", use_container_width=True, type="primary"):
+                                auth_name = st.session_state.get("user_name", "Authorizer")
+                                DB.update("work_permits", row["id"], {"workflow_stage": "authorized", "authorized_by_name": auth_name, "authorized_at": now})
                                     # Notify confirmers
                                     confirmers = get_workflow_people(fc, 2)
                                     for c in confirmers:
@@ -555,15 +548,9 @@ def page_wp():
                         
                         if can_confirm and stage == "authorized":
                             confirmers = get_workflow_people(fc, 2)
-                            if confirmers:
-                                conf_names = [c.get("person_name", "Unknown") for c in confirmers]
-                                selected_conf = st.selectbox("Select Confirmer", conf_names, key=f"conf_sel_{row['id']}")
-                                if st.button("✅ Confirm", key=f"conf_btn_{row['id']}", use_container_width=True, type="primary"):
-                                    DB.update("work_permits", row["id"], {
-                                        "workflow_stage": "confirmed",
-                                        "confirmed_by_name": selected_conf,
-                                        "confirmed_at": now
-                                    })
+                            if st.button("✅ Confirm", key=f"conf_btn_{row['id']}", use_container_width=True, type="primary"):
+                                conf_name = st.session_state.get("user_name", "Confirmer")
+                                DB.update("work_permits", row["id"], {"workflow_stage": "confirmed", "confirmed_by_name": conf_name, "confirmed_at": now})
                                     approvers = get_workflow_people(fc, 3)
                                     for a in approvers:
                                         send_email_notification(a.get("person_email", ""),
@@ -577,16 +564,9 @@ def page_wp():
                         
                         if can_approve and stage in ["authorized", "confirmed"]:
                             approvers = get_workflow_people(fc, 3)
-                            if approvers:
-                                app_names = [a.get("person_name", "Unknown") for a in approvers]
-                                selected_app = st.selectbox("Select Approver", app_names, key=f"app_sel_{row['id']}")
-                                if st.button("🟢 Approve", key=f"app_btn_{row['id']}", use_container_width=True, type="primary"):
-                                    DB.update("work_permits", row["id"], {
-                                        "workflow_stage": "approved",
-                                        "status": "approved",
-                                        "approved_by_name": selected_app,
-                                        "approved_at": now
-                                    })
+                            if st.button("🟢 Approve", key=f"app_btn_{row['id']}", use_container_width=True, type="primary"):
+                                app_name = st.session_state.get("user_name", "Approver")
+                                DB.update("work_permits", row["id"], {"workflow_stage": "approved", "status": "approved", "approved_by_name": app_name, "approved_at": now})
                                     send_email_notification(row.get("requester_contact", ""),
                                         f"🟢 Permit {permit_no} APPROVED",
                                         f"<h3>Permit Approved!</h3><p>Your permit <b>{permit_no}</b> has been <b>APPROVED</b> by {selected_app}.</p><p>You may now proceed with work.</p>")
