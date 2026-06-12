@@ -1084,6 +1084,9 @@ def page_wp():
     # TAB 4: WORKFLOW CONFIG (MULTI-SELECT)
     # ============================================
     with tab4:
+        if not is_admin:
+            st.error("⛔ Admin access only")
+            st.stop()
         st.markdown("### ⚙️ Workflow Configuration")
         st.caption("Manage who authorizes, confirms, and approves work permits")
         
