@@ -407,7 +407,7 @@ def send_email_notification(to_email, subject, body):
         if config and config.data:
             cfg = config.data
             msg = MIMEMultipart()
-            msg['From'] = cfg.get('sender_email', 'eetuk@churchgate.com')
+            msg['From'] = f"facilityXperience <{cfg.get('sender_email', 'eetuk@churchgate.com')}>"
             msg['To'] = to_email
             msg['Subject'] = subject
             msg.attach(MIMEText(body, 'html'))
