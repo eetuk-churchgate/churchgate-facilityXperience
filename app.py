@@ -1247,8 +1247,8 @@ def page_raise_ticket():
     if "ai_chat_history" not in st.session_state:
         st.session_state.ai_chat_history = []
     
-    # CHAT INPUT AT TOP
-    prompt = st.chat_input("Describe your issue...", key="ai_chat_main")
+    # CHAT INPUT — FIRST THING
+    prompt = st.chat_input("Describe your issue...", key="ai_chat_final")
     
     if prompt:
         st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
@@ -1263,24 +1263,23 @@ def page_raise_ticket():
         if ai_response:
             full_response = ai_response
         elif kb.data:
-            full_response = "Here are solutions:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+            full_response = "Solutions found:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
         else:
             full_response = "No solution found. Please raise a ticket below."
         
         st.session_state.ai_chat_history.append({"role": "assistant", "content": full_response})
         st.rerun()
     
-    # Quick action buttons BELOW chat input
-    st.caption("⚡ Quick actions:")
-    quick_issues = ["AC not cooling", "Internet too slow", "Water leaking", "Power outage", "Elevator not working", "Access card issue"]
+    # Quick buttons
     cols = st.columns(6)
+    quick_issues = ["AC not cooling", "Internet slow", "Water leak", "Power out", "Elevator", "Access card"]
     for i, issue in enumerate(quick_issues):
         with cols[i]:
-            if st.button(issue, key=f"quick_{i}", use_container_width=True):
+            if st.button(issue, key=f"q_{i}", use_container_width=True):
                 st.session_state.ai_chat_history.append({"role": "user", "content": issue})
                 st.rerun()
     
-    # Chat history BELOW quick buttons
+    # Chat history
     for msg in st.session_state.ai_chat_history:
         if msg["role"] == "user":
             st.chat_message("user").write(msg["content"])
@@ -1288,7 +1287,7 @@ def page_raise_ticket():
             st.chat_message("assistant").write(msg["content"])
     
     if st.session_state.ai_chat_history:
-        if st.button("🗑️ Clear Chat"):
+        if st.button("🗑️ Clear"):
             st.session_state.ai_chat_history = []
             st.rerun()
     
