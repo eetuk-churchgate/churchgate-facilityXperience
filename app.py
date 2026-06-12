@@ -1389,7 +1389,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting. If unresolved, dir
             st.rerun()
     
     if st.session_state.ai_chat_history:
-        if st.button("🗑️ Clear Chat", use_container_width=True):
+        if st.button("🗑️ Clear Chat", use_container_width=True, key="clear_ai_chat"):
             st.session_state.ai_chat_history = []
             st.session_state.ai_conversation = []
             st.rerun()
