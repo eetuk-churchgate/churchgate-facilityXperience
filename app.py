@@ -1344,8 +1344,6 @@ def page_helpdesk():
             tickets = filtered
         
         if tickets:
-        
-        if tickets:
             df = pd.DataFrame(tickets)
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: st.metric("🔴 Open", len(df[df["status"] == "open"]) if "status" in df.columns else 0)
