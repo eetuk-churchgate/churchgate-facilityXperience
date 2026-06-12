@@ -216,18 +216,21 @@ def get_facility_logo(fc, h=60):
 def ask_facility_xpert(query, categories):
     """AI-powered facility assistant"""
     try:
+        from openai import OpenAI
+        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
         cat_list = ", ".join(categories[:10])
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center. Help tenants resolve facility issues. Categories: {cat_list}. For emergencies (fire, elevator stuck, water leak), advise calling security. Keep under 100 words."},
+                {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja. Help tenants and staff resolve facility issues quickly. Available categories: {cat_list}. For emergencies (fire, elevator stuck, major water leak), advise calling security or raising urgent ticket immediately. Keep responses concise under 100 words. Be professional and helpful."},
                 {"role": "user", "content": query}
             ],
             max_tokens=200,
             temperature=0.5
         )
         return response.choices[0].message.content
-    except:
+    except Exception as e:
+        st.error(f"AI Error: {str(e)}")
         return None
 
 def get_nav_logo():
@@ -1232,29 +1235,40 @@ def page_raise_ticket():
     
     # AI SMART SEARCH
     st.markdown("### 🤖 facilityXpert — Smart Issue Resolution")
-    ai_query = st.text_input("Describe your issue (AI will suggest solutions)", placeholder="e.g. My AC is not cooling, water leaking from ceiling...", key="ai_search")
+    st.caption("Describe your issue and let AI suggest solutions before raising a ticket")
     
-    if ai_query:
-        kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{ai_query}%,tags.ilike.%{ai_query}%").limit(5).execute()
-        hc = DB.get_helpdesk_categories()
-        cat_names_list = sorted(list(set(c.get("category_name", "") for c in hc)))
-        ai_response = ask_facility_xpert(ai_query, cat_names_list)
+    c1, c2 = st.columns([4, 1])
+    with c1:
+        ai_query = st.text_input("What's the issue?", placeholder="e.g. My AC is blowing hot air, internet is slow, water leaking...", key="ai_search", label_visibility="collapsed")
+    with c2:
+        ask_ai = st.button("🤖 Ask AI", use_container_width=True, type="primary")
+    
+    if ask_ai and ai_query:
+        with st.spinner("🤖 facilityXpert is thinking..."):
+            kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{ai_query}%,tags.ilike.%{ai_query}%").limit(5).execute()
+            hc = DB.get_helpdesk_categories()
+            cat_names_list = sorted(list(set(c.get("category_name", "") for c in hc)))
+            ai_response = ask_facility_xpert(ai_query, cat_names_list)
         
         if ai_response:
             st.markdown("### 🤖 facilityXpert AI Says:")
             st.info(ai_response)
         
         if kb.data:
-            st.success(f"💡 Also found {len(kb.data)} matching solutions:")
+            st.success(f"💡 Also found {len(kb.data)} matching solutions in our knowledge base:")
             for k in kb.data:
                 with st.expander(f"🔧 {k.get('question','')} — {k.get('category','')}"):
                     st.markdown(f"**Solution:** {k.get('answer','')}")
+                    st.caption(f"Priority: {k.get('priority','')} | Department: {k.get('department','')}")
                     if st.button(f"✅ This solved my issue", key=f"solved_{k['id']}"):
-                        st.success("Great! Issue resolved! 🎉")
+                        st.success("Great! Issue resolved without a ticket. 🎉")
                         st.balloons()
         
         if not ai_response and not kb.data:
-            st.info("No solutions found. Please raise a ticket.")
+            st.warning("No solutions found. Please raise a ticket below.")
+    
+    elif ask_ai and not ai_query:
+        st.warning("Please describe your issue first")
     
     st.markdown("---")
     st.markdown("### 📝 Raise New Ticket")
