@@ -1317,8 +1317,33 @@ def page_raise_ticket():
                     ai_response = response.json()["choices"][0]["message"]["content"]
                 else:
                     ai_response = None
-            except:
-                ai_response = None
+            
+            # Check if AI wants to create a ticket — actually create it
+            if ai_response and ("TICKET:" in ai_response.upper() or "I've created a ticket" in ai_response or "created a ticket" in ai_response):
+                try:
+                    cnt = len(DB.get_all("tickets", fc, 1000))
+                    ticket_number = f"TKT-{fc}-{datetime.now().strftime('%d%H%M%S')}"
+                    
+                    DB.insert("tickets", {
+                        "facility_code": fc,
+                        "ticket_number": ticket_number,
+                        "title": prompt[:100],
+                        "description": prompt,
+                        "category": "Internet Outage",
+                        "priority": "medium",
+                        "status": "open",
+                        "requester_name": st.session_state.get("user_name", "AI User"),
+                        "requester_email": st.session_state.get("user", {}).get("email", ""),
+                        "location_building": "AI Assisted",
+                        "sla_deadline": (datetime.now() + timedelta(hours=4)).isoformat(),
+                        "escalation_level": 1,
+                        "created_at": datetime.now().isoformat()
+                    })
+                    
+                    ai_response = ai_response.replace("WTCABJ-001234", ticket_number)
+                    ai_response += f"\n\n✅ **Real ticket created:** {ticket_number}\nTrack it in My Tickets below."
+                except:
+                    pass
             
             if not ai_response:
                 kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{prompt}%,tags.ilike.%{prompt}%").limit(3).execute()
