@@ -16,8 +16,6 @@ import secrets
 from dotenv import load_dotenv
 from supabase import create_client
 import plotly.express as px
-import openai
-openai.api_key = st.secrets["OPENAI_API_KEY"]
 import plotly.graph_objects as go
 import smtplib
 from email.mime.text import MIMEText
@@ -214,23 +212,33 @@ def get_facility_logo(fc, h=60):
 
 
 def ask_facility_xpert(query, categories):
-    """AI-powered facility assistant"""
+    """AI-powered facility assistant using DeepSeek (FREE)"""
     try:
-        from openai import OpenAI
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        import requests
         cat_list = ", ".join(categories[:10])
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja. Help tenants and staff resolve facility issues quickly. Available categories: {cat_list}. For emergencies (fire, elevator stuck, major water leak), advise calling security or raising urgent ticket immediately. Keep responses concise under 100 words. Be professional and helpful."},
-                {"role": "user", "content": query}
-            ],
-            max_tokens=200,
-            temperature=0.5
+        
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {st.secrets.get('DEEPSEEK_API_KEY', '')}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues instantly. Available categories: {cat_list}. For emergencies (fire, elevator stuck, major water leak, electrical hazard), ALWAYS advise calling security or facility emergency line immediately. Be concise, helpful, and professional. Respond in plain text, no markdown."},
+                    {"role": "user", "content": query}
+                ],
+                "max_tokens": 250,
+                "temperature": 0.5
+            }
         )
-        return response.choices[0].message.content
+        
+        if response.status_code == 200:
+            return response.json()["choices"][0]["message"]["content"]
+        else:
+            return None
     except Exception as e:
-        st.error(f"AI Error: {str(e)}")
         return None
 
 def get_nav_logo():
@@ -1233,42 +1241,66 @@ def page_raise_ticket():
     
     st.markdown(f'## 🎫 Raise a Ticket — {info.get("full_name", fc)}')
     
-    # AI SMART SEARCH
-    st.markdown("### 🤖 facilityXpert — Smart Issue Resolution")
-    st.caption("Describe your issue and let AI suggest solutions before raising a ticket")
+    # AI SMART CHAT
+    st.markdown("### 🤖 facilityXpert — AI Assistant")
+    st.caption("Chat with our AI to resolve issues instantly. It learns from every conversation.")
     
-    c1, c2 = st.columns([4, 1])
-    with c1:
-        ai_query = st.text_input("What's the issue?", placeholder="e.g. My AC is blowing hot air, internet is slow, water leaking...", key="ai_search", label_visibility="collapsed")
-    with c2:
-        ask_ai = st.button("🤖 Ask AI", use_container_width=True, type="primary")
+    # Initialize chat history
+    if "ai_chat_history" not in st.session_state:
+        st.session_state.ai_chat_history = []
     
-    if ask_ai and ai_query:
-        with st.spinner("🤖 facilityXpert is thinking..."):
-            kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{ai_query}%,tags.ilike.%{ai_query}%").limit(5).execute()
+    # Display chat history
+    for msg in st.session_state.ai_chat_history:
+        if msg["role"] == "user":
+            st.chat_message("user").write(msg["content"])
+        else:
+            st.chat_message("assistant").write(msg["content"])
+    
+    # Chat input
+    if prompt := st.chat_input("Describe your issue...", key="ai_chat"):
+        # Add user message
+        st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
+        st.chat_message("user").write(prompt)
+        
+        # Search knowledge base
+        kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{prompt}%,tags.ilike.%{prompt}%").limit(3).execute()
+        
+        # Build AI response
+        kb_context = ""
+        if kb.data:
+            kb_context = "Knowledge base matches:\n" + "\n".join([f"- {k.get('question')}: {k.get('answer','')[:200]}" for k in kb.data])
+        
+        with st.spinner("🤖 Thinking..."):
             hc = DB.get_helpdesk_categories()
             cat_names_list = sorted(list(set(c.get("category_name", "") for c in hc)))
-            ai_response = ask_facility_xpert(ai_query, cat_names_list)
+            ai_response = ask_facility_xpert(prompt, cat_names_list)
         
         if ai_response:
-            st.markdown("### 🤖 facilityXpert AI Says:")
-            st.info(ai_response)
+            full_response = ai_response
+        elif kb.data:
+            full_response = f"I found these solutions in our knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+        else:
+            full_response = "I couldn't find a specific solution for that. Please raise a ticket below and our team will help you right away."
         
-        if kb.data:
-            st.success(f"💡 Also found {len(kb.data)} matching solutions in our knowledge base:")
-            for k in kb.data:
-                with st.expander(f"🔧 {k.get('question','')} — {k.get('category','')}"):
-                    st.markdown(f"**Solution:** {k.get('answer','')}")
-                    st.caption(f"Priority: {k.get('priority','')} | Department: {k.get('department','')}")
-                    if st.button(f"✅ This solved my issue", key=f"solved_{k['id']}"):
-                        st.success("Great! Issue resolved without a ticket. 🎉")
-                        st.balloons()
-        
-        if not ai_response and not kb.data:
-            st.warning("No solutions found. Please raise a ticket below.")
+        # Add AI response
+        st.session_state.ai_chat_history.append({"role": "assistant", "content": full_response})
+        st.chat_message("assistant").write(full_response)
     
-    elif ask_ai and not ai_query:
-        st.warning("Please describe your issue first")
+    # Clear chat button
+    if st.session_state.ai_chat_history:
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+            st.session_state.ai_chat_history = []
+            st.rerun()
+    
+    # Quick action chips
+    st.markdown("**⚡ Common Issues (click to ask AI):**")
+    quick_issues = ["AC not cooling", "Internet too slow", "Water leaking", "Power outage", "Elevator not working", "Access card issue"]
+    cols = st.columns(6)
+    for i, issue in enumerate(quick_issues):
+        with cols[i]:
+            if st.button(issue, key=f"quick_{i}", use_container_width=True):
+                st.session_state.ai_chat_history.append({"role": "user", "content": issue})
+                st.rerun()
     
     st.markdown("---")
     st.markdown("### 📝 Raise New Ticket")
