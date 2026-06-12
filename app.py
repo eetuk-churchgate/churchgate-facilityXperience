@@ -1993,7 +1993,7 @@ def main():
     page_perms = {
         "cc": "Command Center", "ppm": "PPM Dashboard",
         "ar": "Asset Register", "cal": "52-Week Calendar", "cs": "Checklist Status",
-        "wo": "Work Orders", "wp": "Raise Permit",,
+       "wo": "Work Orders", "wp": "Raise Permit",
         "fo": "Facility Operations", "oa": "Facility Operations",
         "vm": "Visitor Management", "up": "User Management",
         "rt": "Raise Ticket", "hd": "Helpdesk", "fb": "Feedback",
