@@ -518,7 +518,7 @@ def page_wp():
                         
                         st.markdown("---")
                         st.markdown("**🔄 Audit Trail:**")
-                       st.caption(f"📤 Submitted: {format_wat_time(row.get('submitted_at', row.get('created_at', '')))} by {row.get('raised_by_name', 'N/A')}")
+                        st.caption(f"📤 Submitted: {format_wat_time(row.get('submitted_at', row.get('created_at', '')))} by {row.get('raised_by_name', 'N/A')}")
                         if row.get("authorized_at"):
                             st.caption(f"🔐 Authorized: {format_wat_time(row['authorized_at'])} by {row.get('authorized_by_name', '')}")
                         if row.get("confirmed_at"):
