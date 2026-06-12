@@ -212,41 +212,38 @@ def get_facility_logo(fc, h=60):
 
 
 def ask_facility_xpert(query, categories):
-    """AI assistant using Hugging Face"""
+    """AI assistant using Hugging Face - faster model"""
     try:
         import requests
         api_key = st.secrets.get("HF_API_KEY", "")
         cat_list = ", ".join(categories[:10])
         
-        # Try Phi-3 first
+        # Use FLAN-T5 - faster and always available
         response = requests.post(
-            "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct",
+            "https://api-inference.huggingface.co/models/google/flan-t5-large",
             headers={"Authorization": f"Bearer {api_key}"},
             json={
-                "inputs": f"<|system|>You are facilityXpert for Churchgate Group WTC Abuja. Help with facility issues. Categories: {cat_list}. Be helpful and concise.<|user|>{query}<|assistant|>",
-                "parameters": {"max_new_tokens": 150, "temperature": 0.5},
-                "options": {"wait_for_model": True}
+                "inputs": f"Question: As a facility manager at Churchgate Group WTC Abuja, how do I resolve this: {query}? Available departments: {cat_list}. Give a helpful step-by-step answer.",
+                "parameters": {"max_new_tokens": 200, "temperature": 0.5},
+                "options": {"wait_for_model": True, "use_cache": True}
             },
-            timeout=30
+            timeout=20
         )
         
         if response.status_code == 200:
             data = response.json()
             if isinstance(data, list) and len(data) > 0:
-                text = data[0].get("generated_text", "")
-                if "<|assistant|>" in text:
-                    return text.split("<|assistant|>")[-1].strip()
-                return text.strip()
+                return data[0].get("generated_text", "").strip()
+            if isinstance(data, dict):
+                return data.get("generated_text", "").strip()
         
-        # Fallback: use knowledge base
+        # Fallback to knowledge base
         kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute()
         if kb.data:
             solutions = "\n".join([f"- {k.get('answer','')[:200]}" for k in kb.data])
             return f"I found these solutions:\n\n{solutions}"
-        
         return None
-    except Exception as e:
-        # Final fallback to knowledge base
+    except:
         try:
             kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute()
             if kb.data:
