@@ -1236,7 +1236,8 @@ def page_raise_ticket():
     
     if ai_query:
         kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{ai_query}%,tags.ilike.%{ai_query}%").limit(5).execute()
-        cat_names_list = sorted(list(set(c.get("category_name", "") for c in categories)))
+        hc = DB.get_helpdesk_categories()
+        cat_names_list = sorted(list(set(c.get("category_name", "") for c in hc)))
         ai_response = ask_facility_xpert(ai_query, cat_names_list)
         
         if ai_response:
