@@ -7,6 +7,7 @@ SmartCheck Killer — AI-Powered Enterprise Grade
 import streamlit as st
 from datetime import datetime, date, time, timedelta
 import pandas as pd
+import time
 import base64
 from pathlib import Path
 import os
@@ -1929,6 +1930,64 @@ def forgot_password_page():
                 st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
 
+
+def reset_password_page(token):
+    """Handle password reset with token"""
+    st.markdown("""<style>#MainMenu,header,footer{visibility:hidden;}section[data-testid="stSidebar"]{display:none;}</style>""", unsafe_allow_html=True)
+    
+    # Verify token
+    res = supabase.table("app_users").select("*").eq("reset_token", token).single().execute()
+    if not res.data:
+        st.error("Invalid or expired reset link")
+        if st.button("Back to Login"):
+            st.query_params.clear()
+            st.session_state.show_forgot = False
+            st.rerun()
+        return
+    
+    user = res.data
+    expiry = user.get("reset_token_expiry")
+    if expiry and datetime.now().isoformat() > expiry:
+        st.error("Reset link has expired")
+        if st.button("Request New Link"):
+            st.query_params.clear()
+            st.session_state.show_forgot = True
+            st.rerun()
+        return
+    
+    _, col, _ = st.columns([0.3, 0.4, 0.3])
+    with col:
+        st.markdown(f"""<div style="background:white;border-radius:16px;padding:2rem;box-shadow:0 10px 30px rgba(0,0,0,0.2);text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.5rem;">{get_nav_logo()}<div style="width:1px;height:22px;background:#ddd;"></div><span style="font-weight:800;color:#1a1a1a;font-size:1.1rem;">facility<span style="color:#CC0000;">X</span>perience</span></div><p style="color:#888;font-size:0.8rem;">Churchgate Group</p></div>""", unsafe_allow_html=True)
+        st.subheader("🔐 Reset Your Password")
+        st.caption(f"Resetting password for: {user.get('email','')}")
+        
+        new_pw = st.text_input("New Password", type="password")
+        confirm_pw = st.text_input("Confirm Password", type="password")
+        
+        if st.button("✅ Reset Password", use_container_width=True, type="primary"):
+            if new_pw and new_pw == confirm_pw:
+                if len(new_pw) >= 8:
+                    import hashlib
+                    pw_hash = hashlib.sha256(new_pw.encode()).hexdigest()
+                    DB.update("app_users", user["id"], {
+                        "password_hash": pw_hash,
+                        "reset_token": None,
+                        "reset_token_expiry": None
+                    })
+                    st.success("✅ Password reset successfully!")
+                    st.info("Redirecting to login...")
+                    st.query_params.clear()
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.error("Password must be at least 8 characters")
+            else:
+                st.error("Passwords don't match")
+        
+        if st.button("🔙 Back to Login", use_container_width=True):
+            st.query_params.clear()
+            st.rerun()
+
 def main():
     inject_css()
     
@@ -1957,7 +2016,13 @@ def main():
         if st.session_state.show_forgot:
             forgot_password_page()
         else:
-            login_page()
+            # Check for reset token in URL
+            params = st.query_params
+            token = params.get("token")
+            if token:
+                reset_password_page(token)
+            else:
+                login_page()
         st.stop()
     
     if "facility" not in st.session_state:
