@@ -212,33 +212,38 @@ def get_facility_logo(fc, h=60):
 
 
 def ask_facility_xpert(query, categories):
-    """AI-powered facility assistant using DeepSeek (FREE)"""
+    """AI-powered facility assistant using DeepSeek"""
     try:
         import requests
         cat_list = ", ".join(categories[:10])
         
+        api_key = st.secrets.get("DEEPSEEK_API_KEY", "")
+        
         response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
+            "https://api.deepseek.com/chat/completions",
             headers={
-                "Authorization": f"Bearer {st.secrets.get('DEEPSEEK_API_KEY', '')}",
+                "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
             json={
                 "model": "deepseek-chat",
                 "messages": [
-                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues instantly. Available categories: {cat_list}. For emergencies (fire, elevator stuck, major water leak, electrical hazard), ALWAYS advise calling security or facility emergency line immediately. Be concise, helpful, and professional. Respond in plain text, no markdown."},
+                    {"role": "system", "content": f"You are facilityXpert, AI assistant for Churchgate Group WTC Abuja. Help tenants resolve facility issues. Categories: {cat_list}. Be concise and helpful. For emergencies, advise calling security."},
                     {"role": "user", "content": query}
                 ],
-                "max_tokens": 250,
-                "temperature": 0.5
-            }
+                "max_tokens": 200
+            },
+            timeout=10
         )
         
         if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
         else:
+            st.write(f"API Error: {response.status_code} - {response.text[:100]}")
             return None
     except Exception as e:
+        st.write(f"API Exception: {str(e)}")
         return None
 
 def get_nav_logo():
