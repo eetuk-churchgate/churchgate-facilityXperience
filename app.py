@@ -212,38 +212,28 @@ def get_facility_logo(fc, h=60):
 
 
 def ask_facility_xpert(query, categories):
-    """AI-powered facility assistant using DeepSeek"""
+    """AI assistant using Hugging Face (FREE)"""
     try:
         import requests
         cat_list = ", ".join(categories[:10])
-        
-        api_key = st.secrets.get("DEEPSEEK_API_KEY", "")
+        api_key = st.secrets.get("HF_API_KEY", "")
         
         response = requests.post(
-            "https://api.deepseek.com/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
+            "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct",
+            headers={"Authorization": f"Bearer {api_key}"},
             json={
-                "model": "deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": f"You are facilityXpert, AI assistant for Churchgate Group WTC Abuja. Help tenants resolve facility issues. Categories: {cat_list}. Be concise and helpful. For emergencies, advise calling security."},
-                    {"role": "user", "content": query}
-                ],
-                "max_tokens": 200
+                "inputs": f"<|system|>You are facilityXpert, AI assistant for Churchgate Group WTC Abuja. Help tenants with facility issues. Categories: {cat_list}. Be concise. For emergencies, advise calling security.<|user|>{query}<|assistant|>",
+                "parameters": {"max_new_tokens": 200, "temperature": 0.5}
             },
-            timeout=10
+            timeout=15
         )
         
         if response.status_code == 200:
             data = response.json()
-            return data["choices"][0]["message"]["content"]
-        else:
-            st.write(f"API Error: {response.status_code} - {response.text[:100]}")
-            return None
-    except Exception as e:
-        st.write(f"API Exception: {str(e)}")
+            if isinstance(data, list) and len(data) > 0:
+                return data[0].get("generated_text", "").split("<|assistant|>")[-1].strip()
+        return None
+    except:
         return None
 
 def get_nav_logo():
