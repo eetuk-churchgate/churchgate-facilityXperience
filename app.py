@@ -1326,6 +1326,25 @@ def page_helpdesk():
             search=search if search else None
         )
         
+        # Filter by user's department
+        user_depts = st.session_state.get("user", {}).get("department_permissions", [])
+        if isinstance(user_depts, str):
+            try: user_depts = eval(user_depts)
+            except: user_depts = []
+        can_see_all = user_role in ["admin", "approver", "confirmer"]
+        
+        if tickets and not can_see_all and user_depts:
+            filtered = []
+            for t in tickets:
+                ticket_cat = t.get("category", "")
+                for c in categories:
+                    if c.get("category_name") == ticket_cat and c.get("department") in user_depts:
+                        filtered.append(t)
+                        break
+            tickets = filtered
+        
+        if tickets:
+        
         if tickets:
             df = pd.DataFrame(tickets)
             c1, c2, c3, c4, c5 = st.columns(5)
