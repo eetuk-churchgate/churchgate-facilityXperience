@@ -469,6 +469,7 @@ def page_wp():
     can_authorize = is_admin or "Authorize Permit" in user_perms or len(user_perms) == 0
     can_confirm = is_admin or "Confirm Permit" in user_perms or len(user_perms) == 0
     can_approve = is_admin or "Approve Permit" in user_perms or len(user_perms) == 0
+    can_raise = is_admin or "Raise Permit" in user_perms or len(user_perms) == 0
     
     st.markdown(f'## 🛡️ Permit-to-Work System — {info.get("full_name", fc)}')
     
@@ -612,9 +613,7 @@ def page_wp():
                                 st.success("🔄 Permit resubmitted for approval!")
                                 st.balloons()
                                 st.rerun()
-            st.markdown("---")
-            st.markdown("**Debug Info:**")
-            st.code(f"Facility: {fc}\nTable: work_permits\nCheck Supabase for data.")
+            st.info("📋 No work permits found. Raise your first permit in the '➕ Raise Permit' tab!")
     
     # ============================================
     # TAB 2: RAISE PERMIT
