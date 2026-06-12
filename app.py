@@ -1257,6 +1257,7 @@ def page_raise_ticket():
             hc = DB.get_helpdesk_categories()
             cat_names_list = sorted(list(set(c.get("category_name", "") for c in hc)))
             ai_response = ask_facility_xpert(ai_query, cat_names_list)
+            st.write(f"Debug: {ai_response}")
         
         if ai_response:
             st.markdown("### 🤖 facilityXpert AI Says:")
