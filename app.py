@@ -212,46 +212,37 @@ def get_facility_logo(fc, h=60):
 
 
 def ask_facility_xpert(query, categories):
-    """AI assistant using Hugging Face - faster model"""
+    """Smart assistant - Knowledge Base powered with AI enhancement"""
+    # PRIMARY: Knowledge base search
+    kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(5).execute()
+    
+    if kb.data:
+        solutions = []
+        for k in kb.data:
+            solutions.append(f"**{k.get('question','')}**\n{k.get('answer','')}\n_Department: {k.get('department','')} | Priority: {k.get('priority','')}_")
+        return "\n\n---\n\n".join(solutions)
+    
+    # SECONDARY: Try Hugging Face
     try:
         import requests
         api_key = st.secrets.get("HF_API_KEY", "")
-        cat_list = ", ".join(categories[:10])
-        
-        # Use FLAN-T5 - faster and always available
         response = requests.post(
-            "https://api-inference.huggingface.co/models/google/flan-t5-large",
+            "https://api-inference.huggingface.co/models/google/flan-t5-base",
             headers={"Authorization": f"Bearer {api_key}"},
             json={
-                "inputs": f"Question: As a facility manager at Churchgate Group WTC Abuja, how do I resolve this: {query}? Available departments: {cat_list}. Give a helpful step-by-step answer.",
-                "parameters": {"max_new_tokens": 200, "temperature": 0.5},
-                "options": {"wait_for_model": True, "use_cache": True}
+                "inputs": f"Answer as a facility manager: {query}",
+                "options": {"wait_for_model": True}
             },
-            timeout=20
+            timeout=15
         )
-        
         if response.status_code == 200:
             data = response.json()
             if isinstance(data, list) and len(data) > 0:
                 return data[0].get("generated_text", "").strip()
-            if isinstance(data, dict):
-                return data.get("generated_text", "").strip()
-        
-        # Fallback to knowledge base
-        kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute()
-        if kb.data:
-            solutions = "\n".join([f"- {k.get('answer','')[:200]}" for k in kb.data])
-            return f"I found these solutions:\n\n{solutions}"
-        return None
     except:
-        try:
-            kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute()
-            if kb.data:
-                solutions = "\n".join([f"- {k.get('answer','')[:200]}" for k in kb.data])
-                return f"I found these solutions:\n\n{solutions}"
-        except:
-            pass
-        return None
+        pass
+    
+    return None
 
 def get_nav_logo():
     """Churchgate logo for top navigation - white version for dark background"""
