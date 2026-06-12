@@ -1264,7 +1264,10 @@ def page_helpdesk():
             
             submitted = st.form_submit_button("🎫 Submit Ticket", use_container_width=True, type="primary")
             
+            st.write(f"Debug: submitted={submitted}")
+            
             if submitted:
+                st.write("Debug: Inside submit block")
                 if not title or not description or not requester_name:
                     st.error("⚠️ Title, Description, and Name are required")
                 else:
