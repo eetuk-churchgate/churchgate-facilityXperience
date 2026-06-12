@@ -2009,11 +2009,6 @@ def main():
         "uc": "Utility Dashboard", "mis": "Monthly MIS",
     }
     
-    required = page_perms.get(page, "")
-    if not is_admin and required and required not in user_perms and len(user_perms) > 0:
-        st.error("⛔ You don't have permission to access this page.")
-        st.stop()
-    
     sidebar()
     ROUTER.get(page, page_cc)()
 
