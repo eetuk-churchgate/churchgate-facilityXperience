@@ -1243,23 +1243,20 @@ def page_raise_ticket():
     
     # AI SMART CHAT
     st.markdown("### 🤖 facilityXpert — AI Assistant")
-    st.caption("Chat with our AI to resolve issues instantly. It learns from every conversation.")
     
     # Initialize chat history
     if "ai_chat_history" not in st.session_state:
         st.session_state.ai_chat_history = []
     
-    # Chat input box — ALWAYS VISIBLE
-    prompt = st.chat_input("Describe your issue...", key="ai_chat")
+    # Display chat history FIRST
+    for msg in st.session_state.ai_chat_history:
+        if msg["role"] == "user":
+            st.chat_message("user").write(msg["content"])
+        else:
+            st.chat_message("assistant").write(msg["content"])
     
-    # Display chat history
-    chat_container = st.container()
-    with chat_container:
-        for msg in st.session_state.ai_chat_history:
-            if msg["role"] == "user":
-                st.chat_message("user").write(msg["content"])
-            else:
-                st.chat_message("assistant").write(msg["content"])
+    # Chat input — always at bottom of chat
+    prompt = st.chat_input("💬 Describe your issue and I'll help resolve it...", key="ai_chat_input")
     
     if prompt:
         # Add user message
