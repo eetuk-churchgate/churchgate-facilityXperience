@@ -434,15 +434,18 @@ def send_email_notification(to_email, subject, body):
     return False
 
 def get_workflow_people(fc, level, department=None):
-    """Get people for a workflow level"""
+    """Get people for a workflow level, filtered by department"""
     try:
         query = supabase.table("workflow_config").select("*").eq("facility_code", fc).eq("workflow_type", "work_permit").eq("level_number", level).eq("is_active", True)
         res = query.execute()
         people = res.data if res.data else []
         if department and people:
-            filtered = [p for p in people if not p.get("department_filter") or p["department_filter"] == [] or p["department_filter"] == ["All Departments"] or department in p["department_filter"]]
-            return filtered if filtered else people
-        return people
+            # Only return people whose department_filter includes this department
+            filtered = [p for p in people if "All Departments" in p.get("department_filter", []) or department in p.get("department_filter", [])]
+            if filtered:
+                return filtered
+        # Fallback: return people with "All Departments" only
+        return [p for p in people if "All Departments" in p.get("department_filter", [])] if people else []
     except: return []
 
 def get_sub_locations_for_building(fc, building_code):
@@ -699,7 +702,8 @@ def page_wp():
                 ed = st.date_input("Proposed End Date*", date.today())
                 etime = st.time_input("End Time*", time(17, 0))
             
-            workers = st.number_input("No. of Workers Expected*", min_value=1, max_value=100, value=2)
+             workers = st.number_input("No. of Workers Expected*", min_value=1, max_value=100, value=2)
+                workers_names = st.text_area("Workers Names (one per line)", height=80, placeholder="Enter each worker's full name on a new line...")
             
             st.markdown("---")
             description = st.text_area("Brief Description of Work*", height=80, placeholder="Describe the work to be performed...")
@@ -763,6 +767,7 @@ def page_wp():
                         "process_owner_contact": pcontact,
                         "site_coordinator_name": scoordinator,
                         "workers_count": workers,
+                            "workers_names": workers_names,
                         "work_location": full_location,
                         "start_datetime": f"{sd}T{stime}",
                         "end_datetime": f"{ed}T{etime}",
@@ -775,8 +780,9 @@ def page_wp():
                     }
                     
                     result = DB.insert("work_permits", permit_data)
-                    
-                    if result:
+                    st.success(f"✅ Work Permit {permit_number} Submitted Successfully!")
+                    st.balloons()
+                    st.rerun()
                         # Notify authorizers
                         authorizers = get_workflow_people(fc, 1, dept)
                         for a in authorizers:
