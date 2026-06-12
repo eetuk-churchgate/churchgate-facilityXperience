@@ -746,40 +746,26 @@ def page_wp():
                 if not sub_location or sub_location == "Select building first": errors.append("Sub-Location")
                 
                 if errors:
-                    st.error(f"⚠️ Please fill all required fields: {', '.join(errors)}")
+                    st.error(f"⚠️ Please fill: {', '.join(errors)}")
                 else:
                     now = datetime.now().isoformat()
                     cnt = len(DB.get_all("work_permits", fc, 1000))
                     permit_number = f"PTW-{fc}-{datetime.now().year}-{str(cnt + 1).zfill(4)}"
                     
                     permit_data = {
-                        "facility_code": fc,
-                        "permit_number": permit_number,
-                        "document_no": document_no,
-                        "permit_type": permit_type,
-                        "department": dept,
-                        "title": description[:100],
-                        "description": description,
-                        "raised_by_name": rname,
-                        "raised_by_designation": rdesignation,
-                        "requester_contact": rcontact,
-                        "process_owner_name": powner,
-                        "process_owner_contact": pcontact,
-                        "site_coordinator_name": scoordinator,
-                        "workers_count": workers,
-                            "workers_names": workers_names,
+                        "facility_code": fc, "permit_number": permit_number, "document_no": document_no,
+                        "permit_type": permit_type, "department": dept, "title": description[:100],
+                        "description": description, "raised_by_name": rname, "raised_by_designation": rdesignation,
+                        "requester_contact": rcontact, "process_owner_name": powner,
+                        "process_owner_contact": pcontact, "site_coordinator_name": scoordinator,
+                        "workers_count": workers, "workers_names": workers_names,
                         "work_location": full_location,
-                        "start_datetime": f"{sd}T{stime}",
-                        "end_datetime": f"{ed}T{etime}",
-                        "ppe_required": ppe_selected,
-                        "equipment_required": equip_selected,
-                        "status": "pending",
-                        "workflow_stage": "submitted",
-                        "submitted_at": now,
-                        "created_at": now
+                        "start_datetime": f"{sd}T{stime}", "end_datetime": f"{ed}T{etime}",
+                        "ppe_required": ppe_selected, "equipment_required": equip_selected,
+                        "status": "pending", "workflow_stage": "submitted", "submitted_at": now, "created_at": now
                     }
                     
-                    result = DB.insert("work_permits", permit_data)
+                    DB.insert("work_permits", permit_data)
                     st.success(f"✅ Work Permit {permit_number} Submitted Successfully!")
                     st.balloons()
                     
