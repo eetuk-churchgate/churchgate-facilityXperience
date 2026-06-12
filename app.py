@@ -169,6 +169,76 @@ class DB:
             return res.data if res.data else []
         except: return []
 
+@staticmethod
+    def get_sub_locations(loc_id):
+        try:
+            res=supabase.table("helpdesk_sub_locations").select("*").eq("location_id",loc_id).order("sub_location_name").execute()
+            return res.data if res.data else []
+        except: return []
+
+    @staticmethod
+    def get_helpdesk_categories():
+        try:
+            res = supabase.table("helpdesk_categories").select("*").eq("is_active", True).order("category_name").execute()
+            return res.data if res.data else []
+        except: return []
+
+    @staticmethod
+    def get_tickets_filtered(fc, status=None, category=None, search=None, limit=100):
+        try:
+            query = supabase.table("tickets").select("*").eq("facility_code", fc)
+            if status and status != "All":
+                query = query.eq("status", status)
+            if category:
+                query = query.eq("category", category)
+            if search:
+                query = query.or_(f"title.ilike.%{search}%,description.ilike.%{search}%")
+            res = query.order("created_at", desc=True).limit(limit).execute()
+            return res.data if res.data else []
+        except: return []
+
+    @staticmethod
+    def get_ticket_comments(ticket_id):
+        try:
+            res = supabase.table("ticket_comments").select("*").eq("ticket_id", ticket_id).order("created_at").execute()
+            return res.data if res.data else []
+        except: return []
+
+@staticmethod
+    def get_sub_locations(loc_id):
+        try:
+            res=supabase.table("helpdesk_sub_locations").select("*").eq("location_id",loc_id).order("sub_location_name").execute()
+            return res.data if res.data else []
+        except: return []
+
+    @staticmethod
+    def get_helpdesk_categories():
+        try:
+            res = supabase.table("helpdesk_categories").select("*").eq("is_active", True).order("category_name").execute()
+            return res.data if res.data else []
+        except: return []
+
+    @staticmethod
+    def get_tickets_filtered(fc, status=None, category=None, search=None, limit=100):
+        try:
+            query = supabase.table("tickets").select("*").eq("facility_code", fc)
+            if status and status != "All":
+                query = query.eq("status", status)
+            if category:
+                query = query.eq("category", category)
+            if search:
+                query = query.or_(f"title.ilike.%{search}%,description.ilike.%{search}%")
+            res = query.order("created_at", desc=True).limit(limit).execute()
+            return res.data if res.data else []
+        except: return []
+
+    @staticmethod
+    def get_ticket_comments(ticket_id):
+        try:
+            res = supabase.table("ticket_comments").select("*").eq("ticket_id", ticket_id).order("created_at").execute()
+            return res.data if res.data else []
+        except: return []
+
 # ============================================
 # HELPERS
 # ============================================
@@ -1174,89 +1244,343 @@ def page_wp():
                     st.error("⚠️ Name and Email are required")
 
 # ============================================
-# TICKETS + HELPDESK
+# HELPDESK — WORLD CLASS TICKET SYSTEM
 # ============================================
-def page_rt():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 🎫 Service Concierge — {info.get("full_name",fc)}')
-    tab1,tab2=st.tabs(["🎫 Raise Ticket","📋 View Tickets"])
-    with tab1:
-        locs=DB.get_locations(fc)
-        loc_names=["Choose one"]+[l.get("location_name","") for l in locs]
-        cats=[
-    {"department":"Engineering — Electrical","category":"Electrical"},
-    {"department":"Engineering — HVAC","category":"HVAC"},
-    {"department":"Engineering — Plumbing","category":"Plumbing"},
-    {"department":"Engineering — Fire Fighting","category":"Fire Safety"},
-    {"department":"Engineering — Vertical Transportation","category":"Elevators/Lifts"},
-    {"department":"Facility Management — Hard Services","category":"Building Fabric"},
-    {"department":"Facility Management — Soft Services","category":"Cleaning/Housekeeping"},
-    {"department":"Facility Management — HSSE","category":"Safety"},
-    {"department":"Technology Group — Network","category":"Internet/Voice"},
-    {"department":"Technology Group — Building Technology","category":"Access Control/CCTV/BMS"},
-    {"department":"Technology Group — IT Service Desk","category":"IT Support"},
-    {"department":"Security","category":"Security"},
-    {"department":"Facility Management — FM Operations","category":"General Maintenance"},
-    {"department":"Facility Management — Fitout","category":"Finishing/Fitout"},
-    {"department":"Facility Management — Transport","category":"Parking/Fleet"},
-]
-        with st.form("tix_form"):
-            c1,c2=st.columns(2)
+def page_helpdesk():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    is_admin = user_role in ["admin", "approver"]
+    
+    st.markdown(f'## 💬 Helpdesk — {info.get("full_name", fc)}')
+    
+    # Only show tabs user has access to
+    tab_names = ["🎫 Raise Ticket", "📋 Ticket Queue"]
+    if is_admin:
+        tab_names.append("⚙️ Settings")
+    
+    tabs = st.tabs(tab_names)
+    tab_idx = 0
+    
+    # ============================================
+    # TAB: RAISE TICKET
+    # ============================================
+    with tabs[tab_idx]:
+        tab_idx += 1
+        st.markdown("### 🎫 Raise a New Ticket")
+        
+        buildings = DB.get_locations(fc)
+        building_options = {}
+        for b in buildings:
+            building_options[b.get("location_code", "")] = b.get("location_name", "")
+        if not building_options:
+            building_options = {"CT": "CT — Office Tower", "SAT": "SAT — Residential Tower", "RC": "RC — Recreation Center", "IP": "IP — Intermediate Parking"}
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            selected_building = st.selectbox("Building*", options=list(building_options.keys()), format_func=lambda x: building_options.get(x, x), key="tix_building")
+            sub_locs = get_sub_locations_for_building(fc, selected_building)
+            if not sub_locs: sub_locs = [f"{selected_building} / 0"]
+            sub_location = st.selectbox("Sub-Location*", sub_locs, key="tix_subloc")
+        with c2:
+            categories = DB.get_helpdesk_categories()
+            cat_names = sorted(list(set(c.get("category_name", "") for c in categories)))
+            category = st.selectbox("Category*", cat_names)
+        
+        full_location = f"{building_options.get(selected_building, selected_building)} → {sub_location}"
+        
+        with st.form("ticket_form"):
+            title = st.text_input("Title*", placeholder="Brief description of the issue")
+            description = st.text_area("Description*", height=100, placeholder="Describe the issue in detail...")
+            
+            c1, c2, c3 = st.columns(3)
             with c1:
-                loc_sel=st.selectbox("Location*",loc_names)
-                cat_sel=st.selectbox("Category*",[c["category"] for c in cats])
+                priority = st.selectbox("Priority", ["low", "medium", "high", "critical"])
+                occupant = st.text_input("Occupant/Tenant (if applicable)")
             with c2:
-                title=st.text_input("Title*")
-                rname=st.text_input("Your Name*")
-            desc=st.text_area("Description*")
-            img=st.file_uploader("Image (Optional)",type=["png","jpg","jpeg"])
-            if st.form_submit_button("🎫 Raise Ticket",use_container_width=True):
-                if title and desc and rname and loc_sel!="Choose one":
-                    cnt=len(DB.get_all("tickets",fc,1000))
-                    DB.insert("tickets",{"facility_code":fc,"ticket_number":f"TKT-{fc}-{datetime.now().strftime('%d%H%M%S')}","title":title,"category":cat_sel,"requester_name":rname,"description":desc,"location_building":loc_sel,"status":"open","created_at":datetime.now().isoformat()})
-                    st.success("Ticket raised!");st.rerun()
-                else:st.error("Please fill all required fields")
-    with tab2:
-        tix=DB.get_all("tickets",fc,50)
-        if tix:
-            df=pd.DataFrame(tix)
-            tabs=st.tabs(["All","Open","In Progress","Hold","Closed","Completed","Rejected"])
-            statuses=["All","open","in_progress","hold","closed","completed","rejected"]
-            for idx,tab in enumerate(tabs):
-                with tab:
-                    if statuses[idx]=="All":d=df
-                    else:d=df[df["status"]==statuses[idx]] if "status" in df.columns else df
-                    st.metric("Count",len(d))
-                    for i,row in d.iterrows():
-                        s=row.get("status","open")
-                        age=datetime.now()-pd.to_datetime(row.get("created_at",datetime.now())) if row.get("created_at") else timedelta(0)
-                        age_str=f"{age.days} Days {age.seconds//3600} Hrs {(age.seconds%3600)//60} Mins"
-                        with st.expander(f"{row.get('ticket_number','')} — {row.get('title','')} — {s.upper()} | Age: {age_str}"):
-                            st.write(f"**Raised by:** {row.get('requester_name','')} | **Location:** {row.get('location_building','')}")
-                            st.write(f"**Category:** {row.get('category','')} | **Description:** {row.get('description','')}")
-                            c1,c2,c3=st.columns(3)
+                requester_name = st.text_input("Your Name*")
+                requester_email = st.text_input("Your Email")
+            with c3:
+                requester_phone = st.text_input("Your Phone")
+                image = st.file_uploader("Image (Optional)", type=["png", "jpg", "jpeg"])
+            
+            submitted = st.form_submit_button("🎫 Submit Ticket", use_container_width=True, type="primary")
+            
+            if submitted:
+                if not title or not description or not requester_name:
+                    st.error("⚠️ Title, Description, and Name are required")
+                else:
+                    cnt = len(DB.get_all("tickets", fc, 1000))
+                    ticket_number = f"TKT-{fc}-{datetime.now().strftime('%d%H%M%S')}"
+                    
+                    sla_hours = 4
+                    for c in categories:
+                        if c.get("category_name") == category:
+                            sla_hours = c.get("sla_hours", 4)
+                            break
+                    sla_deadline = (datetime.now() + timedelta(hours=sla_hours)).isoformat()
+                    
+                    DB.insert("tickets", {
+                        "facility_code": fc,
+                        "ticket_number": ticket_number,
+                        "title": title,
+                        "description": description,
+                        "category": category,
+                        "priority": priority,
+                        "status": "open",
+                        "requester_name": requester_name,
+                        "requester_email": requester_email,
+                        "requester_phone": requester_phone,
+                        "occupant_name": occupant,
+                        "location_building": full_location,
+                        "sla_deadline": sla_deadline,
+                        "escalation_level": 1,
+                        "created_at": datetime.now().isoformat()
+                    })
+                    
+                    st.success(f"✅ Ticket {ticket_number} raised successfully!")
+                    st.balloons()
+                    st.rerun()
+    
+    # ============================================
+    # TAB: TICKET QUEUE
+    # ============================================
+    with tabs[tab_idx]:
+        tab_idx += 1
+        st.markdown("### 📋 Ticket Queue")
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            status_filter = st.selectbox("Status", ["All", "open", "in_progress", "hold", "closed", "rejected"], key="tix_status")
+        with c2:
+            categories = DB.get_helpdesk_categories()
+            cat_names = ["All"] + sorted(list(set(c.get("category_name", "") for c in categories)))
+            cat_filter = st.selectbox("Category", cat_names, key="tix_cat")
+        with c3:
+            search = st.text_input("🔍 Search", placeholder="Search tickets...", key="tix_search")
+        with c4:
+            st.markdown("<br>", unsafe_allow_html=True)
+        
+        tickets = DB.get_tickets_filtered(
+            fc, 
+            status=status_filter if status_filter != "All" else None,
+            category=cat_filter if cat_filter != "All" else None,
+            search=search if search else None
+        )
+        
+        if tickets:
+            df = pd.DataFrame(tickets)
+            c1, c2, c3, c4, c5 = st.columns(5)
+            with c1: st.metric("🔴 Open", len(df[df["status"] == "open"]) if "status" in df.columns else 0)
+            with c2: st.metric("🟡 In Progress", len(df[df["status"] == "in_progress"]) if "status" in df.columns else 0)
+            with c3: st.metric("⏸️ Hold", len(df[df["status"] == "hold"]) if "status" in df.columns else 0)
+            with c4: st.metric("🟢 Closed", len(df[df["status"] == "closed"]) if "status" in df.columns else 0)
+            with c5: st.metric("📋 Total", len(df))
+            
+            st.markdown("---")
+            
+            for i, row in df.iterrows():
+                status = row.get("status", "open")
+                status_badges = {"open": "🔴", "in_progress": "🟡", "hold": "⏸️", "closed": "🟢", "rejected": "❌"}
+                badge = status_badges.get(status, "📋")
+                
+                created = row.get("created_at", "")
+                age_str = ""
+                if created:
+                    try:
+                        created_dt = pd.to_datetime(created)
+                        age = datetime.now() - created_dt
+                        age_str = f"{age.days}d {age.seconds//3600}h {(age.seconds%3600)//60}m"
+                    except: pass
+                
+                sla = row.get("sla_deadline", "")
+                sla_str = ""
+                sla_overdue = False
+                if sla:
+                    try:
+                        sla_dt = pd.to_datetime(sla)
+                        if datetime.now() > sla_dt:
+                            sla_overdue = True
+                            sla_str = "⚠️ OVERDUE"
+                    except: pass
+                
+                with st.expander(f"{badge} {row.get('ticket_number','')} — {row.get('title','')[:80]} | ⏱️ {age_str} {sla_str}"):
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        st.markdown(f"**Raised by:** {row.get('requester_name','N/A')} | **Category:** {row.get('category','')} | **Priority:** {row.get('priority','')}")
+                        st.markdown(f"**Location:** {row.get('location_building','')}")
+                        st.markdown(f"**Description:** {row.get('description','')}")
+                        st.markdown(f"**SLA Deadline:** {sla} | **Level:** L{row.get('escalation_level',1)}")
+                        
+                        comments = DB.get_ticket_comments(row["id"])
+                        if comments:
+                            st.markdown("**📝 Progress Log:**")
+                            for c in comments:
+                                st.caption(f"{c.get('user_name','')} — {c.get('created_at','')}: {c.get('comment_text','')}")
+                    
+                    with c2:
+                        st.markdown("**⚡ Actions:**")
+                        
+                        if status in ["open", "in_progress", "hold"]:
+                            new_comment = st.text_area("Add Note", key=f"cmt_{row['id']}", height=60, placeholder="Progress update...")
+                            
+                            if st.button("🔄 Update Progress", key=f"upd_{row['id']}", use_container_width=True):
+                                if new_comment:
+                                    DB.insert("ticket_comments", {"ticket_id": row["id"], "user_name": st.session_state.get("user_name", "Staff"), "comment_text": new_comment})
+                                    DB.update("tickets", row["id"], {"status": "in_progress"})
+                                    st.success("Updated!")
+                                    st.rerun()
+                            
+                            c1, c2 = st.columns(2)
                             with c1:
-                                if s in ["open","in_progress"]:
-                                    if st.button("🔄 In Progress",key=f"prog_{row['id']}"):DB.update("tickets",row["id"],{"status":"in_progress"});st.rerun()
-                                    if st.button("⏸️ Hold",key=f"hold_{row['id']}"):DB.update("tickets",row["id"],{"status":"hold"});st.rerun()
+                                if st.button("⏸️ Hold", key=f"hold_{row['id']}", use_container_width=True):
+                                    if new_comment:
+                                        DB.insert("ticket_comments", {"ticket_id": row["id"], "user_name": st.session_state.get("user_name", "Staff"), "comment_text": f"HOLD: {new_comment}"})
+                                    DB.update("tickets", row["id"], {"status": "hold"})
+                                    st.rerun()
                             with c2:
-                                if s!="closed":
-                                    if st.button("✅ Close",key=f"close_{row['id']}"):DB.update("tickets",row["id"],{"status":"closed","closed_at":datetime.now().isoformat()});st.rerun()
-                            with c3:
-                                if st.button("❌ Reject",key=f"rej_{row['id']}"):DB.update("tickets",row["id"],{"status":"rejected"});st.rerun()
-
-def page_hd():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 💬 Helpdesk Dashboard — {info.get("full_name",fc)}')
-    tix=DB.get_all("tickets",fc,100)
-    if tix:
-        df=pd.DataFrame(tix)
-        c1,c2,c3,c4=st.columns(4)
-        with c1:st.metric("🔴 Open",len(df[df["status"]=="open"]) if "status" in df.columns else 0)
-        with c2:st.metric("🟡 In Progress",len(df[df["status"]=="in_progress"]) if "status" in df.columns else 0)
-        with c3:st.metric("⏸️ Hold",len(df[df["status"]=="hold"]) if "status" in df.columns else 0)
-        with c4:st.metric("🟢 Closed",len(df[df["status"]=="closed"]) if "status" in df.columns else 0)
-        st.dataframe(df[[c for c in ["ticket_number","title","category","status","requester_name","location_building","created_at"] if c in df.columns]],use_container_width=True,hide_index=True)
+                                if st.button("✅ Close", key=f"close_{row['id']}", use_container_width=True):
+                                    if new_comment:
+                                        DB.insert("ticket_comments", {"ticket_id": row["id"], "user_name": st.session_state.get("user_name", "Staff"), "comment_text": f"CLOSED: {new_comment}"})
+                                    DB.update("tickets", row["id"], {"status": "closed", "closed_at": datetime.now().isoformat()})
+                                    st.success("Ticket closed!")
+                                    st.rerun()
+                            
+                            if st.button("❌ Reject", key=f"rej_{row['id']}", use_container_width=True):
+                                if new_comment:
+                                    DB.insert("ticket_comments", {"ticket_id": row["id"], "user_name": st.session_state.get("user_name", "Staff"), "comment_text": f"REJECTED: {new_comment}"})
+                                DB.update("tickets", row["id"], {"status": "rejected"})
+                                st.error("Ticket rejected")
+                                st.rerun()
+                        
+                        if status == "closed":
+                            if st.button("🔄 Re-Open", key=f"reopen_{row['id']}", use_container_width=True):
+                                DB.update("tickets", row["id"], {"status": "open"})
+                                DB.insert("ticket_comments", {"ticket_id": row["id"], "user_name": st.session_state.get("user_name", "Staff"), "comment_text": "Ticket re-opened"})
+                                st.rerun()
+                        
+                        if is_admin and status not in ["closed", "rejected"]:
+                            st.markdown("---")
+                            st.markdown("**🔺 Escalate**")
+                            esc_level = row.get("escalation_level", 1)
+                            if esc_level < 6:
+                                if st.button(f"🔺 Escalate to L{esc_level+1}", key=f"esc_{row['id']}", use_container_width=True):
+                                    new_level = esc_level + 1
+                                    DB.update("tickets", row["id"], {"escalation_level": new_level})
+                                    DB.insert("ticket_escalation_log", {"ticket_id": row["id"], "from_level": esc_level, "to_level": new_level, "reason": "Manual escalation"})
+                                    
+                                    esc_data = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("level_number", new_level).execute()
+                                    if esc_data.data:
+                                        for e in esc_data.data:
+                                            if e.get("escalate_to_email"):
+                                                send_email_notification(e["escalate_to_email"], f"🔺 Ticket {row.get('ticket_number','')} Escalated to L{new_level}", f"<h3>Ticket Escalated</h3><p>Ticket <b>{row.get('ticket_number','')}</b> has been escalated to Level {new_level}.</p><p><b>Title:</b> {row.get('title','')}</p>")
+                                    st.success(f"Escalated to L{new_level}!")
+                                    st.rerun()
+        else:
+            st.info("No tickets found")
+    
+    # ============================================
+    # TAB: SETTINGS (ADMIN ONLY)
+    # ============================================
+    if is_admin:
+        with tabs[tab_idx]:
+            st.markdown("### ⚙️ Helpdesk Settings")
+            
+            subtabs = st.tabs(["📋 Categories", "📍 Locations", "⏱️ Escalation SLA"])
+            
+            with subtabs[0]:
+                st.markdown("**Manage Ticket Categories**")
+                cats = DB.get_helpdesk_categories()
+                if cats:
+                    df = pd.DataFrame(cats)
+                    st.dataframe(df[["category_name", "department", "sla_hours"]], use_container_width=True, hide_index=True)
+                
+                with st.form("add_category"):
+                    st.markdown("**➕ Add Category**")
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        new_cat = st.text_input("Category Name*")
+                    with c2:
+                        new_dept = st.selectbox("Department", [
+                            "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
+                            "Facility Management — Hard Services", "Facility Management — Soft Services",
+                            "Technology Group — Network", "Technology Group — Building Technology", "Security"
+                        ])
+                    with c3:
+                        new_sla = st.number_input("SLA Hours", min_value=1, max_value=72, value=4)
+                    if st.form_submit_button("➕ Add Category", use_container_width=True):
+                        if new_cat:
+                            supabase.table("helpdesk_categories").insert({"department": new_dept, "category_name": new_cat, "sla_hours": new_sla}).execute()
+                            st.success(f"✅ {new_cat} added!")
+                            st.rerun()
+            
+            with subtabs[1]:
+                st.markdown("**Manage Locations**")
+                locs = DB.get_locations(fc)
+                if locs:
+                    for l in locs:
+                        with st.expander(f"📍 {l.get('location_name','')} ({l.get('location_code','')})"):
+                            subs = DB.get_sub_locations(l["id"])
+                            if subs:
+                                for s in subs:
+                                    st.markdown(f"- {s.get('sub_location_name','')}")
+                            else:
+                                st.caption("No sub-locations")
+            
+            with subtabs[2]:
+                st.markdown("**⏱️ Escalation SLA Configuration**")
+                st.caption("Configure escalation path per category")
+                
+                categories = DB.get_helpdesk_categories()
+                cat_options = ["All Categories"] + [c.get("category_name","") for c in categories]
+                selected_cat = st.selectbox("Select Category", cat_options, key="esc_cat")
+                
+                if selected_cat != "All Categories":
+                    cat_id = None
+                    for c in categories:
+                        if c.get("category_name") == selected_cat:
+                            cat_id = c["id"]
+                            break
+                    
+                    if cat_id:
+                        esc_query = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("category_id", cat_id).order("level_number").execute()
+                        escalations = esc_query.data if esc_query.data else []
+                        
+                        if escalations:
+                            st.markdown("**Current Escalation Path:**")
+                            for e in escalations:
+                                st.markdown(f"**L{e.get('level_number','')}:** {e.get('level_name','')} → {e.get('escalate_to_email','Not set')} ({e.get('sla_minutes','')} mins)")
+                        else:
+                            st.info("No escalation configured for this category.")
+                
+                st.markdown("---")
+                
+                with st.form("add_escalation"):
+                    st.markdown("**➕ Add/Update Escalation Level**")
+                    c1, c2, c3, c4 = st.columns(4)
+                    with c1:
+                        esc_level = st.selectbox("Level", [1, 2, 3, 4, 5, 6], format_func=lambda x: f"L{x}")
+                    with c2:
+                        esc_name = st.text_input("Level Name", placeholder="e.g. Team Lead")
+                    with c3:
+                        esc_email = st.text_input("Escalate To Email")
+                    with c4:
+                        esc_sla = st.number_input("SLA (minutes)", min_value=15, max_value=10080, value=60, step=15)
+                    
+                    if st.form_submit_button("💾 Save Escalation", use_container_width=True):
+                        if selected_cat != "All Categories" and esc_email and cat_id:
+                            supabase.table("ticket_escalation").upsert({
+                                "facility_code": fc,
+                                "category_id": cat_id,
+                                "level_number": esc_level,
+                                "level_name": esc_name or f"Level {esc_level}",
+                                "escalate_to_email": esc_email,
+                                "sla_minutes": esc_sla
+                            }).execute()
+                            st.success(f"✅ L{esc_level} escalation saved!")
+                            st.rerun()
+                        else:
+                            st.error("Please select a specific category and enter email")
 
 # ============================================
 # INCIDENT CHECK
@@ -1822,7 +2146,7 @@ def page_cs():
 ROUTER={
     "cc":page_cc,"ar":page_ar,"cal":page_cal,"cs":page_cs,"ppm":page_ppm,
     "wo":page_generic,"wp":page_wp,"fo":page_fo,"oa":page_oa,
-    "vm":page_vm,"up":page_users,"rt":page_rt,"hd":page_hd,"fb":page_fb,
+    "vm":page_vm,"up":page_users,"rt":page_helpdesk,"hd":page_helpdesk,"fb":page_fb,
     "ac":page_ac,"ic":page_ic,"hot":page_generic,"uc":page_uc,"mis":page_generic,
 }
 
