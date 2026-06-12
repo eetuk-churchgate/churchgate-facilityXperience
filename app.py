@@ -248,38 +248,45 @@ def topnav():
 # ============================================
 def sidebar():
     with st.sidebar:
-        sel=st.session_state.get("facility","WTC")
-        # Only show facilities the user has access to
-        user_home_facility = st.session_state.get("user", {}).get("home_facility", "WTC")
-        if is_admin:
-            allowed_facilities = list(FACILITY_INFO.keys())
-        else:
-            allowed_facilities = [user_home_facility]
-        
-        cols=st.columns(3)
-        for i,(k,v) in enumerate(FACILITY_INFO.items()):
-            if k in allowed_facilities:
-                with cols[i%3]:
-                    if st.button(k,key=f"f_{k}",use_container_width=True,type="primary" if k==sel else "secondary"):st.session_state.facility=k;st.rerun()
-        info=FACILITY_INFO.get(sel,{})
-        st.markdown(f'<div style="background:{info.get("clight","#fce8e8")};border-left:3px solid {info.get("color",CHURCHGATE_RED)};border-radius:6px;padding:0.7rem;margin:0.7rem 0;font-size:0.7rem;"><b>{info.get("full_name",sel)}</b><br>📍 {info.get("city","")}</div>',unsafe_allow_html=True)
+        # Get user info FIRST
         user_perms = st.session_state.get("user", {}).get("extra_permissions", [])
         if isinstance(user_perms, str):
             try: user_perms = eval(user_perms)
             except: user_perms = []
         user_role = st.session_state.get("user_role", "staff")
         is_admin = user_role in ["admin", "approver"]
+        user_home_facility = st.session_state.get("user", {}).get("home_facility", "WTC")
         
+        sel = st.session_state.get("facility", "WTC")
+        
+        # Facility selector - restricted for non-admin
+        if is_admin:
+            allowed_facilities = list(FACILITY_INFO.keys())
+        else:
+            allowed_facilities = [user_home_facility]
+        
+        cols = st.columns(3)
+        for i, (k, v) in enumerate(FACILITY_INFO.items()):
+            if k in allowed_facilities:
+                with cols[i % 3]:
+                    if st.button(k, key=f"f_{k}", use_container_width=True, type="primary" if k == sel else "secondary"):
+                        st.session_state.facility = k
+                        st.rerun()
+        
+        info = FACILITY_INFO.get(sel, {})
+        st.markdown(f'<div style="background:{info.get("clight","#fce8e8")};border-left:3px solid {info.get("color",CHURCHGATE_RED)};border-radius:6px;padding:0.7rem;margin:0.7rem 0;font-size:0.7rem;"><b>{info.get("full_name",sel)}</b><br>📍 {info.get("city","")}</div>',unsafe_allow_html=True)
+        
+        # Role-based navigation
         all_nav = [
-            ("🏠 COMMAND",[("🌐 Command Center","cc"),("📊 PPM Dashboard","ppm")], ["Command Center", "PPM Dashboard"]),
-            ("🏗️ ASSETS & PPM",[("📋 Asset Register","ar"),("📅 52-Week Calendar","cal"),("✅ Checklist Status","cs")], ["Asset Register", "52-Week Calendar", "Checklist Status"]),
-            ("🔧 MAINTENANCE",[("📋 Work Orders","wo"),("🛡️ Work Permits","wp")], ["Work Orders", "Work Permits"]),
-            ("🏢 FACILITY OPERATIONS",[("📊 Operations Dashboard","fo"),("✅ Observations/Alerts","oa")], ["Facility Operations"]),
-            ("👥 PEOPLE",[("🛂 Visitor Management","vm"),("👤 User Management","up")], ["Visitor Management", "User Management"]),
-            ("💬 SERVICES",[("🎫 Raise a Ticket","rt"),("💬 Helpdesk","hd"),("⭐ Feedback","fb")], ["Raise Ticket", "Helpdesk", "Feedback"]),
-            ("✅ COMPLIANCE",[("✅ Audit Checklist","ac"),("🚨 Incident Check","ic"),("🔄 HOTO Check","hot")], ["Audit Checklist", "Incident Report", "HOTO Check"]),
-            ("⚡ UTILITY",[("⚡ Utility Dashboard","uc")], ["Utility Dashboard"]),
-            ("📊 REPORTS",[("📊 Monthly MIS","mis")], ["Monthly MIS"]),
+            ("🏠 COMMAND", [("🌐 Command Center", "cc"), ("📊 PPM Dashboard", "ppm")], ["Command Center", "PPM Dashboard"]),
+            ("🏗️ ASSETS & PPM", [("📋 Asset Register", "ar"), ("📅 52-Week Calendar", "cal"), ("✅ Checklist Status", "cs")], ["Asset Register", "52-Week Calendar", "Checklist Status"]),
+            ("🔧 MAINTENANCE", [("📋 Work Orders", "wo"), ("🛡️ Work Permits", "wp")], ["Work Orders", "Work Permits"]),
+            ("🏢 FACILITY OPERATIONS", [("📊 Operations Dashboard", "fo"), ("✅ Observations/Alerts", "oa")], ["Facility Operations"]),
+            ("👥 PEOPLE", [("🛂 Visitor Management", "vm"), ("👤 User Management", "up")], ["Visitor Management", "User Management"]),
+            ("💬 SERVICES", [("🎫 Raise a Ticket", "rt"), ("💬 Helpdesk", "hd"), ("⭐ Feedback", "fb")], ["Raise Ticket", "Helpdesk", "Feedback"]),
+            ("✅ COMPLIANCE", [("✅ Audit Checklist", "ac"), ("🚨 Incident Check", "ic"), ("🔄 HOTO Check", "hot")], ["Audit Checklist", "Incident Report", "HOTO Check"]),
+            ("⚡ UTILITY", [("⚡ Utility Dashboard", "uc")], ["Utility Dashboard"]),
+            ("📊 REPORTS", [("📊 Monthly MIS", "mis")], ["Monthly MIS"]),
         ]
         
         for section, items, required_perms in all_nav:
@@ -290,6 +297,15 @@ def sidebar():
                     if st.button(label, key=page_id, use_container_width=True):
                         st.session_state.page = page_id
                         st.rerun()
+        
+        st.markdown("---")
+        if st.button("🚪 Log Out", use_container_width=True, type="primary"):
+            st.session_state.authenticated = False
+            st.session_state.user = None
+            st.session_state.user_name = None
+            st.query_params.clear()
+            st.rerun()
+
 
 # ============================================
 # COMMAND CENTER
