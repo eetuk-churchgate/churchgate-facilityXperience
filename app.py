@@ -1991,7 +1991,7 @@ def page_cs():
 ROUTER={
     "cc":page_cc,"ar":page_ar,"cal":page_cal,"cs":page_cs,"ppm":page_ppm,
     "wo":page_generic,"wp":page_wp,"fo":page_fo,"oa":page_oa,
-    "vm":page_vm,"up":page_users,"rt":page_helpdesk,"hd":page_helpdesk,"fb":page_fb,
+    "vm":page_vm,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb":page_fb,
     "ac":page_ac,"ic":page_ic,"hot":page_generic,"uc":page_uc,"mis":page_generic,
 }
 
