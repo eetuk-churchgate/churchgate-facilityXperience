@@ -1390,7 +1390,8 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
             st.rerun()
     
     if st.session_state.ai_chat_history:
-        if st.sidebar.button("🗑️ Clear AI Chat", use_container_width=True):
+        st.markdown("---")
+        if st.button("🗑️ Clear Chat History", key="clear_ai_btn_123", use_container_width=True):
             st.session_state.ai_chat_history = []
             st.session_state.ai_conversation = []
             st.rerun()
