@@ -1256,42 +1256,81 @@ def page_raise_ticket():
     
     st.markdown(f'## 🎫 Raise a Ticket — {info.get("full_name", fc)}')
     
-    # AI SMART SEARCH
-    st.markdown("### 🤖 facilityXpert — Smart Issue Resolution")
-    st.caption("Describe your issue and let AI suggest solutions before raising a ticket")
+    # AI SMART CHAT — FULL DUPLEX
+    st.markdown("### 🤖 facilityXpert — AI Assistant")
     
-    c1, c2 = st.columns([4, 1])
-    with c1:
-        ai_query = st.text_input("What's the issue?", placeholder="e.g. My AC is blowing hot air, internet is slow, water leaking...", key="ai_search", label_visibility="collapsed")
-    with c2:
-        ask_ai = st.button("🤖 Ask AI", use_container_width=True, type="primary")
+    if "ai_chat_history" not in st.session_state:
+        st.session_state.ai_chat_history = []
+    if "ai_conversation" not in st.session_state:
+        st.session_state.ai_conversation = []
     
-    if ask_ai and ai_query:
-        with st.spinner("🤖 facilityXpert is thinking..."):
-            kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{ai_query}%,tags.ilike.%{ai_query}%").limit(5).execute()
+    # Display chat history
+    for msg in st.session_state.ai_chat_history:
+        if msg["role"] == "user":
+            st.chat_message("user").write(msg["content"])
+        else:
+            st.chat_message("assistant").write(msg["content"])
+    
+    # Chat input — always at bottom of chat area
+    prompt = st.chat_input("Ask facilityXpert anything...", key="ai_chat_main")
+    
+    if prompt:
+        # Add user message to display
+        st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
+        # Add to conversation context
+        st.session_state.ai_conversation.append({"role": "user", "content": prompt})
+        
+        with st.spinner("🤖 Thinking..."):
             hc = DB.get_helpdesk_categories()
             cat_names_list = sorted(list(set(c.get("category_name", "") for c in hc)))
-            ai_response = ask_facility_xpert(ai_query, cat_names_list)
-        
-        if ai_response:
-            st.markdown("### 🤖 facilityXpert AI Says:")
-            st.info(ai_response)
-        
-        if kb.data:
-            st.success(f"💡 Also found {len(kb.data)} matching solutions in our knowledge base:")
-            for k in kb.data:
-                with st.expander(f"🔧 {k.get('question','')} — {k.get('category','')}"):
-                    st.markdown(f"**Solution:** {k.get('answer','')}")
-                    st.caption(f"Priority: {k.get('priority','')} | Department: {k.get('department','')}")
-                    if st.button(f"✅ This solved my issue", key=f"solved_{k['id']}"):
-                        st.success("Great! Issue resolved without a ticket. 🎉")
-                        st.balloons()
-        
-        if not ai_response and not kb.data:
-            st.warning("No solutions found. Please raise a ticket below.")
+            
+            try:
+                import requests
+                api_key = st.secrets.get("GROQ_API_KEY", "")
+                
+                # Build conversation with last 10 messages for context
+                messages = [
+                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues. You have access to these departments: {cat_names_list}. For emergencies, tell them to raise an URGENT ticket or call the facility team. NEVER make up phone numbers or email addresses. Keep responses helpful and concise."}
+                ]
+                # Add last 10 messages for context
+                messages.extend(st.session_state.ai_conversation[-10:])
+                
+                response = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={"model": "llama-3.1-8b-instant", "messages": messages, "max_tokens": 300, "temperature": 0.5},
+                    timeout=15
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    ai_response = data["choices"][0]["message"]["content"]
+                else:
+                    ai_response = None
+            except:
+                ai_response = None
+            
+            # Fallback to knowledge base
+            if not ai_response:
+                kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{prompt}%,tags.ilike.%{prompt}%").limit(3).execute()
+                if kb.data:
+                    ai_response = "Here are solutions from our knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+                else:
+                    ai_response = "I couldn't find a specific solution. Please raise a ticket and our team will help you."
+            
+            # Add AI response
+            st.session_state.ai_chat_history.append({"role": "assistant", "content": ai_response})
+            st.session_state.ai_conversation.append({"role": "assistant", "content": ai_response})
+            st.rerun()
     
-    elif ask_ai and not ai_query:
-        st.warning("Please describe your issue first")
+    # Clear chat
+    if st.session_state.ai_chat_history:
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            if st.button("🗑️ Clear Chat", use_container_width=True):
+                st.session_state.ai_chat_history = []
+                st.session_state.ai_conversation = []
+                st.rerun()
     
     st.markdown("---")
     st.markdown("### 📝 Raise New Ticket")
