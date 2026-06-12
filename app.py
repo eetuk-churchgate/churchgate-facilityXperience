@@ -784,13 +784,6 @@ def page_wp():
                         )
                     
                     st.rerun()
-                        
-                        st.success(f"✅ Work Permit {permit_number} Submitted Successfully!")
-                        st.info(f"📧 Authorization requests sent to {len(authorizers)} team lead(s)")
-                        st.balloons()
-                        st.rerun()
-                    else:
-                        st.error("❌ Failed to submit permit. Please try again.")
     
     # ============================================
     # TAB 3: REPORTS
