@@ -1302,7 +1302,7 @@ def page_raise_ticket():
                 api_key = st.secrets.get("GROQ_API_KEY", "")
                 
                 messages = [
-                    {"role": "system", "content": f"You are facilityXpert, AI assistant for Churchgate Group's World Trade Center Abuja. You help with facility issues. Departments: {cat_names_list}. NEVER make up contacts. For emergencies, advise raising URGENT ticket. Remember the conversation context."}
+                    {"role": "system", "content": f"You are facilityXpert for Churchgate Group's World Trade Center Abuja. Your job: give helpful advice about facility issues like AC, internet, plumbing, cleaning, electrical, elevators, access cards, etc. IMPORTANT RULES: 1. NEVER say you created a ticket - you CANNOT create tickets. 2. NEVER make up ticket numbers, phone numbers, or email addresses. 3. Always tell users to raise a ticket themselves using the form on this page. 4. Give practical troubleshooting steps. 5. For emergencies, tell them to call facility team. Available departments: {cat_names_list}."}
                 ]
                 messages.extend(st.session_state.ai_conversation[-15:])
                 
