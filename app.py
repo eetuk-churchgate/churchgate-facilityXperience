@@ -227,7 +227,7 @@ def ask_facility_xpert(query, categories):
             json={
                 "model": "llama-3.1-8b-instant",
                 "messages": [
-                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues quickly. Available departments: {cat_list}. For emergencies (fire, elevator stuck, major water leak, electrical hazard), ALWAYS advise calling security or facility emergency line immediately. Be concise, helpful, and professional. Give step-by-step solutions."},
+                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues quickly. Available departments: {cat_list}. For emergencies (fire, elevator stuck, major water leak, electrical hazard), ALWAYS tell them to raise an URGENT ticket or call the facility team. NEVER make up phone numbers or email addresses. If you don't know something, say so. Be concise, helpful, and professional. Give step-by-step solutions."},
                     {"role": "user", "content": query}
                 ],
                 "max_tokens": 300,
@@ -1272,7 +1272,6 @@ def page_raise_ticket():
             hc = DB.get_helpdesk_categories()
             cat_names_list = sorted(list(set(c.get("category_name", "") for c in hc)))
             ai_response = ask_facility_xpert(ai_query, cat_names_list)
-            st.write(f"Debug: {ai_response}")
         
         if ai_response:
             st.markdown("### 🤖 facilityXpert AI Says:")
