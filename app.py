@@ -1249,26 +1249,24 @@ def page_raise_ticket():
     if "ai_chat_history" not in st.session_state:
         st.session_state.ai_chat_history = []
     
-    # Display chat history
-    for msg in st.session_state.ai_chat_history:
-        if msg["role"] == "user":
-            st.chat_message("user").write(msg["content"])
-        else:
-            st.chat_message("assistant").write(msg["content"])
+    # Chat input box — ALWAYS VISIBLE
+    prompt = st.chat_input("Describe your issue...", key="ai_chat")
     
-    # Chat input
-    if prompt := st.chat_input("Describe your issue...", key="ai_chat"):
+    # Display chat history
+    chat_container = st.container()
+    with chat_container:
+        for msg in st.session_state.ai_chat_history:
+            if msg["role"] == "user":
+                st.chat_message("user").write(msg["content"])
+            else:
+                st.chat_message("assistant").write(msg["content"])
+    
+    if prompt:
         # Add user message
         st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
-        st.chat_message("user").write(prompt)
         
         # Search knowledge base
         kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{prompt}%,tags.ilike.%{prompt}%").limit(3).execute()
-        
-        # Build AI response
-        kb_context = ""
-        if kb.data:
-            kb_context = "Knowledge base matches:\n" + "\n".join([f"- {k.get('question')}: {k.get('answer','')[:200]}" for k in kb.data])
         
         with st.spinner("🤖 Thinking..."):
             hc = DB.get_helpdesk_categories()
@@ -1278,13 +1276,12 @@ def page_raise_ticket():
         if ai_response:
             full_response = ai_response
         elif kb.data:
-            full_response = f"I found these solutions in our knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+            full_response = "Here are solutions from our knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
         else:
-            full_response = "I couldn't find a specific solution for that. Please raise a ticket below and our team will help you right away."
+            full_response = "I couldn't find a specific solution. Please raise a ticket below and our team will help you."
         
-        # Add AI response
         st.session_state.ai_chat_history.append({"role": "assistant", "content": full_response})
-        st.chat_message("assistant").write(full_response)
+        st.rerun()
     
     # Clear chat button
     if st.session_state.ai_chat_history:
@@ -1292,8 +1289,8 @@ def page_raise_ticket():
             st.session_state.ai_chat_history = []
             st.rerun()
     
-    # Quick action chips
-    st.markdown("**⚡ Common Issues (click to ask AI):**")
+    # Quick action chips — BELOW the chat
+    st.markdown("**⚡ Quick Actions:**")
     quick_issues = ["AC not cooling", "Internet too slow", "Water leaking", "Power outage", "Elevator not working", "Access card issue"]
     cols = st.columns(6)
     for i, issue in enumerate(quick_issues):
