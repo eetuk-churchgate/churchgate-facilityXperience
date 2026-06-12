@@ -534,45 +534,36 @@ def page_wp():
                             if st.button("🔐 Authorize", key=f"auth_btn_{row['id']}", use_container_width=True, type="primary"):
                                 auth_name = st.session_state.get("user_name", "Authorizer")
                                 DB.update("work_permits", row["id"], {"workflow_stage": "authorized", "authorized_by_name": auth_name, "authorized_at": now})
-                                    # Notify confirmers
-                                    confirmers = get_workflow_people(fc, 2)
-                                    for c in confirmers:
-                                        send_email_notification(c.get("person_email", ""), 
-                                            f"🔐 Permit {permit_no} Requires Confirmation",
-                                            f"<h3>Permit Authorized</h3><p><b>{permit_no}</b> authorized by {selected_auth}.</p><p>Please confirm.</p>")
-                                    st.success(f"🔐 Authorized by {selected_auth}!")
+                                confirmers = get_workflow_people(fc, 2)
+                                for c in confirmers:
+                                    send_email_notification(c.get("person_email", ""), f"🔐 Permit {permit_no} Requires Confirmation", f"<h3>Permit Authorized</h3><p><b>{permit_no}</b> authorized by {auth_name}.</p>")
+                                st.success(f"🔐 Authorized!")
                                 st.balloons()
                                 st.rerun()
                             else:
                                 st.warning("No authorizers configured for this department")
                         
                         if can_confirm and stage == "authorized":
-                            confirmers = get_workflow_people(fc, 2)
                             if st.button("✅ Confirm", key=f"conf_btn_{row['id']}", use_container_width=True, type="primary"):
                                 conf_name = st.session_state.get("user_name", "Confirmer")
                                 DB.update("work_permits", row["id"], {"workflow_stage": "confirmed", "confirmed_by_name": conf_name, "confirmed_at": now})
-                                    approvers = get_workflow_people(fc, 3)
-                                    for a in approvers:
-                                        send_email_notification(a.get("person_email", ""),
-                                            f"✅ Permit {permit_no} Requires Approval",
-                                            f"<h3>Permit Confirmed</h3><p><b>{permit_no}</b> confirmed by {selected_conf}.</p><p>Please approve.</p>")
-                                    st.success(f"✅ Confirmed by {selected_conf}!")
+                                approvers = get_workflow_people(fc, 3)
+                                for a in approvers:
+                                    send_email_notification(a.get("person_email", ""), f"✅ Permit {permit_no} Requires Approval", f"<h3>Permit Confirmed</h3><p><b>{permit_no}</b> confirmed by {conf_name}.</p>")
+                                st.success(f"✅ Confirmed!")
                                 st.balloons()
                                 st.rerun()
                             else:
                                 st.warning("No confirmers configured")
                         
                         if can_approve and stage in ["authorized", "confirmed"]:
-                            approvers = get_workflow_people(fc, 3)
                             if st.button("🟢 Approve", key=f"app_btn_{row['id']}", use_container_width=True, type="primary"):
                                 app_name = st.session_state.get("user_name", "Approver")
                                 DB.update("work_permits", row["id"], {"workflow_stage": "approved", "status": "approved", "approved_by_name": app_name, "approved_at": now})
-                                    send_email_notification(row.get("requester_contact", ""),
-                                        f"🟢 Permit {permit_no} APPROVED",
-                                        f"<h3>Permit Approved!</h3><p>Your permit <b>{permit_no}</b> has been <b>APPROVED</b> by {selected_app}.</p><p>You may now proceed with work.</p>")
-                                    st.success(f"🟢 Approved by {selected_app}!")
-                                    st.balloons()
-                                    st.rerun()
+                                send_email_notification(row.get("requester_contact", ""), f"🟢 Permit {permit_no} APPROVED", f"<h3>Permit Approved!</h3><p>Your permit <b>{permit_no}</b> has been <b>APPROVED</b>.</p>")
+                                st.success(f"🟢 Approved!")
+                                st.balloons()
+                                st.rerun()
                             else:
                                 st.warning("No approvers configured")
                         
