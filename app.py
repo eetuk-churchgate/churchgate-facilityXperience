@@ -1257,11 +1257,16 @@ def page_raise_ticket():
     
     st.markdown(f'## 🎫 Raise a Ticket — {info.get("full_name", fc)}')
     
-    # Clear chat button at top
+     # Clear chat button at top
     if "ai_chat_history" in st.session_state and len(st.session_state.get("ai_chat_history", [])) > 0:
         if st.button("🗑️ Clear AI Chat", key="top_clear_chat", use_container_width=True):
             st.session_state.ai_chat_history = []
             st.session_state.ai_conversation = []
+            # Also delete from database
+            user_email = st.session_state.get("user", {}).get("email", "guest")
+            try:
+                supabase.table("ai_chat_sessions").delete().eq("user_email", user_email).execute()
+            except: pass
             st.rerun()
     
     # AI SMART CHAT — FULL DUPLEX WITH MEMORY
