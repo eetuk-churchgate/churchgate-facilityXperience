@@ -531,41 +531,48 @@ def page_wp():
                         dept = row.get("department", "")
                         
                         if can_authorize and stage == "submitted":
+                            auth_comment = st.text_area("Authorization Comment", key=f"auth_cmt_{row['id']}", height=60, placeholder="Enter reason for authorization...")
                             if st.button("🔐 Authorize", key=f"auth_btn_{row['id']}", use_container_width=True, type="primary"):
-                                auth_name = st.session_state.get("user_name", "Authorizer")
-                                DB.update("work_permits", row["id"], {"workflow_stage": "authorized", "authorized_by_name": auth_name, "authorized_at": now})
-                                confirmers = get_workflow_people(fc, 2)
-                                for c in confirmers:
-                                    send_email_notification(c.get("person_email", ""), f"🔐 Permit {permit_no} Requires Confirmation", f"<h3>Permit Authorized</h3><p><b>{permit_no}</b> authorized by {auth_name}.</p>")
-                                st.success(f"🔐 Authorized!")
-                                st.balloons()
-                                st.rerun()
-                            else:
-                                st.warning("No authorizers configured for this department")
+                                if auth_comment:
+                                    auth_name = st.session_state.get("user_name", "Authorizer")
+                                    DB.update("work_permits", row["id"], {"workflow_stage": "authorized", "authorized_by_name": auth_name, "authorized_at": now})
+                                    confirmers = get_workflow_people(fc, 2)
+                                    for c in confirmers:
+                                        send_email_notification(c.get("person_email", ""), f"🔐 Permit {permit_no} Requires Confirmation", f"<h3>Permit Authorized</h3><p><b>{permit_no}</b> authorized by {auth_name}.</p><p><b>Comment:</b> {auth_comment}</p>")
+                                    st.success(f"🔐 Authorized!")
+                                    st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.error("Please add a comment before authorizing")
                         
                         if can_confirm and stage == "authorized":
+                            conf_comment = st.text_area("Confirmation Comment", key=f"conf_cmt_{row['id']}", height=60, placeholder="Enter confirmation notes...")
                             if st.button("✅ Confirm", key=f"conf_btn_{row['id']}", use_container_width=True, type="primary"):
-                                conf_name = st.session_state.get("user_name", "Confirmer")
-                                DB.update("work_permits", row["id"], {"workflow_stage": "confirmed", "confirmed_by_name": conf_name, "confirmed_at": now})
-                                approvers = get_workflow_people(fc, 3)
-                                for a in approvers:
-                                    send_email_notification(a.get("person_email", ""), f"✅ Permit {permit_no} Requires Approval", f"<h3>Permit Confirmed</h3><p><b>{permit_no}</b> confirmed by {conf_name}.</p>")
-                                st.success(f"✅ Confirmed!")
-                                st.balloons()
-                                st.rerun()
-                            else:
-                                st.warning("No confirmers configured")
+                                if conf_comment:
+                                    conf_name = st.session_state.get("user_name", "Confirmer")
+                                    DB.update("work_permits", row["id"], {"workflow_stage": "confirmed", "confirmed_by_name": conf_name, "confirmed_at": now})
+                                    approvers = get_workflow_people(fc, 3)
+                                    for a in approvers:
+                                        send_email_notification(a.get("person_email", ""), f"✅ Permit {permit_no} Requires Approval", f"<h3>Permit Confirmed</h3><p><b>{permit_no}</b> confirmed by {conf_name}.</p><p><b>Comment:</b> {conf_comment}</p>")
+                                    st.success(f"✅ Confirmed!")
+                                    st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.error("Please add a comment before confirming")
                         
                         if can_approve and stage in ["authorized", "confirmed"]:
+                            app_comment = st.text_area("Approval Comment", key=f"app_cmt_{row['id']}", height=60, placeholder="Enter approval notes...")
                             if st.button("🟢 Approve", key=f"app_btn_{row['id']}", use_container_width=True, type="primary"):
-                                app_name = st.session_state.get("user_name", "Approver")
-                                DB.update("work_permits", row["id"], {"workflow_stage": "approved", "status": "approved", "approved_by_name": app_name, "approved_at": now})
-                                send_email_notification(row.get("requester_contact", ""), f"🟢 Permit {permit_no} APPROVED", f"<h3>Permit Approved!</h3><p>Your permit <b>{permit_no}</b> has been <b>APPROVED</b>.</p>")
-                                st.success(f"🟢 Approved!")
-                                st.balloons()
-                                st.rerun()
-                            else:
-                                st.warning("No approvers configured")
+                                if app_comment:
+                                    app_name = st.session_state.get("user_name", "Approver")
+                                    DB.update("work_permits", row["id"], {"workflow_stage": "approved", "status": "approved", "approved_by_name": app_name, "approved_at": now})
+                                    send_email_notification(row.get("requester_contact", ""), f"🟢 Permit {permit_no} APPROVED", f"<h3>Permit Approved!</h3><p>Your permit <b>{permit_no}</b> has been <b>APPROVED</b> by {app_name}.</p><p><b>Comment:</b> {app_comment}</p>")
+                                    st.success(f"🟢 Approved!")
+                                    st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.error("Please add a comment before approving")
+
                         
                         if stage != "rejected":
                             if st.button("❌ Reject", key=f"rej_btn_{row['id']}", use_container_width=True):
