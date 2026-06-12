@@ -518,12 +518,15 @@ def page_wp():
                         st.markdown("---")
                         st.markdown("**🔄 Audit Trail:**")
                         st.caption(f"📤 Submitted: {format_wat_time(row.get('submitted_at', row.get('created_at', '')))}")
-                        if row.get("authorized_at"): 
+                        if row.get("authorized_at"):
                             st.caption(f"🔐 Authorized: {format_wat_time(row['authorized_at'])} by {row.get('authorized_by_name', '')}")
-                        if row.get("confirmed_at"): 
+                        if row.get("confirmed_at"):
                             st.caption(f"✅ Confirmed: {format_wat_time(row['confirmed_at'])} by {row.get('confirmed_by_name', '')}")
-                        if row.get("approved_at"): 
+                        if row.get("approved_at"):
                             st.caption(f"🟢 Approved: {format_wat_time(row['approved_at'])} by {row.get('approved_by_name', '')}")
+                        if stage == "rejected" and row.get("rejected_reason"):
+                            st.error(f"❌ Rejected: {row.get('rejected_reason', '')}")
+                            st.info("📝 Requester can resubmit with corrections")
                     
                     with c2:
                         st.markdown("**⚡ Actions:**")
@@ -574,17 +577,41 @@ def page_wp():
                                     st.error("Please add a comment before approving")
 
                         
-                        if stage != "rejected":
+                        if stage not in ["rejected", "approved"] and (is_admin or can_authorize or can_confirm or can_approve):
+                            rej_comment = st.text_area("Rejection Reason", key=f"rej_cmt_{row['id']}", height=60, placeholder="Enter reason for rejection...")
                             if st.button("❌ Reject", key=f"rej_btn_{row['id']}", use_container_width=True):
+                                if rej_comment:
+                                    rej_name = st.session_state.get("user_name", "Reviewer")
+                                    DB.update("work_permits", row["id"], {
+                                        "workflow_stage": "rejected", 
+                                        "status": "rejected", 
+                                        "rejected_at": now, 
+                                        "rejected_by": rej_name,
+                                        "rejected_reason": rej_comment
+                                    })
+                                    st.error(f"❌ Permit Rejected! Email sent to requester.")
+                                    st.rerun()
+                                else:
+                                    st.error("Please provide a reason for rejection")
+                        
+                        if stage == "rejected" and (is_admin or can_raise):
+                            if st.button("🔄 Resubmit Permit", key=f"resubmit_{row['id']}", use_container_width=True, type="primary"):
                                 DB.update("work_permits", row["id"], {
-                                    "workflow_stage": "rejected",
-                                    "status": "rejected",
-                                    "rejected_at": now
+                                    "workflow_stage": "submitted",
+                                    "status": "pending",
+                                    "submitted_at": now,
+                                    "authorized_at": None,
+                                    "authorized_by_name": None,
+                                    "confirmed_at": None,
+                                    "confirmed_by_name": None,
+                                    "approved_at": None,
+                                    "approved_by_name": None,
+                                    "rejected_at": None,
+                                    "rejected_reason": None
                                 })
-                                st.error("Permit Rejected")
+                                st.success("🔄 Permit resubmitted for approval!")
+                                st.balloons()
                                 st.rerun()
-        else:
-            st.info("📋 No work permits found. Raise your first permit in the '➕ Raise Permit' tab!")
             st.markdown("---")
             st.markdown("**Debug Info:**")
             st.code(f"Facility: {fc}\nTable: work_permits\nCheck Supabase for data.")
