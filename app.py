@@ -169,48 +169,6 @@ class DB:
             return res.data if res.data else []
         except: return []
 
-@staticmethod
-    def get_sub_locations(loc_id):
-        try:
-            res=supabase.table("helpdesk_sub_locations").select("*").eq("location_id",loc_id).order("sub_location_name").execute()
-            return res.data if res.data else []
-        except: return []
-
-    @staticmethod
-    def get_helpdesk_categories():
-        try:
-            res = supabase.table("helpdesk_categories").select("*").eq("is_active", True).order("category_name").execute()
-            return res.data if res.data else []
-        except: return []
-
-    @staticmethod
-    def get_tickets_filtered(fc, status=None, category=None, search=None, limit=100):
-        try:
-            query = supabase.table("tickets").select("*").eq("facility_code", fc)
-            if status and status != "All":
-                query = query.eq("status", status)
-            if category:
-                query = query.eq("category", category)
-            if search:
-                query = query.or_(f"title.ilike.%{search}%,description.ilike.%{search}%")
-            res = query.order("created_at", desc=True).limit(limit).execute()
-            return res.data if res.data else []
-        except: return []
-
-    @staticmethod
-    def get_ticket_comments(ticket_id):
-        try:
-            res = supabase.table("ticket_comments").select("*").eq("ticket_id", ticket_id).order("created_at").execute()
-            return res.data if res.data else []
-        except: return []
-
-@staticmethod
-    def get_sub_locations(loc_id):
-        try:
-            res=supabase.table("helpdesk_sub_locations").select("*").eq("location_id",loc_id).order("sub_location_name").execute()
-            return res.data if res.data else []
-        except: return []
-
     @staticmethod
     def get_helpdesk_categories():
         try:
