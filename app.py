@@ -280,7 +280,7 @@ def sidebar():
         all_nav = [
             ("🏠 COMMAND", [("🌐 Command Center", "cc"), ("📊 PPM Dashboard", "ppm")], ["Command Center", "PPM Dashboard"]),
             ("🏗️ ASSETS & PPM", [("📋 Asset Register", "ar"), ("📅 52-Week Calendar", "cal"), ("✅ Checklist Status", "cs")], ["Asset Register", "52-Week Calendar", "Checklist Status"]),
-            ("🔧 MAINTENANCE", [("📋 Work Orders", "wo"), ("🛡️ Work Permits", "wp")], ["Work Orders", "Work Permits"]),
+            ("🔧 MAINTENANCE", [("📋 Work Orders", "wo"), ("🛡️ Work Permits", "wp")], ["Work Orders", "Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"]),
             ("🏢 FACILITY OPERATIONS", [("📊 Operations Dashboard", "fo"), ("✅ Observations/Alerts", "oa")], ["Facility Operations"]),
             ("👥 PEOPLE", [("🛂 Visitor Management", "vm"), ("👤 User Management", "up")], ["Visitor Management", "User Management"]),
             ("💬 SERVICES", [("🎫 Raise a Ticket", "rt"), ("💬 Helpdesk", "hd"), ("⭐ Feedback", "fb")], ["Raise Ticket", "Helpdesk", "Feedback"]),
@@ -460,6 +460,16 @@ def page_wp():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
     
+    user_perms = st.session_state.get("user", {}).get("extra_permissions", [])
+    if isinstance(user_perms, str):
+        try: user_perms = eval(user_perms)
+        except: user_perms = []
+    user_role = st.session_state.get("user_role", "staff")
+    is_admin = user_role in ["admin", "approver"]
+    can_authorize = is_admin or "Authorize Permit" in user_perms or len(user_perms) == 0
+    can_confirm = is_admin or "Confirm Permit" in user_perms or len(user_perms) == 0
+    can_approve = is_admin or "Approve Permit" in user_perms or len(user_perms) == 0
+    
     st.markdown(f'## 🛡️ Permit-to-Work System — {info.get("full_name", fc)}')
     
     tab1, tab2, tab3, tab4 = st.tabs(["📋 All Permits", "➕ Raise Permit", "📊 Reports", "⚙️ Workflow Config"])
@@ -520,7 +530,7 @@ def page_wp():
                         now = datetime.now().isoformat()
                         dept = row.get("department", "")
                         
-                        if stage == "submitted":
+                        if can_authorize and stage == "submitted":
                             authorizers = get_workflow_people(fc, 1, dept)
                             if authorizers:
                                 auth_names = [a.get("person_name", "Unknown") for a in authorizers]
@@ -543,7 +553,7 @@ def page_wp():
                             else:
                                 st.warning("No authorizers configured for this department")
                         
-                        if stage == "authorized":
+                        if can_confirm and stage == "authorized":
                             confirmers = get_workflow_people(fc, 2)
                             if confirmers:
                                 conf_names = [c.get("person_name", "Unknown") for c in confirmers]
@@ -565,7 +575,7 @@ def page_wp():
                             else:
                                 st.warning("No confirmers configured")
                         
-                        if stage in ["authorized", "confirmed"]:
+                        if can_approve and stage in ["authorized", "confirmed"]:
                             approvers = get_workflow_people(fc, 3)
                             if approvers:
                                 app_names = [a.get("person_name", "Unknown") for a in approvers]
@@ -1579,7 +1589,7 @@ def page_users():
                     
                     module_groups = {
                         "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
-                        "Work Permit": ["Work Permits"],
+                        "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"],
                         "People": ["Visitor Management", "User Management"],
                         "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
                         "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
