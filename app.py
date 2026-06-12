@@ -16,6 +16,8 @@ import secrets
 from dotenv import load_dotenv
 from supabase import create_client
 import plotly.express as px
+import openai
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 import plotly.graph_objects as go
 import smtplib
 from email.mime.text import MIMEText
@@ -209,6 +211,24 @@ def get_facility_logo(fc, h=60):
         with open(lp,"rb") as f: b64=base64.b64encode(f.read()).decode()
         return f'<img src="data:image/{ext};base64,{b64}" height="{h}px" style="max-width:220px;object-fit:contain;">'
     return f'<span style="font-size:2.5rem;">🏢</span>'
+
+
+def ask_facility_xpert(query, categories):
+    """AI-powered facility assistant"""
+    try:
+        cat_list = ", ".join(categories[:10])
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center. Help tenants resolve facility issues. Categories: {cat_list}. For emergencies (fire, elevator stuck, water leak), advise calling security. Keep under 100 words."},
+                {"role": "user", "content": query}
+            ],
+            max_tokens=200,
+            temperature=0.5
+        )
+        return response.choices[0].message.content
+    except:
+        return None
 
 def get_nav_logo():
     """Churchgate logo for top navigation - white version for dark background"""
@@ -1215,19 +1235,25 @@ def page_raise_ticket():
     ai_query = st.text_input("Describe your issue (AI will suggest solutions)", placeholder="e.g. My AC is not cooling, water leaking from ceiling...", key="ai_search")
     
     if ai_query:
-        # Search knowledge base
         kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{ai_query}%,tags.ilike.%{ai_query}%").limit(5).execute()
+        cat_names_list = sorted(list(set(c.get("category_name", "") for c in categories)))
+        ai_response = ask_facility_xpert(ai_query, cat_names_list)
+        
+        if ai_response:
+            st.markdown("### 🤖 facilityXpert AI Says:")
+            st.info(ai_response)
+        
         if kb.data:
-            st.success(f"💡 Found {len(kb.data)} possible solutions. Try these before raising a ticket:")
+            st.success(f"💡 Also found {len(kb.data)} matching solutions:")
             for k in kb.data:
                 with st.expander(f"🔧 {k.get('question','')} — {k.get('category','')}"):
                     st.markdown(f"**Solution:** {k.get('answer','')}")
-                    st.caption(f"Priority: {k.get('priority','')} | Department: {k.get('department','')}")
                     if st.button(f"✅ This solved my issue", key=f"solved_{k['id']}"):
-                        st.success("Great! Issue resolved without a ticket. 🎉")
+                        st.success("Great! Issue resolved! 🎉")
                         st.balloons()
-        else:
-            st.info("No matching solutions found. Please raise a ticket below.")
+        
+        if not ai_response and not kb.data:
+            st.info("No solutions found. Please raise a ticket.")
     
     st.markdown("---")
     st.markdown("### 📝 Raise New Ticket")

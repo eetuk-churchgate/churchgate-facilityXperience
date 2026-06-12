@@ -5,3 +5,4 @@ plotly
 python-dotenv
 Pillow
 fpdf2
+openai
