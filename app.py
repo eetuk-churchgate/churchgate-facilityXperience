@@ -256,6 +256,10 @@ def ask_facility_xpert(query, categories):
             pass
         return None
 
+def clear_ai_chat():
+    st.session_state.ai_chat_history = []
+    st.session_state.ai_conversation = []
+
 def get_nav_logo():
     """Churchgate logo for top navigation - white version for dark background"""
     p = Path("churchgate-logo.png")
@@ -1286,12 +1290,8 @@ def page_raise_ticket():
         else:
             st.chat_message("assistant").write(msg["content"])
     
-    # Clear chat button — ALWAYS VISIBLE
-    if st.session_state.ai_chat_history:
-        if st.button("🗑️ Clear Chat History", key="clear_ai_chat_final", use_container_width=True):
-            st.session_state.ai_chat_history = []
-            st.session_state.ai_conversation = []
-            st.rerun()
+    if len(st.session_state.ai_chat_history) > 0:
+        st.button("🗑️ Clear Chat History", on_click=clear_ai_chat, key="clear_ai_btn", use_container_width=True)
     
     # Chat input
     prompt = st.chat_input("Ask facilityXpert anything...", key="ai_chat_main")
@@ -1396,12 +1396,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
             
             st.rerun()
     
-    if st.session_state.ai_chat_history:
-        st.markdown("---")
-        if st.button("🗑️ Clear Chat History", key="clear_ai_btn_123", use_container_width=True):
-            st.session_state.ai_chat_history = []
-            st.session_state.ai_conversation = []
-            st.rerun()
+  
     
     st.markdown("---")
     st.markdown("### 📝 Raise New Ticket")
