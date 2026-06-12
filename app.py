@@ -1887,23 +1887,44 @@ def forgot_password_page():
     
     _, col, _ = st.columns([0.3, 0.4, 0.3])
     with col:
-        st.markdown("""<div style="background:white;border-radius:16px;padding:2rem;box-shadow:0 10px 30px rgba(0,0,0,0.2);text-align:center;">""", unsafe_allow_html=True)
-        st.subheader("Forgot Password")
-        email = st.text_input("Email")
+        st.markdown(f"""<div style="background:white;border-radius:16px;padding:2rem;box-shadow:0 10px 30px rgba(0,0,0,0.2);text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.5rem;">{get_nav_logo()}<div style="width:1px;height:22px;background:#ddd;"></div><span style="font-weight:800;color:#1a1a1a;font-size:1.1rem;">facility<span style="color:#CC0000;">X</span>perience</span></div><p style="color:#888;font-size:0.8rem;">Churchgate Group</p>""", unsafe_allow_html=True)
+        st.markdown("---")
+        st.subheader("🔑 Forgot Password")
+        st.caption("Enter your email to receive a reset link")
+        
+        email = st.text_input("Email", placeholder="e.g. fasuquo@churchgate.com")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("Send Reset Link", use_container_width=True, type="primary"):
+            if st.button("📩 Send Reset Link", use_container_width=True, type="primary"):
                 if email:
                     res = supabase.table("app_users").select("*").eq("email", email).single().execute()
                     if res.data:
                         token = secrets.token_urlsafe(32)
                         expiry = (datetime.now() + timedelta(hours=1)).isoformat()
                         DB.update("app_users", res.data["id"], {"reset_token": token, "reset_token_expiry": expiry})
-                        st.success(f"Link sent to {email}")
+                        
+                        # Get the app URL from Streamlit
+                        reset_url = "https://facilityxperience.streamlit.app/reset?token=" + token
+                        
+                        send_email_notification(
+                            email,
+                            "🔑 facilityXperience - Password Reset",
+                            f"<h3>Password Reset Request</h3>"
+                            f"<p>You requested a password reset for your facilityXperience account.</p>"
+                            f"<p><b>Click the link below to reset your password:</b></p>"
+                            f"<p><a href='{reset_url}' style='background:#CC0000;color:white;padding:10px 20px;text-decoration:none;border-radius:6px;'>Reset Password</a></p>"
+                            f"<p>This link expires in 1 hour.</p>"
+                            f"<p>If you didn't request this, ignore this email.</p>"
+                        )
+                        
+                        st.success(f"✅ Reset link sent to {email}")
+                        st.info("📧 Check your inbox and spam folder")
                     else:
-                        st.error("Not found")
+                        st.error("Email not found")
+                else:
+                    st.error("Please enter your email")
         with c2:
-            if st.button("Back", use_container_width=True):
+            if st.button("🔙 Back to Login", use_container_width=True):
                 st.session_state.show_forgot = False
                 st.rerun()
         st.markdown("</div>", unsafe_allow_html=True)
