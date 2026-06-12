@@ -212,37 +212,49 @@ def get_facility_logo(fc, h=60):
 
 
 def ask_facility_xpert(query, categories):
-    """Smart assistant - Knowledge Base powered with AI enhancement"""
-    # PRIMARY: Knowledge base search
-    kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(5).execute()
-    
-    if kb.data:
-        solutions = []
-        for k in kb.data:
-            solutions.append(f"**{k.get('question','')}**\n{k.get('answer','')}\n_Department: {k.get('department','')} | Priority: {k.get('priority','')}_")
-        return "\n\n---\n\n".join(solutions)
-    
-    # SECONDARY: Try Hugging Face
+    """AI assistant using Groq (FREE, FAST, REAL LLM)"""
     try:
         import requests
-        api_key = st.secrets.get("HF_API_KEY", "")
+        api_key = st.secrets.get("GROQ_API_KEY", "")
+        cat_list = ", ".join(categories[:10])
+        
         response = requests.post(
-            "https://api-inference.huggingface.co/models/google/flan-t5-base",
-            headers={"Authorization": f"Bearer {api_key}"},
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
             json={
-                "inputs": f"Answer as a facility manager: {query}",
-                "options": {"wait_for_model": True}
+                "model": "llama-3.1-8b-instant",
+                "messages": [
+                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues quickly. Available departments: {cat_list}. For emergencies (fire, elevator stuck, major water leak, electrical hazard), ALWAYS advise calling security or facility emergency line immediately. Be concise, helpful, and professional. Give step-by-step solutions."},
+                    {"role": "user", "content": query}
+                ],
+                "max_tokens": 300,
+                "temperature": 0.5
             },
             timeout=15
         )
+        
         if response.status_code == 200:
             data = response.json()
-            if isinstance(data, list) and len(data) > 0:
-                return data[0].get("generated_text", "").strip()
+            return data["choices"][0]["message"]["content"]
+        
+        # Fallback to knowledge base
+        kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute()
+        if kb.data:
+            solutions = "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+            return f"Here are solutions from our knowledge base:\n\n{solutions}"
+        return None
     except:
-        pass
-    
-    return None
+        try:
+            kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute()
+            if kb.data:
+                solutions = "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+                return f"Here are solutions from our knowledge base:\n\n{solutions}"
+        except:
+            pass
+        return None
 
 def get_nav_logo():
     """Churchgate logo for top navigation - white version for dark background"""
