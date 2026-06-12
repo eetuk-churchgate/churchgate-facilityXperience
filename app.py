@@ -249,10 +249,18 @@ def topnav():
 def sidebar():
     with st.sidebar:
         sel=st.session_state.get("facility","WTC")
+        # Only show facilities the user has access to
+        user_home_facility = st.session_state.get("user", {}).get("home_facility", "WTC")
+        if is_admin:
+            allowed_facilities = list(FACILITY_INFO.keys())
+        else:
+            allowed_facilities = [user_home_facility]
+        
         cols=st.columns(3)
         for i,(k,v) in enumerate(FACILITY_INFO.items()):
-            with cols[i%3]:
-                if st.button(k,key=f"f_{k}",use_container_width=True,type="primary" if k==sel else "secondary"):st.session_state.facility=k;st.rerun()
+            if k in allowed_facilities:
+                with cols[i%3]:
+                    if st.button(k,key=f"f_{k}",use_container_width=True,type="primary" if k==sel else "secondary"):st.session_state.facility=k;st.rerun()
         info=FACILITY_INFO.get(sel,{})
         st.markdown(f'<div style="background:{info.get("clight","#fce8e8")};border-left:3px solid {info.get("color",CHURCHGATE_RED)};border-radius:6px;padding:0.7rem;margin:0.7rem 0;font-size:0.7rem;"><b>{info.get("full_name",sel)}</b><br>📍 {info.get("city","")}</div>',unsafe_allow_html=True)
         user_perms = st.session_state.get("user", {}).get("extra_permissions", [])
@@ -1555,7 +1563,7 @@ def page_users():
                     
                     module_groups = {
                         "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
-                        "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"],
+                        "Work Permit": ["Work Permits"],
                         "People": ["Visitor Management", "User Management"],
                         "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
                         "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
