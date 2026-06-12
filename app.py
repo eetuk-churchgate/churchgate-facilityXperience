@@ -782,22 +782,22 @@ def page_wp():
                     result = DB.insert("work_permits", permit_data)
                     st.success(f"✅ Work Permit {permit_number} Submitted Successfully!")
                     st.balloons()
+                    
+                    authorizers = get_workflow_people(fc, 1, dept)
+                    for a in authorizers:
+                        send_email_notification(
+                            a.get("person_email", ""),
+                            f"📋 New Permit {permit_number} Requires Authorization",
+                            f"<h3>New Work Permit Submitted</h3>"
+                            f"<p><b>Permit:</b> {permit_number}</p>"
+                            f"<p><b>Type:</b> {permit_type}</p>"
+                            f"<p><b>Department:</b> {dept}</p>"
+                            f"<p><b>Location:</b> {full_location}</p>"
+                            f"<p><b>Raised by:</b> {rname} ({rdesignation})</p>"
+                            f"<p><b>Description:</b> {description[:300]}</p>"
+                        )
+                    
                     st.rerun()
-                        # Notify authorizers
-                        authorizers = get_workflow_people(fc, 1, dept)
-                        for a in authorizers:
-                            send_email_notification(
-                                a.get("person_email", ""),
-                                f"📋 New Permit {permit_number} Requires Authorization",
-                                f"<h3>New Work Permit Submitted</h3>"
-                                f"<p><b>Permit:</b> {permit_number}</p>"
-                                f"<p><b>Type:</b> {permit_type}</p>"
-                                f"<p><b>Department:</b> {dept}</p>"
-                                f"<p><b>Location:</b> {full_location}</p>"
-                                f"<p><b>Raised by:</b> {rname} ({rdesignation})</p>"
-                                f"<p><b>Description:</b> {description[:300]}</p>"
-                                f"<p>Please review and authorize at your earliest convenience.</p>"
-                            )
                         
                         st.success(f"✅ Work Permit {permit_number} Submitted Successfully!")
                         st.info(f"📧 Authorization requests sent to {len(authorizers)} team lead(s)")
