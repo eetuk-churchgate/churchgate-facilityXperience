@@ -256,9 +256,6 @@ def ask_facility_xpert(query, categories):
             pass
         return None
 
-def clear_ai_chat():
-    st.session_state.ai_chat_history = []
-    st.session_state.ai_conversation = []
 
 def get_nav_logo():
     """Churchgate logo for top navigation - white version for dark background"""
@@ -1260,6 +1257,13 @@ def page_raise_ticket():
     
     st.markdown(f'## 🎫 Raise a Ticket — {info.get("full_name", fc)}')
     
+    # Clear chat button at top
+    if "ai_chat_history" in st.session_state and len(st.session_state.get("ai_chat_history", [])) > 0:
+        if st.button("🗑️ Clear AI Chat", key="top_clear_chat", use_container_width=True):
+            st.session_state.ai_chat_history = []
+            st.session_state.ai_conversation = []
+            st.rerun()
+    
     # AI SMART CHAT — FULL DUPLEX WITH MEMORY
     st.markdown("### 🤖 facilityXpert — AI Assistant")
     
@@ -1290,13 +1294,7 @@ def page_raise_ticket():
         else:
             st.chat_message("assistant").write(msg["content"])
     
-    if len(st.session_state.ai_chat_history) > 0:
-        col1, col2 = st.columns([4, 1])
-        with col2:
-            if st.button("🗑️ Clear", key="clr_btn_999", use_container_width=True):
-                st.session_state.ai_chat_history = []
-                st.session_state.ai_conversation = []
-                st.rerun()
+    
     
     # Chat input
     prompt = st.chat_input("Ask facilityXpert anything...", key="ai_chat_main")
