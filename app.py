@@ -1291,10 +1291,12 @@ def page_raise_ticket():
             st.chat_message("assistant").write(msg["content"])
     
     if len(st.session_state.ai_chat_history) > 0:
-        if st.button("🗑️ Clear Chat History", key="clear_chat_btn", use_container_width=True):
-            st.session_state.ai_chat_history = []
-            st.session_state.ai_conversation = []
-            st.rerun()
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.button("🗑️ Clear", key="clr_btn_999", use_container_width=True):
+                st.session_state.ai_chat_history = []
+                st.session_state.ai_conversation = []
+                st.rerun()
     
     # Chat input
     prompt = st.chat_input("Ask facilityXpert anything...", key="ai_chat_main")
