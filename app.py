@@ -255,28 +255,33 @@ def sidebar():
                 if st.button(k,key=f"f_{k}",use_container_width=True,type="primary" if k==sel else "secondary"):st.session_state.facility=k;st.rerun()
         info=FACILITY_INFO.get(sel,{})
         st.markdown(f'<div style="background:{info.get("clight","#fce8e8")};border-left:3px solid {info.get("color",CHURCHGATE_RED)};border-radius:6px;padding:0.7rem;margin:0.7rem 0;font-size:0.7rem;"><b>{info.get("full_name",sel)}</b><br>📍 {info.get("city","")}</div>',unsafe_allow_html=True)
-        nav=[
-            ("🏠 COMMAND",[("🌐 Command Center","cc")]),
-            ("🏗️ ASSETS & PPM",[("📋 Asset Register","ar"),("📅 52-Week Calendar","cal"),("✅ Checklist Status","cs"),("📊 PPM Dashboard","ppm")]),
-            ("🔧 MAINTENANCE",[("📋 Work Orders","wo"),("🛡️ Work Permits","wp")]),
-            ("🏢 FACILITY OPERATIONS",[("📊 Operations Dashboard","fo"),("✅ Observations/Alerts","oa")]),
-            ("👥 PEOPLE",[("🛂 Visitor Management","vm"),("👤 Users Profile","up")]),
-            ("💬 SERVICES",[("🎫 Raise a Ticket","rt"),("💬 Helpdesk","hd"),("⭐ Feedback","fb")]),
-            ("✅ COMPLIANCE",[("✅ Audit Checklist","ac"),("🚨 Incident Check","ic"),("🔄 HOTO Check","hot")]),
-            ("⚡ UTILITY",[("⚡ Utility Dashboard","uc")]),
-            ("📊 REPORTS",[("📊 Monthly MIS","mis")]),
+        user_perms = st.session_state.get("user", {}).get("extra_permissions", [])
+        if isinstance(user_perms, str):
+            try: user_perms = eval(user_perms)
+            except: user_perms = []
+        user_role = st.session_state.get("user_role", "staff")
+        is_admin = user_role in ["admin", "approver"]
+        
+        all_nav = [
+            ("🏠 COMMAND",[("🌐 Command Center","cc"),("📊 PPM Dashboard","ppm")], ["Command Center", "PPM Dashboard"]),
+            ("🏗️ ASSETS & PPM",[("📋 Asset Register","ar"),("📅 52-Week Calendar","cal"),("✅ Checklist Status","cs")], ["Asset Register", "52-Week Calendar", "Checklist Status"]),
+            ("🔧 MAINTENANCE",[("📋 Work Orders","wo"),("🛡️ Work Permits","wp")], ["Work Orders", "Work Permits"]),
+            ("🏢 FACILITY OPERATIONS",[("📊 Operations Dashboard","fo"),("✅ Observations/Alerts","oa")], ["Facility Operations"]),
+            ("👥 PEOPLE",[("🛂 Visitor Management","vm"),("👤 User Management","up")], ["Visitor Management", "User Management"]),
+            ("💬 SERVICES",[("🎫 Raise a Ticket","rt"),("💬 Helpdesk","hd"),("⭐ Feedback","fb")], ["Raise Ticket", "Helpdesk", "Feedback"]),
+            ("✅ COMPLIANCE",[("✅ Audit Checklist","ac"),("🚨 Incident Check","ic"),("🔄 HOTO Check","hot")], ["Audit Checklist", "Incident Report", "HOTO Check"]),
+            ("⚡ UTILITY",[("⚡ Utility Dashboard","uc")], ["Utility Dashboard"]),
+            ("📊 REPORTS",[("📊 Monthly MIS","mis")], ["Monthly MIS"]),
         ]
-        for s,items in nav:
-            st.markdown(f'<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.5rem 0 0.1rem 0;">{s}</p>',unsafe_allow_html=True)
-            for l,p in items:
-                if st.button(l,key=p,use_container_width=True):st.session_state.page=p;st.rerun()
-        st.markdown("---")
-        if st.button("🚪 Log Out", use_container_width=True, type="primary"):
-            st.session_state.authenticated = False
-            st.session_state.user = None
-            st.session_state.user_name = None
-            st.query_params.clear()
-            st.rerun()
+        
+        for section, items, required_perms in all_nav:
+            can_see = is_admin or any(p in user_perms for p in required_perms) or len(user_perms) == 0
+            if can_see:
+                st.markdown(f'<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.5rem 0 0.1rem 0;">{section}</p>',unsafe_allow_html=True)
+                for label, page_id in items:
+                    if st.button(label, key=page_id, use_container_width=True):
+                        st.session_state.page = page_id
+                        st.rerun()
 
 # ============================================
 # COMMAND CENTER
@@ -1942,8 +1947,32 @@ def main():
     
     st.markdown(f"""<div style="background:white;padding:0.8rem 1.5rem;border-radius:8px;margin:0.5rem 1rem 1.5rem 1rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.06);"><div style="display:flex;align-items:center;gap:1rem;"><div style="width:42px;height:42px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1rem;">{user_name[:2].upper()}</div><div><div style="font-weight:700;font-size:1rem;color:#1a1a1a;">👋 {greeting}, {user_name}!</div><div style="font-size:0.75rem;color:#666;">{designation} • ID: {emp_id}</div></div></div><div style="font-size:0.7rem;color:#888;text-align:right;"><div>{wat.strftime('%A, %d %B %Y')}</div><div>{wat.strftime('%I:%M %p')} WAT</div></div></div>""", unsafe_allow_html=True)
     
+    user_perms = st.session_state.get("user", {}).get("extra_permissions", [])
+    if isinstance(user_perms, str):
+        try: user_perms = eval(user_perms)
+        except: user_perms = []
+    user_role = st.session_state.get("user_role", "staff")
+    is_admin = user_role in ["admin", "approver"]
+    
+    page = st.session_state.page
+    page_perms = {
+        "cc": "Command Center", "ppm": "PPM Dashboard",
+        "ar": "Asset Register", "cal": "52-Week Calendar", "cs": "Checklist Status",
+        "wo": "Work Orders", "wp": "Work Permits",
+        "fo": "Facility Operations", "oa": "Facility Operations",
+        "vm": "Visitor Management", "up": "User Management",
+        "rt": "Raise Ticket", "hd": "Helpdesk", "fb": "Feedback",
+        "ac": "Audit Checklist", "ic": "Incident Report", "hot": "HOTO Check",
+        "uc": "Utility Dashboard", "mis": "Monthly MIS",
+    }
+    
+    required = page_perms.get(page, "")
+    if not is_admin and required and required not in user_perms and len(user_perms) > 0:
+        st.error("⛔ You don't have permission to access this page.")
+        st.stop()
+    
     sidebar()
-    ROUTER.get(st.session_state.page, page_cc)()
+    ROUTER.get(page, page_cc)()
 
 if __name__ == "__main__":
     main()
