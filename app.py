@@ -703,19 +703,19 @@ def page_wp():
                 etime = st.time_input("End Time*", time(17, 0))
             
             workers = st.number_input("No. of Workers Expected*", min_value=1, max_value=100, value=2)
-            workers_names = st.text_area("Workers Names (one per line)", height=80, placeholder="Enter each worker's full name on a new line...")
+            workers_names = st.text_area("Workers Names* (one per line)", height=80, placeholder="Enter each worker's full name on a new line...")
             
             st.markdown("---")
             description = st.text_area("Brief Description of Work*", height=80, placeholder="Describe the work to be performed...")
             
-            st.markdown("**🦺 PPE Required**")
+            st.markdown("**🦺 PPE Required***")
             ppe_selected = st.multiselect("Select PPE", [
                 "Hard Hat", "Face Shield", "Welder Gloves", "Electrical Gloves", "Body Harness",
                 "Foot Protection", "Ear Plug/Earmuffs", "Chemical Goggles", "Safety Shoes",
                 "Respirator", "Safety Glass", "Fall Protection"
             ])
             
-            st.markdown("**🔧 Equipment Required**")
+            st.markdown("**🔧 Equipment Required***")
             equip_selected = st.multiselect("Select Equipment", [
                 "Fire Extinguishers", "Warning Signs", "Walkie-talkie", "Ladder/Scaffold",
                 "Fire Hoses", "Non-Sparking Tools", "Gas Detector", "Additional Lighting"
