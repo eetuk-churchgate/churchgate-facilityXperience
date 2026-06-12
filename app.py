@@ -702,8 +702,8 @@ def page_wp():
                 ed = st.date_input("Proposed End Date*", date.today())
                 etime = st.time_input("End Time*", time(17, 0))
             
-             workers = st.number_input("No. of Workers Expected*", min_value=1, max_value=100, value=2)
-                workers_names = st.text_area("Workers Names (one per line)", height=80, placeholder="Enter each worker's full name on a new line...")
+            workers = st.number_input("No. of Workers Expected*", min_value=1, max_value=100, value=2)
+            workers_names = st.text_area("Workers Names (one per line)", height=80, placeholder="Enter each worker's full name on a new line...")
             
             st.markdown("---")
             description = st.text_area("Brief Description of Work*", height=80, placeholder="Describe the work to be performed...")
