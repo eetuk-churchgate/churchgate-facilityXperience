@@ -1256,13 +1256,28 @@ def page_raise_ticket():
     
     st.markdown(f'## 🎫 Raise a Ticket — {info.get("full_name", fc)}')
     
-    # AI SMART CHAT — FULL DUPLEX
+    # AI SMART CHAT — FULL DUPLEX WITH MEMORY
     st.markdown("### 🤖 facilityXpert — AI Assistant")
     
+    user_email = st.session_state.get("user", {}).get("email", "guest")
+    
+    # Load or create chat session
     if "ai_chat_history" not in st.session_state:
         st.session_state.ai_chat_history = []
     if "ai_conversation" not in st.session_state:
         st.session_state.ai_conversation = []
+    
+    # Try to load last session from DB
+    if not st.session_state.ai_chat_history and user_email != "guest":
+        try:
+            saved = supabase.table("ai_chat_sessions").select("*").eq("user_email", user_email).order("updated_at", desc=True).limit(1).execute()
+            if saved.data:
+                msgs = saved.data[0].get("messages", [])
+                if isinstance(msgs, str):
+                    msgs = eval(msgs)
+                st.session_state.ai_chat_history = msgs
+                st.session_state.ai_conversation = msgs[-20:]
+        except: pass
     
     # Display chat history
     for msg in st.session_state.ai_chat_history:
@@ -1271,13 +1286,11 @@ def page_raise_ticket():
         else:
             st.chat_message("assistant").write(msg["content"])
     
-    # Chat input — always at bottom of chat area
+    # Chat input
     prompt = st.chat_input("Ask facilityXpert anything...", key="ai_chat_main")
     
     if prompt:
-        # Add user message to display
         st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
-        # Add to conversation context
         st.session_state.ai_conversation.append({"role": "user", "content": prompt})
         
         with st.spinner("🤖 Thinking..."):
@@ -1288,12 +1301,10 @@ def page_raise_ticket():
                 import requests
                 api_key = st.secrets.get("GROQ_API_KEY", "")
                 
-                # Build conversation with last 10 messages for context
                 messages = [
-                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues. You have access to these departments: {cat_names_list}. For emergencies, tell them to raise an URGENT ticket or call the facility team. NEVER make up phone numbers or email addresses. Keep responses helpful and concise."}
+                    {"role": "system", "content": f"You are facilityXpert, AI assistant for Churchgate Group's World Trade Center Abuja. You help with facility issues. Departments: {cat_names_list}. NEVER make up contacts. For emergencies, advise raising URGENT ticket. Remember the conversation context."}
                 ]
-                # Add last 10 messages for context
-                messages.extend(st.session_state.ai_conversation[-10:])
+                messages.extend(st.session_state.ai_conversation[-15:])
                 
                 response = requests.post(
                     "https://api.groq.com/openai/v1/chat/completions",
@@ -1303,34 +1314,39 @@ def page_raise_ticket():
                 )
                 
                 if response.status_code == 200:
-                    data = response.json()
-                    ai_response = data["choices"][0]["message"]["content"]
+                    ai_response = response.json()["choices"][0]["message"]["content"]
                 else:
                     ai_response = None
             except:
                 ai_response = None
             
-            # Fallback to knowledge base
             if not ai_response:
                 kb = supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{prompt}%,tags.ilike.%{prompt}%").limit(3).execute()
                 if kb.data:
-                    ai_response = "Here are solutions from our knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+                    ai_response = "Solutions from knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
                 else:
-                    ai_response = "I couldn't find a specific solution. Please raise a ticket and our team will help you."
+                    ai_response = "I couldn't find a solution. Please raise a ticket."
             
-            # Add AI response
             st.session_state.ai_chat_history.append({"role": "assistant", "content": ai_response})
             st.session_state.ai_conversation.append({"role": "assistant", "content": ai_response})
+            
+            # Save to database
+            try:
+                supabase.table("ai_chat_sessions").upsert({
+                    "user_email": user_email,
+                    "session_id": f"{user_email}_{datetime.now().strftime('%Y%m%d')}",
+                    "messages": st.session_state.ai_chat_history,
+                    "updated_at": datetime.now().isoformat()
+                }).execute()
+            except: pass
+            
             st.rerun()
     
-    # Clear chat
     if st.session_state.ai_chat_history:
-        c1, c2 = st.columns([1, 1])
-        with c1:
-            if st.button("🗑️ Clear Chat", use_container_width=True):
-                st.session_state.ai_chat_history = []
-                st.session_state.ai_conversation = []
-                st.rerun()
+        if st.button("🗑️ Clear Chat", use_container_width=True):
+            st.session_state.ai_chat_history = []
+            st.session_state.ai_conversation = []
+            st.rerun()
     
     st.markdown("---")
     st.markdown("### 📝 Raise New Ticket")
