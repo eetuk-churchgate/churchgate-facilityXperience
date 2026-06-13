@@ -80,8 +80,8 @@ def inject_css():
         .fx-card {{ background:white; border-radius:8px; padding:1rem; border:1px solid #ccc; box-shadow:0 1px 3px rgba(0,0,0,0.06); text-align:center; }}
         .fx-card-label {{ font-size:0.6rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; color:{CHURCHGATE_GREY}; margin-bottom:0.3rem; }}
         .fx-card-value {{ font-size:1.6rem; font-weight:800; color:{CHURCHGATE_DARK}; line-height:1; }}
-        .stButton > button {{ background:{CHURCHGATE_RED} !important; color:white !important; border:none !important; border-radius:6px !important; font-weight:600 !important; }}
-        .stButton > button:hover {{ background:#aa0000 !important; }}
+        .stButton > button {{ background:#6B7280 !important; color:white !important; border:none !important; border-radius:6px !important; font-weight:500 !important; }}
+        .stButton > button:hover {{ background:#4B5563 !important; }}
         .fx-badge {{ display:inline-flex; align-items:center; gap:0.2rem; padding:0.2rem 0.6rem; border-radius:50px; font-size:0.65rem; font-weight:600; }}
         .badge-success {{ background:#ECFDF5; color:#065F46; }} .badge-warning {{ background:#FFFBEB; color:#92400E; }}
         .badge-critical {{ background:#FEF2F2; color:#991B1B; }} .badge-info {{ background:#EFF6FF; color:#1E40AF; }}
@@ -1825,15 +1825,49 @@ def page_helpdesk_queue():
             with sett_tabs[0]:
                 st.markdown("**📍 Manage Locations**")
                 locs = DB.get_locations(fc)
+                
+                # Search
+                loc_search = st.text_input("🔍 Search locations", key="loc_search")
+                
                 if locs:
-                    for l in locs:
-                        with st.expander(f"📍 {l.get('location_name','')} ({l.get('location_code','')})"):
-                            subs = DB.get_sub_locations(l["id"])
-                            if subs:
-                                for s in subs:
-                                    st.caption(f"└ {s.get('sub_location_name','')}")
-                            else:
-                                st.caption("No sub-locations")
+                    # Build table data
+                    table_data = []
+                    for i, l in enumerate(locs):
+                        loc_name = l.get("location_name","")
+                        loc_code = l.get("location_code","")
+                        
+                        if loc_search and loc_search.lower() not in loc_name.lower() and loc_search.lower() not in loc_code.lower():
+                            continue
+                        
+                        subs = DB.get_sub_locations(l["id"])
+                        if subs:
+                            for j, s in enumerate(subs):
+                                table_data.append({
+                                    "SNO": len(table_data) + 1,
+                                    "Location": f"{loc_name} ({loc_code})" if j == 0 else "",
+                                    "Sub Location": s.get("sub_location_name",""),
+                                    "View": "📋" if j == 0 else "",
+                                    "Action": "✏️" if j == 0 else ""
+                                })
+                        else:
+                            table_data.append({
+                                "SNO": len(table_data) + 1,
+                                "Location": f"{loc_name} ({loc_code})",
+                                "Sub Location": "—",
+                                "View": "📋",
+                                "Action": "✏️"
+                            })
+                    
+                    if table_data:
+                        st.dataframe(
+                            pd.DataFrame(table_data),
+                            use_container_width=True,
+                            hide_index=True,
+                            height=400
+                        )
+                    else:
+                        st.info("No locations match your search")
+                
                 st.markdown("---")
                 with st.form("add_loc_form"):
                     c1, c2 = st.columns(2)
