@@ -2166,7 +2166,23 @@ def page_helpdesk_queue():
                     all_users = DB.get_users()
                     user_options = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users]
                     
-                    # Build form WITHOUT st.form
+                    # SHOW EXISTING CONFIGURATION
+                    existing = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("category_id", cat_id).order("level_number").execute()
+                    if existing.data:
+                        st.markdown("**Current Configuration:**")
+                        current_levels = {}
+                        for e in existing.data:
+                            lvl = e.get("level_number")
+                            if lvl not in current_levels:
+                                current_levels[lvl] = []
+                            current_levels[lvl].append(f"{e.get('escalate_to_name','')} ({e.get('escalate_to_email','')}) - {e.get('sla_minutes','')} mins")
+                        
+                        for lvl in sorted(current_levels.keys()):
+                            names = ", ".join(current_levels[lvl])
+                            st.caption(f"**L{lvl}:** {names}")
+                        st.markdown("---")
+                    
+                    # Build form
                     for level in range(1, 7):
                         st.markdown(f"**Level {level}**")
                         c1, c2, c3 = st.columns([3, 1, 1])
