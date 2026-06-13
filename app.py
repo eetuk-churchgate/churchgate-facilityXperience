@@ -73,6 +73,34 @@ def inject_css():
         section[data-testid="stSidebar"] .stButton > button {{ background: #c0c0c0 !important; color: #1a1a1a !important; border: 1px solid #a0a0a0 !important; margin-bottom: 2px !important; }}
         section[data-testid="stSidebar"] button[kind="primary"] {{ background: #CC0000 !important; color: white !important; }}
         section[data-testid="stSidebar"] p {{ color: #333 !important; font-weight: 600 !important; }}
+        
+        /* MOVE COLLAPSE BUTTON OUTSIDE SIDEBAR */
+        [data-testid="collapsedControl"] {{
+            position: fixed !important;
+            top: 80px !important;
+            left: 310px !important;
+            z-index: 99999 !important;
+            background: #CC0000 !important;
+            border-radius: 0 8px 8px 0 !important;
+            padding: 8px 5px !important;
+            box-shadow: 0 2px 10px rgba(204,0,0,0.4) !important;
+            cursor: pointer !important;
+            width: 28px !important;
+            height: 50px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            opacity: 1 !important;
+            visibility: visible !important;
+        }}
+        [data-testid="collapsedControl"]:hover {{
+            background: #aa0000 !important;
+        }}
+        [data-testid="collapsedControl"] svg {{
+            fill: white !important;
+            width: 16px !important;
+            height: 16px !important;
+        }}
         section[data-testid="stSidebar"] .stButton > button {{ background:#c0c0c0 !important; border:1px solid #a0a0a0 !important; border-radius:6px !important; font-size:0.7rem !important; padding:0.35rem 0.5rem !important; }}
         section[data-testid="stSidebar"] button[kind="primary"] {{ background:{CHURCHGATE_RED} !important; color:white !important; }}
         [data-testid="collapsedControl"] {{ position:fixed !important; top:80px !important; left:0 !important; z-index:99999 !important; background:#CC0000 !important; border-radius:0 8px 8px 0 !important; padding:8px 5px !important; box-shadow:0 2px 10px rgba(204,0,0,0.4) !important; cursor:pointer !important; width:28px !important; height:50px !important; display:flex !important; align-items:center !important; justify-content:center !important; opacity:1 !important; visibility:visible !important; }}
