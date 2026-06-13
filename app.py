@@ -1472,7 +1472,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                         f"<p>SLA Deadline: {sla_deadline}</p>"
                     )
                 
-               st.success(f"✅ Ticket {ticket_number} raised successfully!")
+                st.success(f"✅ Ticket {ticket_number} raised successfully!")
                 st.balloons()
                 
                 # Send email to escalation Level 1
@@ -1485,8 +1485,6 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                                 f"🎫 New Ticket {ticket_number}",
                                 f"<h3>New Helpdesk Ticket</h3><p><b>Ticket:</b> {ticket_number}</p><p><b>Category:</b> {category}</p><p><b>Priority:</b> {priority}</p><p><b>Location:</b> {full_location}</p><p><b>Raised by:</b> {requester_name}</p><p><b>Description:</b> {description[:200]}</p>"
                             )
-                
-                st.rerun()
     
     # MY TICKETS WITH RATINGS
     st.markdown("---")
