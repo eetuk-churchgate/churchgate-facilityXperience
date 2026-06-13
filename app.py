@@ -283,8 +283,6 @@ def safe_text(text, default="N/A"):
     return result
 
 def get_logo_base64():
-
-def get_logo_base64():
     """Convert churchgate-logo.png to base64 for embedding in reports"""
     p = Path("churchgate-logo.png")
     if p.exists():
