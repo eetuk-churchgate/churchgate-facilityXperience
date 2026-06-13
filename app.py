@@ -486,10 +486,6 @@ def page_cc():
                     <div style="font-size:0.65rem;color:#888;">👤 {w.get('raised_by_name','N/A')} | 📅 {w.get('start_datetime','')[:10]}</div>
                 </div>
                 """, unsafe_allow_html=True)
-                    st.write(f"**Raised by:** {w.get('raised_by_name','')} | **Type:** {w.get('permit_type','')}")
-                    if w.get("review_l1_name"):st.write(f"✅ L1: {w['review_l1_name']} at {w.get('review_l1_at','')}")
-                    if w.get("review_l2_name"):st.write(f"✅ L2: {w['review_l2_name']} at {w.get('review_l2_at','')}")
-                    if w.get("approved_by_name"):st.write(f"✅ Approved: {w['approved_by_name']} at {w.get('approved_at','')}")
         else:st.info("No work permits")
     with c2:
         st.markdown("### 🎫 Recent Tickets")
