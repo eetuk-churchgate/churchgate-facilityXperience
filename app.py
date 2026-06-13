@@ -490,7 +490,34 @@ def page_cc():
     with c2:
         st.markdown("### 🎫 Recent Tickets")
         tix=DB.get_all("tickets",fc,5)
-        if tix:st.dataframe(pd.DataFrame(tix)[[c for c in ["ticket_number","title","status","requester_name"] if c in pd.DataFrame(tix).columns]],use_container_width=True,hide_index=True)
+        if tix:
+            for t in tix:
+                status = t.get("status","open")
+                colors = {"open":"#EF4444","in_progress":"#F59E0B","hold":"#3B82F6","closed":"#10B981","rejected":"#6B7280"}
+                icons = {"open":"🔴","in_progress":"🟡","hold":"⏸️","closed":"🟢","rejected":"❌"}
+                sc = colors.get(status,"#4a4a4a")
+                si = icons.get(status,"📋")
+                
+                created = t.get("created_at","")
+                age_str = ""
+                if created and str(created) != "None":
+                    try:
+                        age = datetime.now() - pd.to_datetime(created)
+                        age_str = f"{age.days}d {age.seconds//3600}h ago"
+                    except: pass
+                
+                st.markdown(f"""
+                <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span><b>{si} {t.get('ticket_number','')}</b></span>
+                        <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;font-weight:600;">{status.upper()}</span>
+                    </div>
+                    <div style="font-size:0.8rem;color:#1a1a1a;margin-top:0.3rem;">{t.get('title','')[:80]}</div>
+                    <div style="font-size:0.65rem;color:#888;margin-top:0.2rem;">
+                        👤 {t.get('requester_name','N/A')} | 🏷️ {t.get('category','')} | ⏱️ {age_str}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         else:st.info("No tickets")
 
 # ============================================
