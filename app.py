@@ -297,8 +297,27 @@ def check_auto_escalation(fc):
                             if e.get("escalate_to_email"):
                                 send_email_notification(
                                     e["escalate_to_email"],
-                                    f"🔺 AUTO-ESCALATED: Ticket {ticket.get('ticket_number','')} to L{next_level}",
-                                    f"<h3>SLA Exceeded - Auto Escalation</h3><p>Ticket <b>{ticket.get('ticket_number','')}</b> has exceeded its SLA and been auto-escalated to Level {next_level}.</p>"
+                                    f"🔺 ESCALATED L{current_level}→L{next_level}: Ticket {ticket.get('ticket_number','')}",
+                                    f"""
+                                    <div style="font-family:Arial;max-width:600px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
+                                        <div style="background:#F59E0B;padding:20px;color:white;">
+                                            <h2 style="margin:0;">⚠️ Ticket Escalated — Level {next_level}</h2>
+                                            <p style="margin:5px 0 0 0;font-size:12px;">SLA Exceeded — Immediate Action Required</p>
+                                        </div>
+                                        <div style="padding:20px;">
+                                            <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                                                <tr><td style="padding:8px;font-weight:bold;">Ticket:</td><td>{ticket.get('ticket_number','')}</td></tr>
+                                                <tr><td style="padding:8px;font-weight:bold;">Title:</td><td>{ticket.get('title','')}</td></tr>
+                                                <tr><td style="padding:8px;font-weight:bold;">Category:</td><td>{ticket.get('category','')}</td></tr>
+                                                <tr><td style="padding:8px;font-weight:bold;">Escalated:</td><td>Level {current_level} → Level {next_level}</td></tr>
+                                                <tr><td style="padding:8px;font-weight:bold;">SLA Deadline:</td><td>{ticket.get('sla_deadline','')}</td></tr>
+                                            </table>
+                                            <div style="margin-top:15px;background:#FFF3CD;padding:15px;border-radius:8px;">
+                                                <p style="margin:0;color:#92400E;font-weight:bold;">⚡ Action Required: Please resolve or reassign immediately.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    """
                                 )
             except:
                 pass
@@ -1516,8 +1535,40 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                         if e.get("escalate_to_email"):
                             send_email_notification(
                                 e["escalate_to_email"],
-                                f"🎫 New Ticket {ticket_number}",
-                                f"<h3>New Helpdesk Ticket</h3><p><b>Ticket:</b> {ticket_number}</p><p><b>Category:</b> {category}</p><p><b>Priority:</b> {priority}</p><p><b>Location:</b> {full_location}</p><p><b>Raised by:</b> {requester_name}</p><p><b>Description:</b> {description[:200]}</p>"
+                                f"🎫 New Ticket #{ticket_number} — {category}",
+                                f"""
+                                <div style="font-family:Arial;max-width:600px;margin:0 auto;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
+                                    <div style="background:#CC0000;padding:20px;color:white;">
+                                        <h2 style="margin:0;">facilityXperience</h2>
+                                        <p style="margin:5px 0 0 0;font-size:12px;opacity:0.9;">Churchgate Group — {info.get('full_name',fc)}</p>
+                                    </div>
+                                    <div style="padding:20px;">
+                                        <h3 style="color:#1a1a1a;">New Helpdesk Ticket</h3>
+                                        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                                            <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Ticket No:</td><td style="padding:8px;border-bottom:1px solid #eee;">{ticket_number}</td></tr>
+                                            <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Category:</td><td style="padding:8px;border-bottom:1px solid #eee;">{category}</td></tr>
+                                            <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Priority:</td><td style="padding:8px;border-bottom:1px solid #eee;"><span style="background:{'#EF4444' if priority=='critical' else '#F59E0B' if priority=='high' else '#3B82F6'};color:white;padding:2px 10px;border-radius:10px;font-size:11px;">{priority.upper()}</span></td></tr>
+                                            <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Location:</td><td style="padding:8px;border-bottom:1px solid #eee;">{full_location}</td></tr>
+                                            <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">Raised by:</td><td style="padding:8px;border-bottom:1px solid #eee;">{requester_name}</td></tr>
+                                            <tr><td style="padding:8px;border-bottom:1px solid #eee;font-weight:bold;">SLA Deadline:</td><td style="padding:8px;border-bottom:1px solid #eee;">{sla_deadline[:16] if sla_deadline else 'N/A'}</td></tr>
+                                        </table>
+                                        <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin-top:15px;">
+                                            <p style="margin:0;font-weight:bold;">Description:</p>
+                                            <p style="margin:5px 0 0 0;color:#666;">{description[:300]}</p>
+                                        </div>
+                                        <div style="margin-top:20px;padding:15px;background:#FFF3CD;border-radius:8px;">
+                                            <p style="margin:0;font-weight:bold;color:#92400E;">⚡ Action Required:</p>
+                                            <p style="margin:5px 0 0 0;color:#92400E;">Please review and take action on this ticket. SLA timer has started.</p>
+                                        </div>
+                                        <div style="margin-top:15px;text-align:center;">
+                                            <a href="https://facilityxperience.streamlit.app" style="background:#CC0000;color:white;padding:10px 25px;text-decoration:none;border-radius:6px;font-weight:bold;">View in facilityXperience</a>
+                                        </div>
+                                    </div>
+                                    <div style="background:#f9f9f9;padding:12px;text-align:center;font-size:10px;color:#999;">
+                                        Churchgate Group | facilityXperience | This is an automated notification
+                                    </div>
+                                </div>
+                                """
                             )
     
     # MY TICKETS WITH RATINGS
