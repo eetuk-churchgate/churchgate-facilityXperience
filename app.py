@@ -3331,16 +3331,6 @@ def reset_password_page(token):
 def main():
     inject_css()
     
-    # Force sidebar open
-    if st.query_params.get("sidebar") == "open":
-        st.markdown("""
-        <script>
-            parent.document.querySelector('[data-testid="stSidebar"]').style.display = 'block';
-            parent.document.querySelector('[data-testid="stSidebar"]').style.visibility = 'visible';
-            parent.document.querySelector('[data-testid="stSidebar"]').style.transform = 'translateX(0)';
-        </script>
-        """, unsafe_allow_html=True)
-    
     
     # Initialize session state
     if "authenticated" not in st.session_state:
@@ -3401,11 +3391,6 @@ def main():
     
     topnav()
     
-    col1, col2 = st.columns([0.05, 0.95])
-    with col1:
-        if st.button("☰", key="sidebar_toggle", help="Open Sidebar"):
-            st.query_params["sidebar"] = "open"
-            st.rerun()
     
     # Greeting
     user = st.session_state.get("user", {})
