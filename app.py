@@ -1527,6 +1527,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                 
                 st.success(f"✅ Ticket {ticket_number} raised successfully!")
                 st.balloons()
+                time.sleep(1.5)
                 
                 # Send email to escalation Level 1
                 esc_data = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("level_number", 1).execute()
@@ -1575,7 +1576,10 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
     st.markdown("---")
     st.markdown("### 📋 My Tickets")
     
-    my_tickets = supabase.table("tickets").select("*").eq("facility_code", fc).ilike("requester_name", f"%{st.session_state.get('user_name', '')}%").order("created_at", desc=True).limit(20).execute()
+   user_name = st.session_state.get('user_name', '')
+    user_email = st.session_state.get('user', {}).get('email', '')
+    
+    my_tickets = supabase.table("tickets").select("*").eq("facility_code", fc).or_(f"requester_name.eq.{user_name},requester_email.eq.{user_email}").order("created_at", desc=True).limit(20).execute()
     if my_tickets.data:
         for t in my_tickets.data:
             status = t.get("status", "open")
