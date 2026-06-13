@@ -454,13 +454,6 @@ def sidebar():
                         st.rerun()
         
         st.markdown("---")
-        st.markdown("""
-        <div style="text-align:center;margin:0.5rem 0;">
-            <a href="http://www.churchgate.com/" target="_blank" style="color:#CC0000;text-decoration:none;font-size:0.7rem;font-weight:600;">🌐 churchgate.com</a>
-            &nbsp;|&nbsp;
-            <a href="http://www.wtcabuja.com/" target="_blank" style="color:#CC0000;text-decoration:none;font-size:0.7rem;font-weight:600;">🏢 wtcabuja.com</a>
-        </div>
-        """, unsafe_allow_html=True)
         if st.button("🚪 Log Out", use_container_width=True, type="primary"):
             st.session_state.authenticated = False
             st.session_state.user = None
