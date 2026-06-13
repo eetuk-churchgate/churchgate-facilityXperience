@@ -1727,13 +1727,96 @@ def page_helpdesk_queue():
     # Settings (Admin)
     if is_admin:
         st.markdown("---")
-        with st.expander("⚙️ Helpdesk Settings"):
-            subtabs = st.tabs(["Categories", "Escalation"])
+        with st.expander("⚙️ Helpdesk Settings (Admin)", expanded=True):
+            subtabs = st.tabs(["📋 Categories", "⏱️ Escalation Settings"])
+            
             with subtabs[0]:
                 for c in categories:
                     st.markdown(f"- **{c.get('category_name','')}** — {c.get('department','')} ({c.get('sla_hours','4')}hrs)")
+            
             with subtabs[1]:
-                st.markdown("Escalation config available in Work Permit → Workflow Config")
+                st.markdown("### ⏱️ Escalation Configuration")
+                st.caption("Set who gets notified at each escalation level per category")
+                
+                # Get all users for selection
+                all_users = DB.get_users()
+                user_options = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users]
+                
+                # Department → Category selection
+                dept_list = sorted(list(set(c.get("department","") for c in categories)))
+                selected_dept = st.selectbox("Select Department", dept_list, key="esc_dept")
+                
+                dept_cats = [c for c in categories if c.get("department") == selected_dept]
+                cat_names = [c.get("category_name","") for c in dept_cats]
+                selected_cat = st.selectbox("Select Category", cat_names, key="esc_cat_detail")
+                
+                if selected_cat:
+                    cat_id = None
+                    for c in dept_cats:
+                        if c.get("category_name") == selected_cat:
+                            cat_id = c["id"]
+                            break
+                    
+                    if cat_id:
+                        st.markdown("---")
+                        st.markdown(f"**Escalation Path for: {selected_cat}**")
+                        
+                        with st.form("esc_form"):
+                            for level in range(1, 7):
+                                st.markdown(f"**Level {level}**")
+                                c1, c2, c3 = st.columns([3, 2, 2])
+                                with c1:
+                                    selected_users = st.multiselect(
+                                        f"Select Users for L{level}",
+                                        user_options,
+                                        key=f"esc_users_{level}_{cat_id}"
+                                    )
+                                with c2:
+                                    esc_time = st.number_input(
+                                        f"Time for L{level}",
+                                        min_value=0, value=30 if level <= 2 else 60 if level == 3 else 1440,
+                                        key=f"esc_time_{level}_{cat_id}"
+                                    )
+                                with c3:
+                                    time_type = st.selectbox(
+                                        f"Time Type",
+                                        ["Mins", "Hours", "Days"],
+                                        key=f"esc_type_{level}_{cat_id}"
+                                    )
+                                st.markdown("---")
+                            
+                            if st.form_submit_button("💾 Save Escalation Settings", use_container_width=True, type="primary"):
+                                # Convert time to minutes
+                                for level in range(1, 7):
+                                    time_val = st.session_state.get(f"esc_time_{level}_{cat_id}", 30)
+                                    time_type = st.session_state.get(f"esc_type_{level}_{cat_id}", "Mins")
+                                    
+                                    if time_type == "Hours":
+                                        time_val = time_val * 60
+                                    elif time_type == "Days":
+                                        time_val = time_val * 1440
+                                    
+                                    users = st.session_state.get(f"esc_users_{level}_{cat_id}", [])
+                                    
+                                    for user_str in users:
+                                        # Extract email from "Name (email)" format
+                                        if "(" in user_str and ")" in user_str:
+                                            email = user_str.split("(")[-1].replace(")", "").strip()
+                                            name = user_str.split("(")[0].strip()
+                                            
+                                            supabase.table("ticket_escalation").upsert({
+                                                "facility_code": fc,
+                                                "category_id": cat_id,
+                                                "level_number": level,
+                                                "level_name": f"Level {level}",
+                                                "escalate_to_name": name,
+                                                "escalate_to_email": email,
+                                                "sla_minutes": time_val
+                                            }).execute()
+                                
+                                st.success("✅ Escalation settings saved!")
+                                st.balloons()
+                                st.rerun()
 
 # ============================================
 # INCIDENT CHECK
