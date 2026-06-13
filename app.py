@@ -1015,7 +1015,6 @@ def page_wp():
                             pdf.alias_nb_pages()
                             pdf.add_page()
                             
-                            # KPIs
                             kpis = [("Total",str(total),204,0,0),("Open",str(open_count),239,68,68),("In Progress",str(in_progress),245,158,11),("Closed",str(closed_count),16,185,129),("Avg Resolution",avg_display,37,99,235)]
                             xs,ys = pdf.get_x(),pdf.get_y()
                             for i,(l,v,r,g,b) in enumerate(kpis):
@@ -1036,7 +1035,6 @@ def page_wp():
                             pdf.set_y(ys+20)
                             pdf.ln(4)
                             
-                            # Table with full-width columns
                             pdf.set_font('Helvetica','B',6)
                             pdf.set_fill_color(204,0,0)
                             pdf.set_text_color(255,255,255)
@@ -1049,18 +1047,12 @@ def page_wp():
                             pdf.set_text_color(26,26,26)
                             for _,r in report_df.iterrows():
                                 vals = [
-                                    safe_text(str(r['SNo']),''),
-                                    safe_text(str(r['DateTime']),''),
-                                    safe_text(str(r['Ticket No']),''),
-                                    safe_text(str(r['Location']),''),
-                                    safe_text(str(r['Category']),''),
-                                    safe_text(str(r['Title']),''),
-                                    safe_text(str(r['Raised By']),''),
-                                    safe_text(str(r['Priority']),''),
-                                    safe_text(str(r['Status']),''),
-                                    safe_text(str(r['Age']),''),
-                                    safe_text(str(r['Closed']),''),
-                                    safe_text(str(r['Level']),''),
+                                    safe_text(str(r['SNo']),''), safe_text(str(r['DateTime']),''),
+                                    safe_text(str(r['Ticket No']),''), safe_text(str(r['Location']),''),
+                                    safe_text(str(r['Category']),''), safe_text(str(r['Title']),''),
+                                    safe_text(str(r['Raised By']),''), safe_text(str(r['Priority']),''),
+                                    safe_text(str(r['Status']),''), safe_text(str(r['Age']),''),
+                                    safe_text(str(r['Closed']),''), safe_text(str(r['Level']),''),
                                 ]
                                 for v,w in zip(vals,cw):
                                     pdf.cell(w,4.5,f' {v[:w-2]}',1,0)
