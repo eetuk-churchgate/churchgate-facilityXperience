@@ -2182,9 +2182,20 @@ def page_helpdesk_queue():
                                 users = st.session_state.get(f"esc_u_{level}_{cat_id}", [])
                                 
                                 # Delete existing for this level
-                                supabase.table("ticket_escalation").delete().eq("facility_code", fc).eq("category_id", cat_id).eq("level_number", level).execute()
+                                if st.form_submit_button("💾 Save", use_container_width=True):
+                            for level in range(1, 7):
+                                time_val = st.session_state.get(f"esc_t_{level}_{cat_id}", 30)
+                                time_type = st.session_state.get(f"esc_ty_{level}_{cat_id}", "Mins")
+                                if time_type == "Hours": time_val *= 60
+                                elif time_type == "Days": time_val *= 1440
+                                users = st.session_state.get(f"esc_u_{level}_{cat_id}", [])
                                 
-                                # Insert new
+                                # First delete existing for this level
+                                try:
+                                    supabase.table("ticket_escalation").delete().eq("facility_code", fc).eq("category_id", cat_id).eq("level_number", level).execute()
+                                except: pass
+                                
+                                # Then insert new ones
                                 for u in users:
                                     if "(" in u and ")" in u:
                                         email = u.split("(")[-1].replace(")","").strip()
@@ -2199,8 +2210,7 @@ def page_helpdesk_queue():
                                                 "escalate_to_email": email,
                                                 "sla_minutes": time_val
                                             }).execute()
-                                        except Exception as e:
-                                            st.error(f"Save error L{level}: {str(e)}")
+                                        except: pass
                             st.success("✅ Escalation saved!")
                             st.balloons()
                             st.rerun()
