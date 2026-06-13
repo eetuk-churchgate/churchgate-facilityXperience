@@ -2166,32 +2166,36 @@ def page_helpdesk_queue():
                     all_users = DB.get_users()
                     user_options = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users]
                     
-                    # SHOW EXISTING CONFIGURATION
-                    existing = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("category_id", cat_id).order("level_number").execute()
-                    if existing.data:
-                        st.markdown("**Current Configuration:**")
-                        current_levels = {}
-                        for e in existing.data:
-                            lvl = e.get("level_number")
-                            if lvl not in current_levels:
-                                current_levels[lvl] = []
-                            current_levels[lvl].append(f"{e.get('escalate_to_name','')} ({e.get('escalate_to_email','')}) - {e.get('sla_minutes','')} mins")
-                        
-                        for lvl in sorted(current_levels.keys()):
-                            names = ", ".join(current_levels[lvl])
-                            st.caption(f"**L{lvl}:** {names}")
-                        st.markdown("---")
-                    
-                    # Build form
+                    # Build form with pre-selected values
                     for level in range(1, 7):
+                        # Get existing users for this level
+                        existing_users = []
+                        existing_time = 30 if level <= 2 else 60 if level == 3 else 1440
+                        existing_unit = "Mins"
+                        
+                        if existing.data:
+                            for e in existing.data:
+                                if e.get("level_number") == level:
+                                    user_str = f"{e.get('escalate_to_name','')} ({e.get('escalate_to_email','')})"
+                                    existing_users.append(user_str)
+                                    existing_time = e.get("sla_minutes", 30)
+                        
+                        # Convert time to display unit
+                        if existing_time >= 1440:
+                            existing_time = existing_time // 1440
+                            existing_unit = "Days"
+                        elif existing_time >= 60:
+                            existing_time = existing_time // 60
+                            existing_unit = "Hours"
+                        
                         st.markdown(f"**Level {level}**")
                         c1, c2, c3 = st.columns([3, 1, 1])
                         with c1: 
-                            st.multiselect(f"Users L{level}", user_options, key=f"esc_u_{level}_{cat_id}")
+                            st.multiselect(f"Users L{level}", user_options, default=existing_users, key=f"esc_u_{level}_{cat_id}")
                         with c2: 
-                            st.number_input(f"Time", min_value=0, value=30 if level<=2 else 60 if level==3 else 1440, key=f"esc_t_{level}_{cat_id}")
+                            st.number_input(f"Time", min_value=0, value=existing_time, key=f"esc_t_{level}_{cat_id}")
                         with c3: 
-                            st.selectbox(f"Unit", ["Mins","Hours","Days"], key=f"esc_ty_{level}_{cat_id}")
+                            st.selectbox(f"Unit", ["Mins","Hours","Days"], index=["Mins","Hours","Days"].index(existing_unit), key=f"esc_ty_{level}_{cat_id}")
                         st.markdown("---")
                     
                     if st.button("💾 Save Escalation Settings", use_container_width=True, key="save_esc_btn"):
