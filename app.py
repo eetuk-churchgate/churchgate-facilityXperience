@@ -2180,12 +2180,25 @@ def page_helpdesk_queue():
                                 if time_type == "Hours": time_val *= 60
                                 elif time_type == "Days": time_val *= 1440
                                 users = st.session_state.get(f"esc_u_{level}_{cat_id}", [])
+                                
+                                # Delete existing for this level
+                                supabase.table("ticket_escalation").delete().eq("facility_code", fc).eq("category_id", cat_id).eq("level_number", level).execute()
+                                
+                                # Insert new
                                 for u in users:
                                     if "(" in u and ")" in u:
                                         email = u.split("(")[-1].replace(")","").strip()
                                         name = u.split("(")[0].strip()
-                                        supabase.table("ticket_escalation").upsert({"facility_code":fc,"category_id":cat_id,"level_number":level,"level_name":f"Level {level}","escalate_to_name":name,"escalate_to_email":email,"sla_minutes":time_val}).execute()
-                            st.success("✅ Saved!")
+                                        supabase.table("ticket_escalation").insert({
+                                            "facility_code": fc,
+                                            "category_id": cat_id,
+                                            "level_number": level,
+                                            "level_name": f"Level {level}",
+                                            "escalate_to_name": name,
+                                            "escalate_to_email": email,
+                                            "sla_minutes": time_val
+                                        }).execute()
+                            st.success("✅ Escalation saved!")
                             st.balloons()
                             st.rerun()
     
