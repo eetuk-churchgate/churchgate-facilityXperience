@@ -268,6 +268,43 @@ def get_nav_logo():
     return '<span style="font-weight:800;color:white;font-size:1rem;display:inline-block;vertical-align:middle;">CHURCHGATE</span>'
 
 
+def check_auto_escalation(fc):
+    """Auto-escalate overdue tickets"""
+    try:
+        tickets = supabase.table("tickets").select("*").eq("facility_code", fc).in_("status", ["open","in_progress","hold"]).execute()
+        if not tickets.data:
+            return
+        
+        now = datetime.now()
+        
+        for ticket in tickets.data:
+            current_level = ticket.get("escalation_level", 1)
+            if current_level >= 6:
+                continue
+            
+            sla_deadline = ticket.get("sla_deadline")
+            if not sla_deadline:
+                continue
+            
+            try:
+                sla_dt = pd.to_datetime(sla_deadline)
+                if now > sla_dt:
+                    next_level = current_level + 1
+                    esc_config = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("level_number", next_level).execute()
+                    supabase.table("tickets").update({"escalation_level": next_level}).eq("id", ticket["id"]).execute()
+                    if esc_config.data:
+                        for e in esc_config.data:
+                            if e.get("escalate_to_email"):
+                                send_email_notification(
+                                    e["escalate_to_email"],
+                                    f"🔺 AUTO-ESCALATED: Ticket {ticket.get('ticket_number','')} to L{next_level}",
+                                    f"<h3>SLA Exceeded - Auto Escalation</h3><p>Ticket <b>{ticket.get('ticket_number','')}</b> has exceeded its SLA and been auto-escalated to Level {next_level}.</p>"
+                                )
+            except:
+                pass
+    except:
+        pass
+
 def safe_text(text, default="N/A"):
     """Remove unicode characters that break PDFs"""
     if not text or str(text) == "None" or str(text) == "nan":
@@ -1435,9 +1472,20 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                         f"<p>SLA Deadline: {sla_deadline}</p>"
                     )
                 
-                st.success(f"✅ Ticket {ticket_number} raised successfully!")
-                st.info(f"📧 Notification sent to {len(authorizers)} team member(s)")
+               st.success(f"✅ Ticket {ticket_number} raised successfully!")
                 st.balloons()
+                
+                # Send email to escalation Level 1
+                esc_data = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("level_number", 1).execute()
+                if esc_data.data:
+                    for e in esc_data.data:
+                        if e.get("escalate_to_email"):
+                            send_email_notification(
+                                e["escalate_to_email"],
+                                f"🎫 New Ticket {ticket_number}",
+                                f"<h3>New Helpdesk Ticket</h3><p><b>Ticket:</b> {ticket_number}</p><p><b>Category:</b> {category}</p><p><b>Priority:</b> {priority}</p><p><b>Location:</b> {full_location}</p><p><b>Raised by:</b> {requester_name}</p><p><b>Description:</b> {description[:200]}</p>"
+                            )
+                
                 st.rerun()
     
     # MY TICKETS WITH RATINGS
@@ -1593,6 +1641,8 @@ def page_helpdesk_queue():
                             ac1, ac2, ac3 = st.columns(3)
                             
                             if status in ["open", "in_progress", "hold"]:
+                                # Action buttons row 1
+                                ac1, ac2, ac3 = st.columns(3)
                                 with ac1:
                                     if st.button("🔄 Update", key=f"det_upd_{ticket_id}", use_container_width=True):
                                         if new_comment:
@@ -1608,15 +1658,64 @@ def page_helpdesk_queue():
                                     if st.button("✅ Close", key=f"det_close_{ticket_id}", use_container_width=True):
                                         DB.update("tickets", ticket_id, {"status": "closed", "closed_at": datetime.now().isoformat()})
                                         if row.get("requester_email"):
-                                            send_email_notification(row["requester_email"], f"✅ Ticket {row.get('ticket_number','')} Resolved", f"<h3>Ticket Resolved</h3>")
+                                            send_email_notification(row["requester_email"], f"✅ Ticket {row.get('ticket_number','')} Resolved", f"<h3>Ticket Resolved</h3><p>Please rate your experience.</p>")
                                         st.success("✅ Closed!")
                                         st.rerun()
                                 
-                                if st.button("❌ Reject", key=f"det_rej_{ticket_id}", use_container_width=True):
-                                    DB.update("tickets", ticket_id, {"status": "rejected"})
-                                    st.error("Ticket rejected")
-                                    st.rerun()
+                                # Action buttons row 2
+                                ac4, ac5, ac6 = st.columns(3)
+                                with ac4:
+                                    if st.button("❌ Reject", key=f"det_rej_{ticket_id}", use_container_width=True):
+                                        DB.update("tickets", ticket_id, {"status": "rejected"})
+                                        st.error("Ticket rejected")
+                                        st.rerun()
+                                with ac5:
+                                    if st.button("🔄 Re-Assign", key=f"det_reassign_{ticket_id}", use_container_width=True):
+                                        st.session_state.reassign_ticket = ticket_id
+                                        st.rerun()
+                                with ac6:
+                                    if st.button("ℹ️ More Info", key=f"det_more_{ticket_id}", use_container_width=True):
+                                        st.session_state.more_info_ticket = ticket_id
+                                        st.rerun()
                                 
+                                # Re-Assign form
+                                if "reassign_ticket" in st.session_state and st.session_state.reassign_ticket == ticket_id:
+                                    all_users = DB.get_users()
+                                    user_names = [u.get("name","") for u in all_users]
+                                    reassign_to = st.selectbox("Re-assign to", user_names, key=f"reassign_{ticket_id}")
+                                    c1, c2 = st.columns(2)
+                                    with c1:
+                                        if st.button("✅ Confirm Re-Assign", key=f"confirm_reassign_{ticket_id}", use_container_width=True):
+                                            DB.update("tickets", ticket_id, {"assigned_to": reassign_to})
+                                            DB.insert("ticket_comments", {"ticket_id": ticket_id, "user_name": st.session_state.get("user_name","Staff"), "comment_text": f"Re-assigned to {reassign_to}"})
+                                            send_email_notification(row.get("requester_email",""), f"🔄 Ticket {row.get('ticket_number','')} Re-Assigned", f"<h3>Ticket Re-Assigned</h3><p>Your ticket has been re-assigned to {reassign_to}.</p>")
+                                            st.success(f"✅ Re-assigned to {reassign_to}!")
+                                            st.session_state.reassign_ticket = None
+                                            st.rerun()
+                                    with c2:
+                                        if st.button("❌ Cancel", key=f"cancel_reassign_{ticket_id}", use_container_width=True):
+                                            st.session_state.reassign_ticket = None
+                                            st.rerun()
+                                
+                                # More Info form
+                                if "more_info_ticket" in st.session_state and st.session_state.more_info_ticket == ticket_id:
+                                    more_info_note = st.text_area("Request more information", key=f"more_info_{ticket_id}", height=60, placeholder="What additional information do you need?")
+                                    c1, c2 = st.columns(2)
+                                    with c1:
+                                        if st.button("📩 Request Info", key=f"send_more_{ticket_id}", use_container_width=True):
+                                            if more_info_note:
+                                                DB.insert("ticket_comments", {"ticket_id": ticket_id, "user_name": st.session_state.get("user_name","Staff"), "comment_text": f"INFO REQUESTED: {more_info_note}"})
+                                                if row.get("requester_email"):
+                                                    send_email_notification(row["requester_email"], f"ℹ️ More Info Requested - Ticket {row.get('ticket_number','')}", f"<h3>Additional Information Requested</h3><p><b>Ticket:</b> {row.get('ticket_number','')}</p><p><b>Request:</b> {more_info_note}</p><p>Please respond with the requested information.</p>")
+                                                st.success("✅ Info request sent!")
+                                                st.session_state.more_info_ticket = None
+                                                st.rerun()
+                                    with c2:
+                                        if st.button("❌ Cancel", key=f"cancel_more_{ticket_id}", use_container_width=True):
+                                            st.session_state.more_info_ticket = None
+                                            st.rerun()
+                                
+                                # Escalate
                                 if is_admin:
                                     esc_level = row.get("escalation_level", 1)
                                     if esc_level < 6:
@@ -3098,6 +3197,8 @@ def main():
         with open(wm_path, "rb") as f:
             wm_b64 = base64.b64encode(f.read()).decode()
         st.markdown(f"""<style>.stApp::after {{content:'';position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:70vw;height:70vh;background-image:url(data:image/{wm_ext};base64,{wm_b64});background-size:contain;background-repeat:no-repeat;background-position:center;opacity:0.10;z-index:0;pointer-events:none;}}</style>""", unsafe_allow_html=True)
+    
+    check_auto_escalation(fc)
     
     topnav()
     
