@@ -1466,7 +1466,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
     
     full_location = f"{building_options.get(selected_building, selected_building)} → {sub_location}"
     
-    with st.form("raise_ticket_form"):
+    with st.form("raise_ticket_form", clear_on_submit=True):
         title = st.text_input("Title*", placeholder="Brief description of the issue")
         description = st.text_area("Description*", height=100, placeholder="Describe the issue in detail...")
         
@@ -1583,28 +1583,40 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
     if my_tickets.data:
         for t in my_tickets.data:
             status = t.get("status", "open")
-            badges = {"open": "🔴", "in_progress": "🟡", "hold": "⏸️", "closed": "🟢", "rejected": "❌"}
-            with st.expander(f"{badges.get(status,'📋')} {t.get('ticket_number','')} — {t.get('title','')[:60]} — {status.upper()}"):
-                st.write(f"**Category:** {t.get('category','')} | **Priority:** {t.get('priority','')}")
-                st.write(f"**Location:** {t.get('location_building','')}")
-                st.write(f"**Description:** {t.get('description','')}")
-                
-                if t.get("status") == "closed":
-                    st.success("✅ Resolved")
-                    # Star rating
-                    if not t.get("satisfaction_rating"):
-                        rating = st.slider("Rate your experience", 1, 5, 5, key=f"rate_{t['id']}")
-                        feedback = st.text_area("Additional feedback (optional)", key=f"fb_{t['id']}")
-                        if st.button("⭐ Submit Rating", key=f"submit_rate_{t['id']}"):
-                            DB.update("tickets", t["id"], {"satisfaction_rating": rating, "satisfaction_feedback": feedback})
-                            st.success("Thank you for your feedback!")
-                            st.rerun()
-                    else:
-                        st.markdown(f"**Your Rating:** {'⭐' * t.get('satisfaction_rating', 0)}")
-                elif t.get("status") == "in_progress":
-                    st.info("🟡 Team is working on this")
-                elif t.get("status") == "open":
-                    st.warning("🔴 Awaiting assignment")
+            colors = {"open":"#EF4444","in_progress":"#F59E0B","hold":"#3B82F6","closed":"#10B981","rejected":"#6B7280"}
+            icons = {"open":"🔴","in_progress":"🟡","hold":"⏸️","closed":"🟢","rejected":"❌"}
+            sc = colors.get(status,"#4a4a4a")
+            si = icons.get(status,"📋")
+            
+            created = t.get("created_at","")
+            age_str = ""
+            if created and str(created) != "None":
+                try:
+                    age = datetime.now() - pd.to_datetime(created)
+                    age_str = f"{age.days}d {age.seconds//3600}h ago"
+                except: pass
+            
+            st.markdown(f"""
+            <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span><b>{si} {t.get('ticket_number','')}</b></span>
+                    <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;font-weight:600;">{status.upper()}</span>
+                </div>
+                <div style="font-size:0.8rem;color:#1a1a1a;margin-top:0.3rem;">{t.get('title','')[:80]}</div>
+                <div style="font-size:0.65rem;color:#888;margin-top:0.2rem;">🏷️ {t.get('category','')} | 📍 {t.get('location_building','')[:30]} | ⏱️ {age_str}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Rating for closed tickets
+            if t.get("status") == "closed":
+                if not t.get("satisfaction_rating"):
+                    rating = st.slider("Rate your experience", 1, 5, 5, key=f"rate_{t['id']}")
+                    if st.button("⭐ Submit Rating", key=f"submit_rate_{t['id']}"):
+                        DB.update("tickets", t["id"], {"satisfaction_rating": rating})
+                        st.success("Thank you!")
+                        st.rerun()
+                else:
+                    st.markdown(f"**Your Rating:** {'⭐' * t.get('satisfaction_rating', 0)}")
     else:
         st.info("No tickets raised yet")
 
