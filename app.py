@@ -1758,55 +1758,150 @@ def page_helpdesk_queue():
             all_tickets = DB.get_all("tickets", fc, 500)
             if all_tickets:
                 df = pd.DataFrame(all_tickets)
-                st.success(f"✅ Report for {rpt_month} {rpt_year} — {len(df)} tickets")
-                html = f"""<html><head><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:11px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:5px;border-bottom:1px solid #ddd}}</style></head><body><h1>Helpdesk Report — {rpt_month} {rpt_year}</h1><p>{info.get('full_name',fc)}</p><table><tr><th>Ticket No</th><th>Title</th><th>Category</th><th>Status</th><th>Raised By</th></tr>"""
-                for _, r in df.head(50).iterrows():
-                    html += f"<tr><td>{r.get('ticket_number','')}</td><td>{r.get('title','')[:60]}</td><td>{r.get('category','')}</td><td>{r.get('status','')}</td><td>{r.get('requester_name','')}</td></tr>"
-                html += "</table></body></html>"
-                st.components.v1.html(html, height=500, scrolling=True)
-                st.download_button("📥 HTML", html, f"helpdesk_{rpt_month}_{rpt_year}.html", "text/html", use_container_width=True)
-                st.download_button("📥 CSV", df.to_csv(index=False), f"helpdesk_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
                 
-                # PDF Download
-                try:
-                    from fpdf import FPDF
-                    pdf = FPDF('L', 'mm', 'A4')
-                    pdf.add_page()
-                    pdf.set_font('Helvetica', 'B', 16)
-                    pdf.set_text_color(204, 0, 0)
-                    pdf.cell(0, 10, f'Helpdesk Report - {rpt_month} {rpt_year}', 0, 1)
-                    pdf.set_font('Helvetica', '', 10)
-                    pdf.set_text_color(0, 0, 0)
-                    pdf.cell(0, 8, f'{info.get("full_name",fc)} | Generated: {datetime.now().strftime("%d %B %Y")}', 0, 1)
-                    pdf.ln(5)
-                    pdf.set_font('Helvetica', 'B', 9)
-                    pdf.set_fill_color(204, 0, 0)
-                    pdf.set_text_color(255, 255, 255)
-                    pdf.cell(45, 7, ' Ticket No', 1, 0, 'L', True)
-                    pdf.cell(60, 7, ' Title', 1, 0, 'L', True)
-                    pdf.cell(45, 7, ' Category', 1, 0, 'L', True)
-                    pdf.cell(25, 7, ' Status', 1, 0, 'L', True)
-                    pdf.cell(35, 7, ' Raised By', 1, 0, 'L', True)
-                    pdf.cell(30, 7, ' Opened', 1, 0, 'L', True)
-                    pdf.cell(30, 7, ' Closed', 1, 1, 'L', True)
-                    pdf.set_font('Helvetica', '', 8)
-                    pdf.set_text_color(0, 0, 0)
-                    for _, r in df.head(50).iterrows():
-                        pdf.cell(45, 6, f' {r.get("ticket_number","")[:20]}', 1, 0)
-                        pdf.cell(60, 6, f' {r.get("title","")[:30]}', 1, 0)
-                        pdf.cell(45, 6, f' {r.get("category","")[:22]}', 1, 0)
-                        pdf.cell(25, 6, f' {r.get("status","")[:12]}', 1, 0)
-                        pdf.cell(35, 6, f' {r.get("requester_name","")[:16]}', 1, 0)
-                        pdf.cell(30, 6, f' {r.get("created_at","")[:10]}', 1, 0)
-                        pdf.cell(30, 6, f' {r.get("closed_at","")[:10] if r.get("closed_at") else "N/A"}', 1, 1)
-                    pdf_file = f"/tmp/helpdesk_{rpt_month}_{rpt_year}.pdf"
-                    pdf.output(pdf_file)
-                    with open(pdf_file, "rb") as f:
-                        st.download_button("📥 PDF", f.read(), f"helpdesk_{rpt_month}_{rpt_year}.pdf", "application/pdf", use_container_width=True)
-                except:
-                    pass
+                # Metrics
+                total = len(df)
+                open_count = len(df[df["status"]=="open"]) if "status" in df.columns else 0
+                closed_count = len(df[df["status"]=="closed"]) if "status" in df.columns else 0
+                in_progress = len(df[df["status"]=="in_progress"]) if "status" in df.columns else 0
+                
+                st.success(f"✅ Report generated for {rpt_month} {rpt_year} — {total} tickets")
+                
+                # KPI Cards
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: st.metric("📋 Total", total)
+                with c2: st.metric("🔴 Open", open_count)
+                with c3: st.metric("🟡 In Progress", in_progress)
+                with c4: st.metric("🟢 Closed", closed_count)
+                
+                # Full table with details
+                st.markdown("---")
+                st.markdown("### 📋 Detailed Ticket Report")
+                
+                show_cols = ["ticket_number","title","category","priority","status","requester_name","location_building","created_at","closed_at","escalation_level"]
+                available_cols = [c for c in show_cols if c in df.columns]
+                
+                # Rename columns for display
+                col_names = {
+                    "ticket_number":"Ticket No","title":"Title","category":"Category",
+                    "priority":"Priority","status":"Status","requester_name":"Raised By",
+                    "location_building":"Location","created_at":"Opened","closed_at":"Closed",
+                    "escalation_level":"Level"
+                }
+                display_df = df[available_cols].rename(columns={c:col_names.get(c,c) for c in available_cols})
+                st.dataframe(display_df, use_container_width=True, hide_index=True, height=400)
+                
+                # Downloads
+                st.markdown("---")
+                st.markdown("### 📥 Download Report")
+                
+                c1, c2, c3 = st.columns(3)
+                
+                # CSV
+                with c1:
+                    csv = df.to_csv(index=False)
+                    st.download_button("📥 Download CSV", csv, f"helpdesk_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
+                
+                # HTML
+                with c2:
+                    logo_b64 = get_logo_base64()
+                    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:30px;color:#1a1a1a}}h1{{color:#CC0000;border-bottom:3px solid #CC0000;padding-bottom:10px}}h2{{color:#333;margin-top:20px}}table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:10px}}th{{background:#CC0000;color:white;padding:8px 6px;text-align:left}}td{{padding:6px;border-bottom:1px solid #ddd}}.kpi{{display:inline-block;width:22%;background:#f5f5f5;border-radius:8px;padding:12px;margin:8px 1%;text-align:center}}.kpi-val{{font-size:26px;font-weight:bold;color:#CC0000}}.footer{{margin-top:30px;font-size:9px;color:#999;text-align:center;border-top:1px solid #ddd;padding-top:15px}}</style></head><body>{'<div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;"><img src="data:image/png;base64,'+logo_b64+'" height="40"></div>' if logo_b64 else ''}<h1>Helpdesk Analytics Report</h1><p><b>{info.get('full_name',fc)}</b> | {rpt_month} {rpt_year} | Generated: {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p><div class="kpi"><div class="kpi-val">{total}</div>Total</div><div class="kpi"><div class="kpi-val">{open_count}</div>Open</div><div class="kpi"><div class="kpi-val">{in_progress}</div>In Progress</div><div class="kpi"><div class="kpi-val">{closed_count}</div>Closed</div><h2>Ticket Details</h2><table><tr><th>Ticket No</th><th>Title</th><th>Category</th><th>Priority</th><th>Status</th><th>Raised By</th><th>Location</th><th>Opened</th><th>Closed</th><th>Level</th></tr>"""
+                    for _, r in df.iterrows():
+                        html += f"<tr><td>{r.get('ticket_number','')}</td><td>{r.get('title','')[:50]}</td><td>{r.get('category','')}</td><td>{r.get('priority','')}</td><td><b>{r.get('status','').upper()}</b></td><td>{r.get('requester_name','')}</td><td>{r.get('location_building','')}</td><td>{str(r.get('created_at',''))[:10]}</td><td>{str(r.get('closed_at',''))[:10] if r.get('closed_at') else 'N/A'}</td><td>L{r.get('escalation_level',1)}</td></tr>"
+                    html += f"</table><div class='footer'><p>Churchgate Group | facilityXperience Enterprise | Confidential</p><p>Auto-generated on {datetime.now().strftime('%d %B %Y at %I:%M %p WAT')}</p></div></body></html>"
+                    st.download_button("📥 Download HTML", html, f"helpdesk_{rpt_month}_{rpt_year}.html", "text/html", use_container_width=True)
+                
+                # PDF
+                with c3:
+                    try:
+                        from fpdf import FPDF
+                        logo_b64 = get_logo_base64()
+                        
+                        class HelpdeskPDF(FPDF):
+                            def header(self):
+                                logo_path = Path("churchgate-logo.png")
+                                if logo_path.exists():
+                                    self.image(str(logo_path), x=14, y=8, h=10)
+                                self.set_fill_color(26, 26, 26)
+                                self.set_text_color(255, 255, 255)
+                                self.set_font('Helvetica', 'B', 12)
+                                self.set_xy(14, 22)
+                                self.cell(260, 6, f'Helpdesk Report - {rpt_month} {rpt_year}', 0, 0, 'L')
+                                self.set_font('Helvetica', '', 8)
+                                self.set_xy(14, 28)
+                                self.cell(260, 5, f'{info.get("full_name",fc)} | Generated: {datetime.now().strftime("%d %B %Y")}', 0, 0, 'L')
+                                self.set_y(36)
+                            def footer(self):
+                                self.set_y(-18)
+                                self.set_font('Helvetica', 'I', 7)
+                                self.set_text_color(150,150,150)
+                                self.cell(0, 8, f'Page {self.page_no()}/{{nb}} | Churchgate Group | Confidential', 0, 0, 'C')
+                        
+                        pdf = HelpdeskPDF('L', 'mm', 'A4')
+                        pdf.alias_nb_pages()
+                        pdf.add_page()
+                        
+                        # KPIs
+                        pdf.set_font('Helvetica', 'B', 10)
+                        pdf.set_text_color(26,26,26)
+                        pdf.cell(0, 7, 'Key Metrics', 0, 1)
+                        pdf.ln(2)
+                        kpis = [("Total", str(total), 204,0,0),("Open", str(open_count), 239,68,68),("In Progress", str(in_progress), 245,158,11),("Closed", str(closed_count), 16,185,129)]
+                        xs, ys = pdf.get_x(), pdf.get_y()
+                        for i,(l,v,r,g,b) in enumerate(kpis):
+                            x = xs + (i*70)
+                            pdf.set_fill_color(245,245,245)
+                            pdf.set_draw_color(r,g,b)
+                            pdf.rect(x, ys, 62, 16, 'DF')
+                            pdf.set_fill_color(r,g,b)
+                            pdf.rect(x, ys, 3, 16, 'F')
+                            pdf.set_xy(x+5, ys+2)
+                            pdf.set_font('Helvetica', '', 7)
+                            pdf.set_text_color(100,100,100)
+                            pdf.cell(54, 5, l.upper(), 0, 0, 'C')
+                            pdf.set_xy(x+5, ys+8)
+                            pdf.set_font('Helvetica', 'B', 13)
+                            pdf.set_text_color(r,g,b)
+                            pdf.cell(54, 7, v, 0, 0, 'C')
+                        pdf.set_y(ys+22)
+                        pdf.ln(5)
+                        
+                        # Table
+                        pdf.set_font('Helvetica', 'B', 8)
+                        pdf.set_fill_color(204,0,0)
+                        pdf.set_text_color(255,255,255)
+                        cw = [35,50,40,20,20,30,35,25,20]
+                        headers = ['Ticket No','Title','Category','Priority','Status','Raised By','Location','Opened','Closed']
+                        for h,w in zip(headers,cw):
+                            pdf.cell(w, 6, f' {h}', 1, 0, 'L', True)
+                        pdf.ln()
+                        pdf.set_font('Helvetica', '', 7)
+                        pdf.set_text_color(26,26,26)
+                        for _, r in df.head(40).iterrows():
+                            vals = [
+                                str(r.get('ticket_number',''))[:16],
+                                str(r.get('title',''))[:25],
+                                str(r.get('category',''))[:20],
+                                str(r.get('priority',''))[:10],
+                                str(r.get('status','')).upper()[:10],
+                                str(r.get('requester_name',''))[:14],
+                                str(r.get('location_building',''))[:18],
+                                str(r.get('created_at',''))[:10],
+                                str(r.get('closed_at',''))[:10] if r.get('closed_at') else 'N/A',
+                            ]
+                            for v,w in zip(vals,cw):
+                                pdf.cell(w, 5, f' {v}', 1, 0)
+                            pdf.ln()
+                        
+                        pdf_file = f"/tmp/hd_{rpt_month}_{rpt_year}.pdf"
+                        pdf.output(pdf_file)
+                        with open(pdf_file, "rb") as f:
+                            st.download_button("📥 Download PDF", f.read(), f"helpdesk_{rpt_month}_{rpt_year}.pdf", "application/pdf", use_container_width=True)
+                    except Exception as e:
+                        st.error(f"PDF Error: {e}")
             else:
-                st.info("No data")
+                st.info("No data to report")
+
     
     # ============================================
     # TAB 3: ESCALATION SETTINGS
