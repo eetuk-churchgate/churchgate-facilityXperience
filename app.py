@@ -2166,6 +2166,9 @@ def page_helpdesk_queue():
                     all_users = DB.get_users()
                     user_options = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users]
                     
+                    # Get existing escalation data
+                    existing = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("category_id", cat_id).order("level_number").execute()
+                    
                     # Build form with pre-selected values
                     for level in range(1, 7):
                         # Get existing users for this level
