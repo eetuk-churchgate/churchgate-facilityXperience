@@ -3363,7 +3363,7 @@ def reset_password_page(token):
 def main():
     inject_css()
     
-    components.html("""
+    st.components.v1.html("""
     <button class="fx-sidebar-toggle" onclick="
         var sidebar = parent.document.querySelector('[data-testid=\"stSidebar\"]');
         if(sidebar) {
