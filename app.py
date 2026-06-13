@@ -1897,256 +1897,221 @@ def page_helpdesk_queue():
     with tabs[2]:
         st.markdown("### 📄 Helpdesk Reports")
         
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            rpt_type = st.selectbox("Report Type", ["Monthly Report", "Customized Report", "Tickets Carry Forward"])
-        with c2:
-            rpt_month = st.selectbox("Month", ["January","February","March","April","May","June","July","August","September","October","November","December"])
-        with c3:
-            rpt_year = st.selectbox("Year", [2024,2025,2026,2027])
+        rpt_type = st.selectbox("Report Type", ["Monthly Report", "Customized Report", "Tickets Carry Forward"])
+        
+        all_tickets = DB.get_all("tickets", fc, 500)
+        all_users = DB.get_users()
+        occupant_options = ["All Occupants", "Internal Team"] + sorted(list(set(
+            t.get("occupant_name","") for t in all_tickets if t.get("occupant_name") and str(t.get("occupant_name")) != "None"
+        )))
+        categories = DB.get_helpdesk_categories()
+        cat_options = ["All"] + sorted(list(set(c.get("category_name","") for c in categories)))
+        status_options = ["All", "open", "in_progress", "hold", "closed", "rejected"]
+        
+        if rpt_type == "Monthly Report":
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                rpt_month = st.selectbox("Month", ["January","February","March","April","May","June","July","August","September","October","November","December"])
+            with c2:
+                rpt_year = st.selectbox("Year", [2024,2025,2026,2027])
+            with c3:
+                rpt_occupant = st.selectbox("Select Occupant", occupant_options)
+            with c4:
+                rpt_category = st.selectbox("Category", cat_options)
+            
+            rpt_status = st.selectbox("Select Status", status_options)
+            
+        elif rpt_type == "Customized Report":
+            c1, c2 = st.columns(2)
+            with c1:
+                date_from = st.date_input("From", date.today().replace(day=1))
+            with c2:
+                date_to = st.date_input("To", date.today())
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                rpt_occupant = st.selectbox("Select Occupant", occupant_options, key="cust_occ")
+            with c2:
+                rpt_category = st.selectbox("Category", cat_options, key="cust_cat")
+            with c3:
+                rpt_status = st.selectbox("Select Status", status_options, key="cust_status")
+            
+            rpt_month = "Custom"
+            rpt_year = ""
+            
+        else:  # Tickets Carry Forward
+            rpt_year = st.selectbox("Select Year", [2024,2025,2026,2027], key="tcf_year")
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                rpt_occupant = st.selectbox("Select Occupant", occupant_options, key="tcf_occ")
+            with c2:
+                rpt_category = st.selectbox("Category", cat_options, key="tcf_cat")
+            with c3:
+                rpt_status = st.selectbox("Select Status", status_options, key="tcf_status")
+            
+            rpt_month = "Carry Forward"
         
         if st.button("📊 Generate Report", use_container_width=True):
-            all_tickets = DB.get_all("tickets", fc, 500)
             if all_tickets:
                 df = pd.DataFrame(all_tickets)
                 
-                total = len(df)
-                open_count = len(df[df["status"]=="open"]) if "status" in df.columns else 0
-                in_progress = len(df[df["status"]=="in_progress"]) if "status" in df.columns else 0
-                hold_count = len(df[df["status"]=="hold"]) if "status" in df.columns else 0
-                closed_count = len(df[df["status"]=="closed"]) if "status" in df.columns else 0
+                # Apply filters
+                if rpt_month not in ["Custom", "Carry Forward"]:
+                    month_map = {"January":1,"February":2,"March":3,"April":4,"May":5,"June":6,"July":7,"August":8,"September":9,"October":10,"November":11,"December":12}
+                    month_num = month_map.get(rpt_month, 0)
+                    if month_num > 0 and "created_at" in df.columns:
+                        df = df[pd.to_datetime(df["created_at"]).dt.month == month_num]
+                    if rpt_year and "created_at" in df.columns:
+                        df = df[pd.to_datetime(df["created_at"]).dt.year == rpt_year]
                 
-                resolution_times = []
-                if "created_at" in df.columns and "closed_at" in df.columns:
+                if rpt_type == "Customized Report" and "created_at" in df.columns:
+                    df = df[(pd.to_datetime(df["created_at"]).dt.date >= date_from) & (pd.to_datetime(df["created_at"]).dt.date <= date_to)]
+                
+                if rpt_type == "Tickets Carry Forward" and rpt_year and "created_at" in df.columns:
+                    df = df[pd.to_datetime(df["created_at"]).dt.year <= rpt_year]
+                
+                if rpt_occupant != "All Occupants":
+                    if rpt_occupant == "Internal Team":
+                        external_companies = ["AGIP","Optiva","Heritage","Periscope","Maroto","Seplat","Handy","Aselsan","First E&P","Microsoft","Lighthouse","General Electric","Dell","Access Bank","TotalEnergies"]
+                        df = df[~df["occupant_name"].str.contains('|'.join(external_companies), case=False, na=False)]
+                    else:
+                        df = df[df["occupant_name"] == rpt_occupant]
+                
+                if rpt_category != "All":
+                    df = df[df["category"] == rpt_category]
+                
+                if rpt_status != "All":
+                    df = df[df["status"] == rpt_status]
+                
+                if len(df) == 0:
+                    st.warning("No tickets match your filters")
+                else:
+                    total = len(df)
+                    open_count = len(df[df["status"]=="open"]) if "status" in df.columns else 0
+                    in_progress = len(df[df["status"]=="in_progress"]) if "status" in df.columns else 0
+                    hold_count = len(df[df["status"]=="hold"]) if "status" in df.columns else 0
+                    closed_count = len(df[df["status"]=="closed"]) if "status" in df.columns else 0
+                    
+                    resolution_times = []
+                    if "created_at" in df.columns and "closed_at" in df.columns:
+                        for _, r in df.iterrows():
+                            try:
+                                closed_val = r.get("closed_at")
+                                if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" and str(closed_val) != "":
+                                    hrs = (pd.to_datetime(closed_val) - pd.to_datetime(r["created_at"])).total_seconds() / 3600
+                                    if hrs > 0: resolution_times.append(hrs)
+                            except: pass
+                    avg_resolution = round(sum(resolution_times) / len(resolution_times), 1) if resolution_times else 0
+                    avg_display = f"{avg_resolution}h" if avg_resolution > 0 else "N/A"
+                    
+                    st.success(f"✅ Report generated — {total} tickets")
+                    
+                    c1, c2, c3, c4, c5, c6 = st.columns(6)
+                    with c1: st.metric("📋 Total", total)
+                    with c2: st.metric("🔴 Open", open_count)
+                    with c3: st.metric("🟡 In Progress", in_progress)
+                    with c4: st.metric("⏸️ Hold", hold_count)
+                    with c5: st.metric("🟢 Closed", closed_count)
+                    with c6: st.metric("⏱️ Avg Resolution", avg_display)
+                    
+                    st.markdown("---")
+                    st.markdown("### 📋 Detailed Ticket Report")
+                    
+                    table_data = []
                     for _, r in df.iterrows():
-                        try:
-                            closed_val = r.get("closed_at")
-                            if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" and str(closed_val) != "":
-                                created = pd.to_datetime(r["created_at"])
-                                closed = pd.to_datetime(closed_val)
-                                hrs = (closed - created).total_seconds() / 3600
-                                if hrs > 0:
-                                    resolution_times.append(hrs)
-                        except: pass
-                avg_resolution = round(sum(resolution_times) / len(resolution_times), 1) if resolution_times else 0
-                avg_display = f"{avg_resolution}h" if avg_resolution > 0 else "N/A"
-                
-                sla_met = 0
-                sla_exceeded = 0
-                if "sla_deadline" in df.columns and "closed_at" in df.columns:
-                    for _, r in df.iterrows():
-                        try:
-                            closed_val = r.get("closed_at")
-                            if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" and r.get("sla_deadline"):
-                                if pd.to_datetime(closed_val) <= pd.to_datetime(r["sla_deadline"]):
-                                    sla_met += 1
-                                else:
-                                    sla_exceeded += 1
-                        except: pass
-                
-                st.success(f"✅ Report generated for {rpt_month} {rpt_year} — {total} tickets")
-                
-                c1, c2, c3, c4, c5, c6 = st.columns(6)
-                with c1: st.metric("📋 Total", total)
-                with c2: st.metric("🔴 Open", open_count)
-                with c3: st.metric("🟡 In Progress", in_progress)
-                with c4: st.metric("⏸️ Hold", hold_count)
-                with c5: st.metric("🟢 Closed", closed_count)
-                with c6: st.metric("⏱️ Avg Resolution", avg_display)
-                
-                c1, c2 = st.columns(2)
-                with c1: st.metric("✅ SLA Met", sla_met)
-                with c2: st.metric("⚠️ SLA Exceeded", sla_exceeded)
-                
-                st.markdown("---")
-                st.markdown("### 📋 Detailed Ticket Report")
-                
-                table_data = []
-                for _, r in df.iterrows():
-                    created = str(r.get('created_at',''))[:16] if r.get('created_at') and str(r.get('created_at')) != "None" else "—"
-                    closed_val = r.get('closed_at')
-                    closed = str(closed_val)[:16] if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" else "Pending"
+                        created = str(r.get('created_at',''))[:16] if r.get('created_at') and str(r.get('created_at')) != "None" else "—"
+                        closed_val = r.get('closed_at')
+                        closed = str(closed_val)[:16] if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" else "Pending"
+                        
+                        age_str = "—"
+                        if r.get('created_at') and str(r.get('created_at')) != "None":
+                            try:
+                                created_dt = pd.to_datetime(r['created_at'])
+                                end_dt = pd.to_datetime(r['closed_at']) if r.get('closed_at') and str(r.get('closed_at')) != "None" and str(r.get('closed_at')) != "nan" else datetime.now()
+                                age = end_dt - created_dt
+                                age_str = f"{age.days}d {age.seconds//3600}h"
+                            except: pass
+                        
+                        table_data.append({
+                            "SNo": len(table_data) + 1,
+                            "DateTime": created,
+                            "Ticket No": safe_text(r.get('ticket_number',''),"—"),
+                            "Location": safe_text(r.get('location_building',''),"—"),
+                            "Category": safe_text(r.get('category',''),"—"),
+                            "Title": safe_text(r.get('title',''),"—")[:50],
+                            "Raised By": safe_text(r.get('requester_name',''),"—"),
+                            "Priority": safe_text(r.get('priority',''),"—"),
+                            "Status": safe_text(r.get('status',''),"—").upper(),
+                            "Age": age_str,
+                            "Closed": closed,
+                            "Level": f"L{safe_text(r.get('escalation_level',1),'1')}"
+                        })
                     
-                    age_str = "—"
-                    if r.get('created_at') and str(r.get('created_at')) != "None" and str(r.get('created_at')) != "nan":
-                        try:
-                            created_dt = pd.to_datetime(r['created_at'])
-                            if r.get('closed_at') and str(r.get('closed_at')) != "None" and str(r.get('closed_at')) != "nan":
-                                end_dt = pd.to_datetime(r['closed_at'])
-                            else:
-                                end_dt = datetime.now()
-                            age = end_dt - created_dt
-                            age_str = f"{age.days}d {age.seconds//3600}h"
-                        except: pass
+                    report_df = pd.DataFrame(table_data)
+                    st.dataframe(report_df, use_container_width=True, hide_index=True, height=500)
                     
-                    sla_status = "—"
-                    if r.get('sla_deadline') and str(r.get('sla_deadline')) != "None":
-                        try:
-                            if r.get('closed_at') and str(r.get('closed_at')) != "None" and str(r.get('closed_at')) != "nan":
-                                if pd.to_datetime(r['closed_at']) <= pd.to_datetime(r['sla_deadline']):
-                                    sla_status = "Met"
-                                else:
-                                    sla_status = "Exceeded"
-                            elif datetime.now() > pd.to_datetime(r['sla_deadline']):
-                                sla_status = "Overdue"
-                            else:
-                                sla_status = "Active"
-                        except: pass
+                    # Downloads
+                    st.markdown("---")
+                    st.markdown("### 📥 Download Reports")
                     
-                    table_data.append({
-                        "SNo": len(table_data) + 1,
-                        "DateTime": created,
-                        "Ticket No": safe_text(r.get('ticket_number',''),"—"),
-                        "Location": safe_text(r.get('location_building',''),"—"),
-                        "Category": safe_text(r.get('category',''),"—"),
-                        "Title": safe_text(r.get('title',''),"—")[:50],
-                        "Raised By": safe_text(r.get('requester_name',''),"—"),
-                        "Priority": safe_text(r.get('priority',''),"—"),
-                        "Status": safe_text(r.get('status',''),"—").upper(),
-                        "Age": age_str,
-                        "SLA": sla_status,
-                        "Closed": closed,
-                        "Level": f"L{safe_text(r.get('escalation_level',1),'1')}"
-                    })
-                
-                report_df = pd.DataFrame(table_data)
-                st.dataframe(report_df, use_container_width=True, hide_index=True, height=500)
-                
-                st.markdown("---")
-                st.markdown("### 📥 Download Reports")
-                
-                logo_b64 = get_logo_base64()
-                logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
-                
-                # HTML
-                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-                    body{{font-family:Arial;margin:25px;color:#1a1a1a;font-size:11px}}
-                    .header{{background:#1a1a1a;color:white;padding:18px 20px;border-radius:10px;display:flex;align-items:center;gap:15px;margin-bottom:20px}}
-                    .header h1{{margin:0;font-size:19px}}
-                    .kpi-row{{display:flex;gap:8px;margin:15px 0;flex-wrap:wrap}}
-                    .kpi{{flex:1;min-width:100px;background:#f5f5f5;border-radius:8px;padding:10px;text-align:center;border-left:4px solid #CC0000}}
-                    .kpi.green{{border-left-color:#10B981}}.kpi.orange{{border-left-color:#F59E0B}}
-                    .kpi-val{{font-size:22px;font-weight:bold;color:#CC0000}}.kpi-label{{font-size:9px;color:#666}}
-                    table{{width:100%;border-collapse:collapse;font-size:10px;margin:15px 0}}
-                    th{{background:#CC0000;color:white;padding:7px 5px;text-align:left;font-size:8px}}
-                    td{{padding:4px 5px;border-bottom:1px solid #ddd}}
-                    tr:nth-child(even){{background:#fafafa}}
-                    .footer{{margin-top:25px;font-size:9px;color:#999;text-align:center;border-top:1px solid #ddd;padding-top:12px}}
-                </style></head><body>
-                <div class="header">{logo_html}<div><h1>Helpdesk Analytics Report</h1><p style="margin:3px 0 0 0;font-size:10px;opacity:0.8">{safe_text(info.get('full_name',fc))} | {rpt_month} {rpt_year} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p></div></div>
-                <div class="kpi-row">
-                    <div class="kpi"><div class="kpi-val">{total}</div><div class="kpi-label">Total</div></div>
-                    <div class="kpi"><div class="kpi-val">{open_count}</div><div class="kpi-label">Open</div></div>
-                    <div class="kpi orange"><div class="kpi-val">{in_progress}</div><div class="kpi-label">In Progress</div></div>
-                    <div class="kpi green"><div class="kpi-val">{closed_count}</div><div class="kpi-label">Closed</div></div>
-                    <div class="kpi"><div class="kpi-val">{sla_met}</div><div class="kpi-label">SLA Met</div></div>
-                    <div class="kpi"><div class="kpi-val">{avg_display}</div><div class="kpi-label">Avg Resolution</div></div>
-                </div>
-                <h2>Detailed Ticket Report</h2>
-                <table><tr><th>#</th><th>DateTime</th><th>Ticket No</th><th>Location</th><th>Category</th><th>Title</th><th>Raised By</th><th>Priority</th><th>Status</th><th>Age</th><th>SLA</th><th>Closed</th><th>Lvl</th></tr>"""
-                
-                for _, r in report_df.iterrows():
-                    html += f"<tr><td>{r['SNo']}</td><td>{r['DateTime']}</td><td>{r['Ticket No']}</td><td>{r['Location']}</td><td>{r['Category']}</td><td>{r['Title']}</td><td>{r['Raised By']}</td><td>{r['Priority']}</td><td>{r['Status']}</td><td>{r['Age']}</td><td>{r['SLA']}</td><td>{r['Closed']}</td><td>{r['Level']}</td></tr>"
-                
-                html += f"</table><div class='footer'><p>Churchgate Group | facilityXperience Enterprise | Confidential</p></div></body></html>"
-                
-                with st.expander("🌐 HTML Report Preview", expanded=True):
-                    st.components.v1.html(html, height=500, scrolling=True)
-                
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    st.download_button("📥 HTML", html, f"helpdesk_{rpt_month}_{rpt_year}.html", "text/html", use_container_width=True)
-                with c2:
-                    st.download_button("📥 CSV", df.to_csv(index=False), f"helpdesk_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
-                with c3:
-                    try:
-                        from fpdf import FPDF
-                        
-                        class HDReportPDF(FPDF):
-                            def header(self):
-                                logo_path = Path("churchgate-logo.png")
-                                if logo_path.exists():
-                                    self.image(str(logo_path), x=14, y=8, h=10)
-                                self.set_text_color(255,255,255)
-                                self.set_fill_color(26,26,26)
-                                self.rect(10,22,277,14,'F')
-                                self.set_fill_color(204,0,0)
-                                self.rect(10,22,4,14,'F')
-                                self.set_font('Helvetica','B',11)
-                                self.set_xy(18,24)
-                                self.cell(260,5,'Helpdesk Analytics Report',0,0,'L')
-                                self.set_font('Helvetica','',8)
-                                self.set_xy(18,29)
-                                self.cell(260,5,f'{safe_text(info.get("full_name",fc))} | {rpt_month} {rpt_year}',0,0,'L')
-                                self.set_y(40)
-                            def footer(self):
-                                self.set_y(-18)
-                                self.set_font('Helvetica','I',7)
-                                self.set_text_color(150,150,150)
-                                self.cell(0,8,f'Page {{nb}} | Churchgate Group | Confidential',0,0,'C')
-                        
-                        pdf = HDReportPDF('L','mm','A4')
-                        pdf.alias_nb_pages()
-                        pdf.add_page()
-                        
-                        kpis = [("Total",str(total),204,0,0),("Open",str(open_count),239,68,68),("In Prog",str(in_progress),245,158,11),("Closed",str(closed_count),16,185,129),("Avg Res",avg_display,37,99,235)]
-                        xs,ys = pdf.get_x(),pdf.get_y()
-                        for i,(l,v,r,g,b) in enumerate(kpis):
-                            x = xs + (i*55)
-                            pdf.set_fill_color(245,245,245)
-                            pdf.set_draw_color(r,g,b)
-                            pdf.rect(x,ys,50,15,'DF')
-                            pdf.set_fill_color(r,g,b)
-                            pdf.rect(x,ys,3,15,'F')
-                            pdf.set_xy(x+5,ys+2)
-                            pdf.set_font('Helvetica','',6)
-                            pdf.set_text_color(100,100,100)
-                            pdf.cell(42,4,l.upper(),0,0,'C')
-                            pdf.set_xy(x+5,ys+7)
-                            pdf.set_font('Helvetica','B',12)
-                            pdf.set_text_color(r,g,b)
-                            pdf.cell(42,6,v,0,0,'C')
-                        pdf.set_y(ys+20)
-                        pdf.ln(4)
-                        
-                        pdf.set_font('Helvetica','B',6)
-                        pdf.set_fill_color(204,0,0)
-                        pdf.set_text_color(255,255,255)
-                        cw = [8,22,26,22,22,28,20,14,14,16,14,18,12]
-                        headers = ['#','DateTime','Ticket','Location','Category','Title','By','Priority','Status','Age','SLA','Closed','Lvl']
-                        for h,w in zip(headers,cw):
-                            pdf.cell(w,5.5,f' {h}',1,0,'L',True)
-                        pdf.ln()
-                        pdf.set_font('Helvetica','',5.5)
-                        pdf.set_text_color(26,26,26)
-                        for _,r in report_df.head(40).iterrows():
-                            vals = [
-                                safe_text(str(r['SNo']),'')[0:3],
-                                safe_text(str(r['DateTime']),'')[0:11],
-                                safe_text(str(r['Ticket No']),'')[0:13],
-                                safe_text(str(r['Location']),'')[0:11],
-                                safe_text(str(r['Category']),'')[0:11],
-                                safe_text(str(r['Title']),'')[0:14],
-                                safe_text(str(r['Raised By']),'')[0:9],
-                                safe_text(str(r['Priority']),'')[0:7],
-                                safe_text(str(r['Status']),'')[0:7],
-                                safe_text(str(r['Age']),'')[0:8],
-                                safe_text(str(r['SLA']),'')[0:7],
-                                safe_text(str(r['Closed']),'')[0:9],
-                                safe_text(str(r['Level']),'')[0:4],
-                            ]
-                            for v,w in zip(vals,cw):
-                                pdf.cell(w,4.5,f' {v}',1,0)
+                    logo_b64 = get_logo_base64()
+                    logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
+                    
+                    html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:25px;color:#1a1a1a;font-size:11px}}.header{{background:#1a1a1a;color:white;padding:18px 20px;border-radius:10px;display:flex;align-items:center;gap:15px;margin-bottom:20px}}.header h1{{margin:0;font-size:19px}}.kpi-row{{display:flex;gap:8px;margin:15px 0}}.kpi{{flex:1;background:#f5f5f5;border-radius:8px;padding:10px;text-align:center;border-left:4px solid #CC0000}}.kpi.green{{border-left-color:#10B981}}.kpi-val{{font-size:22px;font-weight:bold;color:#CC0000}}.kpi-label{{font-size:9px;color:#666}}table{{width:100%;border-collapse:collapse;font-size:10px}}th{{background:#CC0000;color:white;padding:7px 5px;text-align:left;font-size:8px}}td{{padding:4px 5px;border-bottom:1px solid #ddd}}.footer{{margin-top:25px;font-size:9px;color:#999;text-align:center;border-top:1px solid #ddd;padding-top:12px}}</style></head><body><div class="header">{logo_html}<div><h1>Helpdesk Report - {rpt_month} {rpt_year}</h1><p style="font-size:10px;opacity:0.8">{safe_text(info.get('full_name',fc))} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p></div></div><div class="kpi-row"><div class="kpi"><div class="kpi-val">{total}</div><div class="kpi-label">Total</div></div><div class="kpi"><div class="kpi-val">{open_count}</div><div class="kpi-label">Open</div></div><div class="kpi"><div class="kpi-val">{in_progress}</div><div class="kpi-label">In Progress</div></div><div class="kpi green"><div class="kpi-val">{closed_count}</div><div class="kpi-label">Closed</div></div><div class="kpi"><div class="kpi-val">{avg_display}</div><div class="kpi-label">Avg Resolution</div></div></div><h2>Tickets</h2><table><tr><th>#</th><th>DateTime</th><th>Ticket</th><th>Location</th><th>Category</th><th>Title</th><th>By</th><th>Priority</th><th>Status</th><th>Age</th><th>Closed</th></tr>"""
+                    
+                    for _, r in report_df.iterrows():
+                        html += f"<tr><td>{r['SNo']}</td><td>{r['DateTime']}</td><td>{r['Ticket No']}</td><td>{r['Location']}</td><td>{r['Category']}</td><td>{r['Title']}</td><td>{r['Raised By']}</td><td>{r['Priority']}</td><td>{r['Status']}</td><td>{r['Age']}</td><td>{r['Closed']}</td></tr>"
+                    
+                    html += f"</table><div class='footer'>Churchgate Group | facilityXperience | Confidential</div></body></html>"
+                    
+                    with st.expander("🌐 HTML Preview", expanded=True):
+                        st.components.v1.html(html, height=500, scrolling=True)
+                    
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.download_button("📥 HTML", html, f"helpdesk_report.html", "text/html", use_container_width=True)
+                    with c2:
+                        st.download_button("📥 CSV", df.to_csv(index=False), f"helpdesk_report.csv", "text/csv", use_container_width=True)
+                    with c3:
+                        try:
+                            from fpdf import FPDF
+                            pdf = FPDF('L','mm','A4')
+                            pdf.add_page()
+                            logo_path = Path("churchgate-logo.png")
+                            if logo_path.exists():
+                                pdf.image(str(logo_path), x=14, y=8, h=10)
+                            pdf.set_font('Helvetica','B',14)
+                            pdf.set_text_color(204,0,0)
+                            pdf.set_xy(14,22)
+                            pdf.cell(260,8,f'Helpdesk Report - {rpt_month} {rpt_year}',0,1)
+                            pdf.set_font('Helvetica','',9)
+                            pdf.set_text_color(0,0,0)
+                            pdf.set_xy(14,30)
+                            pdf.cell(260,6,f'{safe_text(info.get("full_name",fc))} | Total: {total} tickets',0,1)
+                            pdf.ln(5)
+                            pdf.set_font('Helvetica','B',7)
+                            pdf.set_fill_color(204,0,0)
+                            pdf.set_text_color(255,255,255)
+                            cw = [8,24,28,24,24,28,22,14,14,18,18,12]
+                            for h,w in zip(['#','DateTime','Ticket','Location','Category','Title','By','Priority','Status','Age','Closed','Lvl'],cw):
+                                pdf.cell(w,5.5,f' {h}',1,0,'L',True)
                             pdf.ln()
-                        
-                        pdf_file = f"/tmp/hd_{rpt_month}_{rpt_year}.pdf"
-                        pdf.output(pdf_file)
-                        with open(pdf_file,"rb") as f:
-                            st.download_button("📥 PDF",f.read(),f"helpdesk_{rpt_month}_{rpt_year}.pdf","application/pdf",use_container_width=True)
-                    except Exception as e:
-                        st.error(f"PDF unavailable. Error: {str(e)[:80]}")
+                            pdf.set_font('Helvetica','',6)
+                            pdf.set_text_color(26,26,26)
+                            for _,r in report_df.head(40).iterrows():
+                                vals = [safe_text(str(r[c]),'')[:w-2] for c,w in zip(['SNo','DateTime','Ticket No','Location','Category','Title','Raised By','Priority','Status','Age','Closed','Level'],cw)]
+                                for v,w in zip(vals,cw):
+                                    pdf.cell(w,4.5,f' {v}',1,0)
+                                pdf.ln()
+                            pdf_file = f"/tmp/hd_report.pdf"
+                            pdf.output(pdf_file)
+                            with open(pdf_file,"rb") as f:
+                                st.download_button("📥 PDF",f.read(),"helpdesk_report.pdf","application/pdf",use_container_width=True)
+                        except Exception as e:
+                            st.error(f"PDF: {str(e)[:60]}")
             else:
-                st.info("No data to report for this period")
+                st.info("No ticket data available")
     
     # ============================================
     # TAB 3: ESCALATION SETTINGS
