@@ -1822,15 +1822,16 @@ def page_helpdesk_queue():
             st.markdown("### ⚙️ Helpdesk Settings")
             sett_tabs = st.tabs(["📍 Locations", "🏷️ Categories", "📊 Status"])
             
+            # ============================================
+            # LOCATIONS TABLE
+            # ============================================
             with sett_tabs[0]:
-                st.markdown("**📍 Manage Locations**")
-                locs = DB.get_locations(fc)
+                st.markdown("#### 📍 Location Details")
                 
-                # Search
-                loc_search = st.text_input("🔍 Search locations", key="loc_search")
+                locs = DB.get_locations(fc)
+                loc_search = st.text_input("🔍 Search locations", key="loc_search_main")
                 
                 if locs:
-                    # Build table data
                     table_data = []
                     for i, l in enumerate(locs):
                         loc_name = l.get("location_name","")
@@ -1840,57 +1841,181 @@ def page_helpdesk_queue():
                             continue
                         
                         subs = DB.get_sub_locations(l["id"])
-                        if subs:
-                            for j, s in enumerate(subs):
-                                table_data.append({
-                                    "SNO": len(table_data) + 1,
-                                    "Location": f"{loc_name} ({loc_code})" if j == 0 else "",
-                                    "Sub Location": s.get("sub_location_name",""),
-                                    "View": "📋" if j == 0 else "",
-                                    "Action": "✏️" if j == 0 else ""
-                                })
-                        else:
-                            table_data.append({
-                                "SNO": len(table_data) + 1,
-                                "Location": f"{loc_name} ({loc_code})",
-                                "Sub Location": "—",
-                                "View": "📋",
-                                "Action": "✏️"
-                            })
+                        sub_count = len(subs) if subs else 0
+                        
+                        table_data.append({
+                            "SNO": len(table_data) + 1,
+                            "Location": f"{loc_code}",
+                            "Sub Locations": f"{sub_count} subs",
+                            "View": "🔍 View",
+                            "Action": "✏️ Edit"
+                        })
                     
                     if table_data:
-                        st.dataframe(
-                            pd.DataFrame(table_data),
-                            use_container_width=True,
-                            hide_index=True,
-                            height=400
-                        )
-                    else:
-                        st.info("No locations match your search")
+                        # Pagination
+                        page_size = 10
+                        total_pages = max(1, (len(table_data) + page_size - 1) // page_size)
+                        
+                        if "loc_page" not in st.session_state:
+                            st.session_state.loc_page = 1
+                        
+                        start = (st.session_state.loc_page - 1) * page_size
+                        end = start + page_size
+                        page_data = table_data[start:end]
+                        
+                        st.caption(f"Showing {start+1} to {min(end, len(table_data))} of {len(table_data)} entries")
+                        
+                        # Table
+                        for row in page_data:
+                            c1, c2, c3, c4, c5 = st.columns([0.5, 2, 1.5, 1, 1])
+                            with c1: st.markdown(f"**{row['SNO']}**")
+                            with c2: st.markdown(row["Location"])
+                            with c3: st.markdown(row["Sub Locations"])
+                            with c4:
+                                loc_id = None
+                                for l in locs:
+                                    if l.get("location_code") == row["Location"]:
+                                        loc_id = l["id"]
+                                        break
+                                if loc_id:
+                                    if st.button("🔍 View", key=f"view_loc_{loc_id}", use_container_width=True):
+                                        st.session_state.view_loc_id = loc_id
+                                        st.rerun()
+                            with c5:
+                                if st.button("✏️ Edit", key=f"edit_loc_{loc_id}", use_container_width=True):
+                                    st.session_state.edit_loc_id = loc_id
+                                    st.rerun()
+                            st.markdown("---")
+                        
+                        # Pagination controls
+                        c1, c2, c3 = st.columns([1, 2, 1])
+                        with c1:
+                            if st.session_state.loc_page > 1:
+                                if st.button("← Previous", key="loc_prev"):
+                                    st.session_state.loc_page -= 1
+                                    st.rerun()
+                        with c2:
+                            st.markdown(f"**Page {st.session_state.loc_page} of {total_pages}**")
+                        with c3:
+                            if st.session_state.loc_page < total_pages:
+                                if st.button("Next →", key="loc_next"):
+                                    st.session_state.loc_page += 1
+                                    st.rerun()
+                    
+                    # VIEW SUB LOCATIONS
+                    if "view_loc_id" in st.session_state and st.session_state.view_loc_id:
+                        loc_id = st.session_state.view_loc_id
+                        loc_info = next((l for l in locs if l["id"] == loc_id), None)
+                        
+                        if loc_info:
+                            st.markdown("---")
+                            st.markdown(f"#### 📍 Sublocations for {loc_info.get('location_name','')}")
+                            
+                            subs = DB.get_sub_locations(loc_id)
+                            if subs:
+                                for s in subs:
+                                    c1, c2 = st.columns([4, 1])
+                                    with c1: st.markdown(f"└ {s.get('sub_location_name','')}")
+                                    with c2: 
+                                        if st.button("✏️", key=f"edit_sub_{s['id']}", use_container_width=True):
+                                            pass
+                            else:
+                                st.info("No sub-locations")
+                            
+                            with st.form(f"add_sub_loc_{loc_id}"):
+                                new_sub = st.text_input("Add SubLocation", key=f"new_sub_{loc_id}")
+                                if st.form_submit_button("➕ Add SubLocation"):
+                                    if new_sub:
+                                        supabase.table("helpdesk_sub_locations").insert({"location_id": loc_id, "sub_location_name": new_sub}).execute()
+                                        st.success("✅ Added!")
+                                        st.rerun()
+                            
+                            if st.button("❌ Close View", key=f"close_view_loc_{loc_id}"):
+                                st.session_state.view_loc_id = None
+                                st.rerun()
                 
+                # ADD NEW LOCATION
                 st.markdown("---")
                 with st.form("add_loc_form"):
+                    st.markdown("**➕ Add New Location**")
                     c1, c2 = st.columns(2)
-                    with c1: 
+                    with c1:
                         new_loc_code = st.text_input("Location Code", key="loc_code")
                         new_loc_name = st.text_input("Location Name", key="loc_name")
-                    with c2: 
-                        parent_loc = st.selectbox("Parent Location", ["None"] + [l.get("location_code","") for l in locs]) if locs else st.selectbox("Parent", ["None"])
-                        new_sub_name = st.text_input("Sub-Location Name", key="sub_name")
+                    with c2:
+                        new_sub_name = st.text_input("Initial Sub-Location (optional)", key="sub_name")
                     if st.form_submit_button("➕ Add Location"):
                         if new_loc_code and new_loc_name:
-                            supabase.table("helpdesk_locations").insert({"facility_code":fc,"location_code":new_loc_code,"location_name":new_loc_name}).execute()
+                            res = supabase.table("helpdesk_locations").insert({"facility_code":fc,"location_code":new_loc_code,"location_name":new_loc_name}).execute()
+                            if res.data and new_sub_name:
+                                supabase.table("helpdesk_sub_locations").insert({"location_id":res.data[0]["id"],"sub_location_name":new_sub_name}).execute()
                             st.success("✅ Added!")
                             st.rerun()
             
+            # ============================================
+            # CATEGORIES TABLE
+            # ============================================
             with sett_tabs[1]:
-                st.markdown("**🏷️ Manage Categories**")
-                for c in categories:
-                    st.markdown(f"- **{c.get('category_name','')}** — {c.get('department','')} (SLA: {c.get('sla_hours','4')}hrs)")
+                st.markdown("#### 🏷️ Category Details")
+                
+                cat_search = st.text_input("🔍 Search categories", key="cat_search_main")
+                
+                if categories:
+                    table_data = []
+                    for c in categories:
+                        if cat_search and cat_search.lower() not in c.get("category_name","").lower() and cat_search.lower() not in c.get("department","").lower():
+                            continue
+                        
+                        table_data.append({
+                            "SNO": len(table_data) + 1,
+                            "Department": c.get("department",""),
+                            "Category": c.get("category_name",""),
+                            "SLA": f"{c.get('sla_hours','4')}hrs"
+                        })
+                    
+                    if table_data:
+                        page_size = 10
+                        total_pages = max(1, (len(table_data) + page_size - 1) // page_size)
+                        
+                        if "cat_page" not in st.session_state:
+                            st.session_state.cat_page = 1
+                        
+                        start = (st.session_state.cat_page - 1) * page_size
+                        end = start + page_size
+                        page_data = table_data[start:end]
+                        
+                        st.caption(f"Showing {start+1} to {min(end, len(table_data))} of {len(table_data)} entries")
+                        
+                        for row in page_data:
+                            c1, c2, c3, c4, c5, c6 = st.columns([0.5, 2, 2, 1, 1, 1])
+                            with c1: st.markdown(f"**{row['SNO']}**")
+                            with c2: st.markdown(row["Department"])
+                            with c3: st.markdown(row["Category"])
+                            with c4: st.markdown(row["SLA"])
+                            with c5: st.button("✏️", key=f"edit_cat_{row['SNO']}", use_container_width=True)
+                            with c6: st.button("🔍", key=f"view_cat_{row['SNO']}", use_container_width=True)
+                            st.markdown("---")
+                        
+                        c1, c2, c3 = st.columns([1, 2, 1])
+                        with c1:
+                            if st.session_state.cat_page > 1:
+                                if st.button("← Prev", key="cat_prev"):
+                                    st.session_state.cat_page -= 1
+                                    st.rerun()
+                        with c2:
+                            st.markdown(f"**Page {st.session_state.cat_page} of {total_pages}**")
+                        with c3:
+                            if st.session_state.cat_page < total_pages:
+                                if st.button("Next →", key="cat_next"):
+                                    st.session_state.cat_page += 1
+                                    st.rerun()
+                
+                st.markdown("---")
                 with st.form("add_cat_form"):
+                    st.markdown("**➕ Add New Category**")
                     c1, c2, c3 = st.columns(3)
                     with c1: new_cat = st.text_input("Category Name", key="cat_name")
-                    with c2: new_dept = st.selectbox("Department", dept_list, key="cat_dept")
+                    with c2: new_dept = st.selectbox("Department", sorted(list(set(c.get("department","") for c in categories))), key="cat_dept")
                     with c3: new_sla = st.number_input("SLA Hours", 1, 72, 4, key="cat_sla")
                     if st.form_submit_button("➕ Add Category"):
                         if new_cat:
@@ -1898,9 +2023,13 @@ def page_helpdesk_queue():
                             st.success("✅ Added!")
                             st.rerun()
             
+            # ============================================
+            # STATUS
+            # ============================================
             with sett_tabs[2]:
-                st.markdown("**📊 Custom Statuses**")
-                st.info("Default: Open, In Progress, Hold, Closed, Rejected")
+                st.markdown("#### 📊 Status Configuration")
+                st.info("Default statuses: Open, In Progress, Hold, Closed, Rejected")
+                st.caption("Custom status management coming soon.")
 
 # ============================================
 # INCIDENT CHECK
