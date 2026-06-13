@@ -1697,45 +1697,71 @@ def page_helpdesk_queue():
         if all_tickets:
             df = pd.DataFrame(all_tickets)
             
-            # KPI ROW
+            # METRICS
             total = len(df)
             open_count = len(df[df["status"]=="open"]) if "status" in df.columns else 0
             in_progress = len(df[df["status"]=="in_progress"]) if "status" in df.columns else 0
             hold_count = len(df[df["status"]=="hold"]) if "status" in df.columns else 0
             closed_count = len(df[df["status"]=="closed"]) if "status" in df.columns else 0
+            rejected_count = len(df[df["status"]=="rejected"]) if "status" in df.columns else 0
             
-            # SLA Analysis
+            # Resolution time
+            resolution_times = []
+            if "created_at" in df.columns and "closed_at" in df.columns:
+                for _, r in df.iterrows():
+                    try:
+                        closed_val = r.get("closed_at")
+                        if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" and str(closed_val) != "":
+                            created = pd.to_datetime(r["created_at"])
+                            closed = pd.to_datetime(closed_val)
+                            hrs = (closed - created).total_seconds() / 3600
+                            if hrs > 0:
+                                resolution_times.append(hrs)
+                    except: pass
+            avg_resolution = round(sum(resolution_times) / len(resolution_times), 1) if resolution_times else 0
+            avg_display = f"{avg_resolution}h" if avg_resolution > 0 else "N/A"
+            
+            # SLA
             sla_met = 0
             sla_exceeded = 0
             if "sla_deadline" in df.columns and "closed_at" in df.columns:
                 for _, r in df.iterrows():
                     try:
-                        if r.get("closed_at") and r.get("sla_deadline"):
-                            if pd.to_datetime(r["closed_at"]) <= pd.to_datetime(r["sla_deadline"]):
+                        closed_val = r.get("closed_at")
+                        if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" and r.get("sla_deadline"):
+                            if pd.to_datetime(closed_val) <= pd.to_datetime(r["sla_deadline"]):
                                 sla_met += 1
                             else:
                                 sla_exceeded += 1
                     except: pass
             
-            # Avg resolution time
-            resolution_times = []
-            if "created_at" in df.columns and "closed_at" in df.columns:
+            # First Response Time
+            frt_met = 0
+            if "created_at" in df.columns:
                 for _, r in df.iterrows():
                     try:
-                        if r.get("closed_at") and str(r.get("closed_at")) != "None":
-                            created = pd.to_datetime(r["created_at"])
-                            closed = pd.to_datetime(r["closed_at"])
-                            resolution_times.append((closed - created).total_seconds() / 3600)
+                        if r.get("created_at"):
+                            comments = DB.get_ticket_comments(r.get("id"))
+                            if comments and len(comments) > 0:
+                                first_comment = pd.to_datetime(comments[0].get("created_at"))
+                                created = pd.to_datetime(r["created_at"])
+                                if (first_comment - created).total_seconds() / 60 <= 30:
+                                    frt_met += 1
                     except: pass
-            avg_resolution = sum(resolution_times) / len(resolution_times) if resolution_times else 0
             
+            # Priority breakdown
+            priority_breakdown = df["priority"].value_counts().to_dict() if "priority" in df.columns else {}
+            critical_high = priority_breakdown.get("critical", 0) + priority_breakdown.get("high", 0)
+            backlog = open_count + in_progress + hold_count
+            
+            # KPI ROW
             c1, c2, c3, c4, c5, c6 = st.columns(6)
             with c1: st.metric("📋 Total", total)
             with c2: st.metric("🔴 Open", open_count)
             with c3: st.metric("🟡 In Progress", in_progress)
             with c4: st.metric("⏸️ Hold", hold_count)
             with c5: st.metric("🟢 Closed", closed_count)
-            with c6: st.metric("⏱️ Avg Resolution", f"{avg_resolution:.1f}h")
+            with c6: st.metric("⏱️ Avg Resolution", avg_display)
             
             st.markdown("---")
             
@@ -1751,12 +1777,12 @@ def page_helpdesk_queue():
             
             st.markdown("---")
             
-            # CHARTS ROW
+            # CHARTS
             c1, c2 = st.columns(2)
             with c1:
                 if "category" in df.columns:
                     cat_counts = df["category"].value_counts().head(10)
-                    fig = px.bar(x=cat_counts.index, y=cat_counts.values, title="📊 Tickets by Category", labels={"x":"","y":""}, color=cat_counts.values, color_continuous_scale="Reds")
+                    fig = px.bar(x=cat_counts.index, y=cat_counts.values, title="📊 Tickets by Category", color=cat_counts.values, color_continuous_scale="Reds")
                     fig.update_layout(height=350)
                     st.plotly_chart(fig, use_container_width=True)
             with c2:
@@ -1777,39 +1803,76 @@ def page_helpdesk_queue():
                 fig3.update_layout(height=300)
                 st.plotly_chart(fig3, use_container_width=True)
             
-            # TOP ISSUES & INSIGHTS
+            # EXECUTIVE KPI DASHBOARD
             st.markdown("---")
+            st.markdown("#### 🏢 Executive KPI Dashboard")
+            
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.metric("🔥 Critical/High", critical_high)
+                st.caption("Urgent tickets")
+            with c2:
+                rate = round((closed_count/total)*100) if total > 0 else 0
+                st.metric("📈 Resolution Rate", f"{rate}%")
+                st.caption("Tickets resolved")
+            with c3:
+                st.metric("⏱️ First Response SLA", f"{frt_met}/{total}")
+                st.caption("Acknowledged within 30m")
+            with c4:
+                st.metric("📋 Current Backlog", backlog)
+                st.caption("Awaiting resolution")
+            
+            # Department Performance
+            st.markdown("---")
+            st.markdown("#### 📊 Department Performance")
+            dept_performance = {}
+            if "category" in df.columns:
+                for _, r in df.iterrows():
+                    cat = r.get("category","Unknown")
+                    if cat not in dept_performance:
+                        dept_performance[cat] = {"total": 0, "closed": 0}
+                    dept_performance[cat]["total"] += 1
+                    if r.get("status") == "closed":
+                        dept_performance[cat]["closed"] += 1
+            
+            if dept_performance:
+                dept_df = pd.DataFrame([
+                    {"Department": k, "Total": v["total"], "Closed": v["closed"],
+                     "Resolution Rate": f"{round((v['closed']/v['total'])*100)}%" if v['total'] > 0 else "0%"}
+                    for k, v in dept_performance.items()
+                ]).sort_values("Total", ascending=False)
+                st.dataframe(dept_df, use_container_width=True, hide_index=True)
+            
+            # AI INSIGHTS
+            st.markdown("---")
+            st.markdown("#### 🤖 AI Insights")
+            overdue = 0
+            if "sla_deadline" in df.columns:
+                now = datetime.now()
+                for _, r in df.iterrows():
+                    try:
+                        if pd.to_datetime(r["sla_deadline"]) < now and r.get("status") not in ["closed","rejected"]:
+                            overdue += 1
+                    except: pass
+            
             c1, c2 = st.columns(2)
             with c1:
-                st.markdown("#### 🔥 Top Issues")
-                if "category" in df.columns:
-                    for cat, count in df["category"].value_counts().head(5).items():
-                        st.markdown(f"- **{cat}**: {count} tickets")
-            with c2:
-                st.markdown("#### 🤖 AI Insights")
-                overdue = 0
-                if "sla_deadline" in df.columns:
-                    now = datetime.now()
-                    for _, r in df.iterrows():
-                        try:
-                            if pd.to_datetime(r["sla_deadline"]) < now and r.get("status") not in ["closed","rejected"]:
-                                overdue += 1
-                        except: pass
-                
                 if overdue > 0:
-                    st.error(f"🔴 {overdue} tickets past SLA deadline - immediate action required")
-                
+                    st.error(f"🔴 {overdue} tickets past SLA deadline")
                 if open_count > 0:
-                    st.warning(f"📋 {open_count} open tickets pending assignment")
-                
+                    st.warning(f"📋 {open_count} open tickets pending")
                 if avg_resolution > 4:
-                    st.info(f"⏱️ Average resolution time ({avg_resolution:.1f}h) exceeds 4-hour target")
+                    st.info(f"⏱️ Avg resolution ({avg_display}) exceeds 4h target")
                 else:
-                    st.success(f"✅ Average resolution time ({avg_resolution:.1f}h) within 4-hour target")
-                
+                    st.success(f"✅ Avg resolution ({avg_display}) within target")
+            with c2:
                 if "category" in df.columns and len(df["category"].value_counts()) > 0:
                     top_cat = df["category"].value_counts().index[0]
-                    st.info(f"📈 Most reported: **{top_cat}** - consider preventive maintenance")
+                    st.info(f"📈 Most reported: **{top_cat}**")
+                if rate >= 80:
+                    st.success(f"✅ Resolution rate {rate}% meets target")
+                else:
+                    st.warning(f"⚠️ Resolution rate {rate}% below 80% target")
         else:
             st.info("No ticket data available for analytics")
     
@@ -1832,34 +1895,35 @@ def page_helpdesk_queue():
             if all_tickets:
                 df = pd.DataFrame(all_tickets)
                 
-                # METRICS
                 total = len(df)
                 open_count = len(df[df["status"]=="open"]) if "status" in df.columns else 0
                 in_progress = len(df[df["status"]=="in_progress"]) if "status" in df.columns else 0
                 hold_count = len(df[df["status"]=="hold"]) if "status" in df.columns else 0
                 closed_count = len(df[df["status"]=="closed"]) if "status" in df.columns else 0
-                rejected_count = len(df[df["status"]=="rejected"]) if "status" in df.columns else 0
                 
-                # Avg resolution
                 resolution_times = []
                 if "created_at" in df.columns and "closed_at" in df.columns:
                     for _, r in df.iterrows():
                         try:
-                            if r.get("closed_at") and str(r.get("closed_at")) != "None":
+                            closed_val = r.get("closed_at")
+                            if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" and str(closed_val) != "":
                                 created = pd.to_datetime(r["created_at"])
-                                closed = pd.to_datetime(r["closed_at"])
-                                resolution_times.append((closed - created).total_seconds() / 3600)
+                                closed = pd.to_datetime(closed_val)
+                                hrs = (closed - created).total_seconds() / 3600
+                                if hrs > 0:
+                                    resolution_times.append(hrs)
                         except: pass
-                avg_resolution = sum(resolution_times) / len(resolution_times) if resolution_times else 0
+                avg_resolution = round(sum(resolution_times) / len(resolution_times), 1) if resolution_times else 0
+                avg_display = f"{avg_resolution}h" if avg_resolution > 0 else "N/A"
                 
-                # SLA
                 sla_met = 0
                 sla_exceeded = 0
                 if "sla_deadline" in df.columns and "closed_at" in df.columns:
                     for _, r in df.iterrows():
                         try:
-                            if r.get("closed_at") and r.get("sla_deadline") and str(r.get("closed_at")) != "None":
-                                if pd.to_datetime(r["closed_at"]) <= pd.to_datetime(r["sla_deadline"]):
+                            closed_val = r.get("closed_at")
+                            if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" and r.get("sla_deadline"):
+                                if pd.to_datetime(closed_val) <= pd.to_datetime(r["sla_deadline"]):
                                     sla_met += 1
                                 else:
                                     sla_exceeded += 1
@@ -1867,72 +1931,67 @@ def page_helpdesk_queue():
                 
                 st.success(f"✅ Report generated for {rpt_month} {rpt_year} — {total} tickets")
                 
-                # KPI CARDS
                 c1, c2, c3, c4, c5, c6 = st.columns(6)
                 with c1: st.metric("📋 Total", total)
                 with c2: st.metric("🔴 Open", open_count)
                 with c3: st.metric("🟡 In Progress", in_progress)
                 with c4: st.metric("⏸️ Hold", hold_count)
                 with c5: st.metric("🟢 Closed", closed_count)
-                with c6: st.metric("⏱️ Avg Resolution", f"{avg_resolution:.1f}h")
+                with c6: st.metric("⏱️ Avg Resolution", avg_display)
                 
-                # SLA CARDS
                 c1, c2 = st.columns(2)
                 with c1: st.metric("✅ SLA Met", sla_met)
                 with c2: st.metric("⚠️ SLA Exceeded", sla_exceeded)
                 
                 st.markdown("---")
-                
-                # DETAILED TABLE
                 st.markdown("### 📋 Detailed Ticket Report")
                 
-                def safe_text(text):
-                    if not text or str(text) == "None": return "—"
-                    return str(text).replace('\u2014','-').replace('\u2019',"'").replace('\u2013','-')
-                
-                # Build enriched table
                 table_data = []
                 for _, r in df.iterrows():
-                    created = str(r.get('created_at',''))[:16] if r.get('created_at') else "—"
-                    closed = str(r.get('closed_at',''))[:16] if r.get('closed_at') and str(r.get('closed_at')) != 'None' else "Pending"
+                    created = str(r.get('created_at',''))[:16] if r.get('created_at') and str(r.get('created_at')) != "None" else "—"
+                    closed_val = r.get('closed_at')
+                    closed = str(closed_val)[:16] if closed_val and str(closed_val) != "None" and str(closed_val) != "nan" else "Pending"
                     
-                    # Calculate ticket age
                     age_str = "—"
-                    if r.get('created_at'):
+                    if r.get('created_at') and str(r.get('created_at')) != "None" and str(r.get('created_at')) != "nan":
                         try:
-                            age = datetime.now() - pd.to_datetime(r['created_at'])
+                            created_dt = pd.to_datetime(r['created_at'])
+                            if r.get('closed_at') and str(r.get('closed_at')) != "None" and str(r.get('closed_at')) != "nan":
+                                end_dt = pd.to_datetime(r['closed_at'])
+                            else:
+                                end_dt = datetime.now()
+                            age = end_dt - created_dt
                             age_str = f"{age.days}d {age.seconds//3600}h"
                         except: pass
                     
-                    # SLA status
                     sla_status = "—"
-                    if r.get('sla_deadline'):
+                    if r.get('sla_deadline') and str(r.get('sla_deadline')) != "None":
                         try:
-                            if r.get('closed_at') and str(r.get('closed_at')) != 'None':
+                            if r.get('closed_at') and str(r.get('closed_at')) != "None" and str(r.get('closed_at')) != "nan":
                                 if pd.to_datetime(r['closed_at']) <= pd.to_datetime(r['sla_deadline']):
-                                    sla_status = "✅ Met"
+                                    sla_status = "Met"
                                 else:
-                                    sla_status = "⚠️ Exceeded"
+                                    sla_status = "Exceeded"
                             elif datetime.now() > pd.to_datetime(r['sla_deadline']):
-                                sla_status = "🔴 Overdue"
+                                sla_status = "Overdue"
                             else:
-                                sla_status = "🟢 Active"
+                                sla_status = "Active"
                         except: pass
                     
                     table_data.append({
                         "SNo": len(table_data) + 1,
                         "DateTime": created,
-                        "Ticket No": safe_text(r.get('ticket_number','')),
-                        "Location": safe_text(r.get('location_building','')),
-                        "Category": safe_text(r.get('category','')),
-                        "Title": safe_text(r.get('title',''))[:50],
-                        "Raised By": safe_text(r.get('requester_name','')),
-                        "Priority": safe_text(r.get('priority','')),
-                        "Status": safe_text(r.get('status','')).upper(),
-                        "Ticket Age": age_str,
+                        "Ticket No": safe_text(r.get('ticket_number',''),"—"),
+                        "Location": safe_text(r.get('location_building',''),"—"),
+                        "Category": safe_text(r.get('category',''),"—"),
+                        "Title": safe_text(r.get('title',''),"—")[:50],
+                        "Raised By": safe_text(r.get('requester_name',''),"—"),
+                        "Priority": safe_text(r.get('priority',''),"—"),
+                        "Status": safe_text(r.get('status',''),"—").upper(),
+                        "Age": age_str,
                         "SLA": sla_status,
                         "Closed": closed,
-                        "Level": f"L{r.get('escalation_level',1)}"
+                        "Level": f"L{safe_text(r.get('escalation_level',1),'1')}"
                     })
                 
                 report_df = pd.DataFrame(table_data)
@@ -1944,52 +2003,46 @@ def page_helpdesk_queue():
                 logo_b64 = get_logo_base64()
                 logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
                 
-                # HTML REPORT
+                # HTML
                 html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
                     body{{font-family:Arial;margin:25px;color:#1a1a1a;font-size:11px}}
-                    .header{{background:linear-gradient(105deg,#1a1a1a,#2a2a2a);color:white;padding:20px;border-radius:10px;display:flex;align-items:center;gap:15px;margin-bottom:20px}}
-                    .header h1{{margin:0;font-size:20px}}
-                    .kpi-row{{display:flex;gap:10px;margin:15px 0}}
-                    .kpi{{flex:1;background:#f5f5f5;border-radius:8px;padding:10px;text-align:center;border-left:4px solid #CC0000}}
+                    .header{{background:#1a1a1a;color:white;padding:18px 20px;border-radius:10px;display:flex;align-items:center;gap:15px;margin-bottom:20px}}
+                    .header h1{{margin:0;font-size:19px}}
+                    .kpi-row{{display:flex;gap:8px;margin:15px 0;flex-wrap:wrap}}
+                    .kpi{{flex:1;min-width:100px;background:#f5f5f5;border-radius:8px;padding:10px;text-align:center;border-left:4px solid #CC0000}}
                     .kpi.green{{border-left-color:#10B981}}.kpi.orange{{border-left-color:#F59E0B}}
-                    .kpi-val{{font-size:24px;font-weight:bold;color:#CC0000}}.kpi-label{{font-size:9px;color:#666}}
+                    .kpi-val{{font-size:22px;font-weight:bold;color:#CC0000}}.kpi-label{{font-size:9px;color:#666}}
                     table{{width:100%;border-collapse:collapse;font-size:10px;margin:15px 0}}
-                    th{{background:#CC0000;color:white;padding:8px 5px;text-align:left;font-size:9px}}
-                    td{{padding:5px;border-bottom:1px solid #ddd}}
+                    th{{background:#CC0000;color:white;padding:7px 5px;text-align:left;font-size:8px}}
+                    td{{padding:4px 5px;border-bottom:1px solid #ddd}}
                     tr:nth-child(even){{background:#fafafa}}
                     .footer{{margin-top:25px;font-size:9px;color:#999;text-align:center;border-top:1px solid #ddd;padding-top:12px}}
-                    .badge-open{{color:#EF4444;font-weight:bold}}
-                    .badge-closed{{color:#10B981;font-weight:bold}}
-                    .sla-met{{color:#10B981}}.sla-exceeded{{color:#EF4444}}
                 </style></head><body>
-                <div class="header">{logo_html}<div><h1>Helpdesk Analytics Report</h1><p style="margin:3px 0 0 0;font-size:10px;opacity:0.8">{safe_text(info.get('full_name',fc))} | {rpt_month} {rpt_year} | Generated: {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p></div></div>
+                <div class="header">{logo_html}<div><h1>Helpdesk Analytics Report</h1><p style="margin:3px 0 0 0;font-size:10px;opacity:0.8">{safe_text(info.get('full_name',fc))} | {rpt_month} {rpt_year} | {datetime.now().strftime('%d %B %Y, %I:%M %p WAT')}</p></div></div>
                 <div class="kpi-row">
-                    <div class="kpi"><div class="kpi-val">{total}</div><div class="kpi-label">Total Tickets</div></div>
+                    <div class="kpi"><div class="kpi-val">{total}</div><div class="kpi-label">Total</div></div>
                     <div class="kpi"><div class="kpi-val">{open_count}</div><div class="kpi-label">Open</div></div>
                     <div class="kpi orange"><div class="kpi-val">{in_progress}</div><div class="kpi-label">In Progress</div></div>
                     <div class="kpi green"><div class="kpi-val">{closed_count}</div><div class="kpi-label">Closed</div></div>
                     <div class="kpi"><div class="kpi-val">{sla_met}</div><div class="kpi-label">SLA Met</div></div>
-                    <div class="kpi"><div class="kpi-val">{avg_resolution:.1f}h</div><div class="kpi-label">Avg Resolution</div></div>
+                    <div class="kpi"><div class="kpi-val">{avg_display}</div><div class="kpi-label">Avg Resolution</div></div>
                 </div>
                 <h2>Detailed Ticket Report</h2>
-                <table><tr><th>SNo</th><th>Date/Time</th><th>Ticket No</th><th>Location</th><th>Category</th><th>Title</th><th>Raised By</th><th>Priority</th><th>Status</th><th>Age</th><th>SLA</th><th>Closed</th></tr>"""
+                <table><tr><th>#</th><th>DateTime</th><th>Ticket No</th><th>Location</th><th>Category</th><th>Title</th><th>Raised By</th><th>Priority</th><th>Status</th><th>Age</th><th>SLA</th><th>Closed</th><th>Lvl</th></tr>"""
                 
                 for _, r in report_df.iterrows():
-                    status_class = "badge-open" if r["Status"] in ["OPEN","IN_PROGRESS"] else "badge-closed" if r["Status"] == "CLOSED" else ""
-                    sla_class = "sla-met" if "Met" in str(r["SLA"]) else "sla-exceeded" if "Exceeded" in str(r["SLA"]) or "Overdue" in str(r["SLA"]) else ""
-                    html += f"<tr><td>{r['SNo']}</td><td>{r['DateTime']}</td><td>{r['Ticket No']}</td><td>{r['Location']}</td><td>{r['Category']}</td><td>{r['Title']}</td><td>{r['Raised By']}</td><td>{r['Priority']}</td><td class='{status_class}'>{r['Status']}</td><td>{r['Ticket Age']}</td><td class='{sla_class}'>{r['SLA']}</td><td>{r['Closed']}</td></tr>"
+                    html += f"<tr><td>{r['SNo']}</td><td>{r['DateTime']}</td><td>{r['Ticket No']}</td><td>{r['Location']}</td><td>{r['Category']}</td><td>{r['Title']}</td><td>{r['Raised By']}</td><td>{r['Priority']}</td><td>{r['Status']}</td><td>{r['Age']}</td><td>{r['SLA']}</td><td>{r['Closed']}</td><td>{r['Level']}</td></tr>"
                 
-                html += f"</table><div class='footer'><p>Churchgate Group | facilityXperience Enterprise | Confidential</p><p>Auto-generated on {datetime.now().strftime('%d %B %Y at %I:%M %p WAT')}</p></div></body></html>"
+                html += f"</table><div class='footer'><p>Churchgate Group | facilityXperience Enterprise | Confidential</p></div></body></html>"
                 
-                # Preview
                 with st.expander("🌐 HTML Report Preview", expanded=True):
                     st.components.v1.html(html, height=500, scrolling=True)
                 
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    st.download_button("📥 Download HTML", html, f"helpdesk_{rpt_month}_{rpt_year}.html", "text/html", use_container_width=True)
+                    st.download_button("📥 HTML", html, f"helpdesk_{rpt_month}_{rpt_year}.html", "text/html", use_container_width=True)
                 with c2:
-                    st.download_button("📥 Download CSV", df.to_csv(index=False), f"helpdesk_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
+                    st.download_button("📥 CSV", df.to_csv(index=False), f"helpdesk_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
                 with c3:
                     try:
                         from fpdf import FPDF
@@ -2021,8 +2074,7 @@ def page_helpdesk_queue():
                         pdf.alias_nb_pages()
                         pdf.add_page()
                         
-                        # KPIs
-                        kpis = [("Total",str(total),204,0,0),("Open",str(open_count),239,68,68),("In Progress",str(in_progress),245,158,11),("Closed",str(closed_count),16,185,129),("Avg Resolution",f"{avg_resolution:.1f}h",37,99,235)]
+                        kpis = [("Total",str(total),204,0,0),("Open",str(open_count),239,68,68),("In Prog",str(in_progress),245,158,11),("Closed",str(closed_count),16,185,129),("Avg Res",avg_display,37,99,235)]
                         xs,ys = pdf.get_x(),pdf.get_y()
                         for i,(l,v,r,g,b) in enumerate(kpis):
                             x = xs + (i*55)
@@ -2042,12 +2094,11 @@ def page_helpdesk_queue():
                         pdf.set_y(ys+20)
                         pdf.ln(4)
                         
-                        # Table
                         pdf.set_font('Helvetica','B',6)
                         pdf.set_fill_color(204,0,0)
                         pdf.set_text_color(255,255,255)
-                        cw = [8,25,28,25,25,30,22,16,18,16,18,22]
-                        headers = ['#','Date','Ticket','Location','Category','Title','Raised By','Priority','Status','Age','SLA','Closed']
+                        cw = [8,22,26,22,22,28,20,14,14,16,14,18,12]
+                        headers = ['#','DateTime','Ticket','Location','Category','Title','By','Priority','Status','Age','SLA','Closed','Lvl']
                         for h,w in zip(headers,cw):
                             pdf.cell(w,5.5,f' {h}',1,0,'L',True)
                         pdf.ln()
@@ -2055,21 +2106,30 @@ def page_helpdesk_queue():
                         pdf.set_text_color(26,26,26)
                         for _,r in report_df.head(40).iterrows():
                             vals = [
-                                str(r['SNo']),str(r['DateTime'])[:12],str(r['Ticket No'])[:14],
-                                str(r['Location'])[:12],str(r['Category'])[:12],str(r['Title'])[:15],
-                                str(r['Raised By'])[:10],str(r['Priority'])[:8],str(r['Status'])[:8],
-                                str(r['Ticket Age'])[:9],str(r['SLA'])[:8],str(r['Closed'])[:10]
+                                safe_text(str(r['SNo']),'')[0:3],
+                                safe_text(str(r['DateTime']),'')[0:11],
+                                safe_text(str(r['Ticket No']),'')[0:13],
+                                safe_text(str(r['Location']),'')[0:11],
+                                safe_text(str(r['Category']),'')[0:11],
+                                safe_text(str(r['Title']),'')[0:14],
+                                safe_text(str(r['Raised By']),'')[0:9],
+                                safe_text(str(r['Priority']),'')[0:7],
+                                safe_text(str(r['Status']),'')[0:7],
+                                safe_text(str(r['Age']),'')[0:8],
+                                safe_text(str(r['SLA']),'')[0:7],
+                                safe_text(str(r['Closed']),'')[0:9],
+                                safe_text(str(r['Level']),'')[0:4],
                             ]
                             for v,w in zip(vals,cw):
                                 pdf.cell(w,4.5,f' {v}',1,0)
                             pdf.ln()
                         
-                        pdf_file = f"/tmp/hd_full_{rpt_month}_{rpt_year}.pdf"
+                        pdf_file = f"/tmp/hd_{rpt_month}_{rpt_year}.pdf"
                         pdf.output(pdf_file)
                         with open(pdf_file,"rb") as f:
-                            st.download_button("📥 Download PDF",f.read(),f"helpdesk_{rpt_month}_{rpt_year}.pdf","application/pdf",use_container_width=True)
+                            st.download_button("📥 PDF",f.read(),f"helpdesk_{rpt_month}_{rpt_year}.pdf","application/pdf",use_container_width=True)
                     except Exception as e:
-                        st.error(f"PDF unavailable. Error: {str(e)[:60]}")
+                        st.error(f"PDF unavailable. Error: {str(e)[:80]}")
             else:
                 st.info("No data to report for this period")
     
