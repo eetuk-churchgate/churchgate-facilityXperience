@@ -3299,6 +3299,21 @@ def reset_password_page(token):
 def main():
     inject_css()
     
+    st.markdown("""
+    <style>
+        [data-testid="stSidebar"] {
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            width: 300px !important;
+            transform: none !important;
+        }
+        [data-testid="stSidebarContent"] {
+            display: block !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Initialize session state
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
