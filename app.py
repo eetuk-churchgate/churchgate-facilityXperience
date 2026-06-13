@@ -474,7 +474,18 @@ def page_cc():
         if wp:
             for w in wp:
                 s=w.get("status","pending")
-                with st.expander(f"{w.get('permit_number','')} — {w.get('title','')} — {s.upper()}"):
+                status_colors = {"approved":"#10B981","pending":"#F59E0B","rejected":"#EF4444","submitted":"#3B82F6"}
+                sc = status_colors.get(s,"#4a4a4a")
+                st.markdown(f"""
+                <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <b>{w.get('permit_number','')}</b>
+                        <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.7rem;font-weight:600;">{s.upper()}</span>
+                    </div>
+                    <div style="font-size:0.8rem;color:#666;margin-top:0.2rem;">{w.get('title','')[:80]}</div>
+                    <div style="font-size:0.65rem;color:#888;">👤 {w.get('raised_by_name','N/A')} | 📅 {w.get('start_datetime','')[:10]}</div>
+                </div>
+                """, unsafe_allow_html=True)
                     st.write(f"**Raised by:** {w.get('raised_by_name','')} | **Type:** {w.get('permit_type','')}")
                     if w.get("review_l1_name"):st.write(f"✅ L1: {w['review_l1_name']} at {w.get('review_l1_at','')}")
                     if w.get("review_l2_name"):st.write(f"✅ L2: {w['review_l2_name']} at {w.get('review_l2_at','')}")
