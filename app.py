@@ -1529,7 +1529,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
 
 # ============================================
 # HELPDESK — WORLD CLASS TICKET SYSTEM v2.0
-# COMPLETE MODULE (FIXED)
+# FINAL VERSION — GREY BUTTONS + COLLAPSIBLE LOCATIONS
 # ============================================
 
 def page_helpdesk_queue():
@@ -1597,7 +1597,6 @@ def page_helpdesk_queue():
             
             st.markdown("---")
             
-            # Track which ticket detail is open
             if "open_ticket_detail" not in st.session_state:
                 st.session_state.open_ticket_detail = None
             
@@ -1624,7 +1623,7 @@ def page_helpdesk_queue():
                     with c1:
                         new_comment = st.text_input("Quick Note", key=f"cmt_{row['id']}", placeholder="Add progress note...")
                     with c2:
-                        btn_label = "🔼 Hide Details" if is_open else "📋 View Details"
+                        btn_label = "🔼 Hide" if is_open else "📋 Details"
                         if st.button(btn_label, key=f"vdet_{row['id']}", use_container_width=True):
                             if is_open:
                                 st.session_state.open_ticket_detail = None
@@ -1632,7 +1631,6 @@ def page_helpdesk_queue():
                                 st.session_state.open_ticket_detail = ticket_id
                             st.rerun()
                     
-                    # SHOW DETAILS RIGHT HERE IF OPEN
                     if is_open:
                         with st.container():
                             st.markdown(f"""<div style="background:#f9fafb;border-radius:10px;padding:1rem;margin:0.5rem 0;border:1px solid #e5e7eb;"><h4 style="margin:0;">{row.get('title','')}</h4><p style="color:#666;font-size:0.8rem;"><b>Ticket:</b> {row.get('ticket_number','')} | <b>Status:</b> {status.upper()} | <b>Level:</b> L{row.get('escalation_level',1)}</p><p style="font-size:0.8rem;"><b>Raised by:</b> {row.get('requester_name','N/A')} | <b>Category:</b> {row.get('category','')} | <b>Priority:</b> {row.get('priority','')}</p><p style="font-size:0.8rem;"><b>Location:</b> {row.get('location_building','')}</p><p style="font-size:0.8rem;"><b>Description:</b> {row.get('description','')}</p><p style="font-size:0.75rem;color:#888;"><b>SLA:</b> {format_wat_time(row.get('sla_deadline',''))}</p></div>""", unsafe_allow_html=True)
@@ -1662,7 +1660,7 @@ def page_helpdesk_queue():
                                     if st.button("✅ Close", key=f"det_close_{ticket_id}", use_container_width=True):
                                         DB.update("tickets", ticket_id, {"status": "closed", "closed_at": datetime.now().isoformat()})
                                         if row.get("requester_email"):
-                                            send_email_notification(row["requester_email"], f"✅ Ticket {row.get('ticket_number','')} Resolved", f"<h3>Ticket Resolved</h3><p>Please rate your experience.</p>")
+                                            send_email_notification(row["requester_email"], f"✅ Ticket {row.get('ticket_number','')} Resolved", f"<h3>Ticket Resolved</h3>")
                                         st.success("✅ Closed!")
                                         st.rerun()
                                 
@@ -1798,7 +1796,7 @@ def page_helpdesk_queue():
                             with c2: st.number_input(f"Time", min_value=0, value=30 if level<=2 else 60 if level==3 else 1440, key=f"esc_t_{level}_{cat_id}")
                             with c3: st.selectbox(f"Unit", ["Mins","Hours","Days"], key=f"esc_ty_{level}_{cat_id}")
                             st.markdown("---")
-                        if st.form_submit_button("💾 Save", use_container_width=True, type="primary"):
+                        if st.form_submit_button("💾 Save", use_container_width=True):
                             for level in range(1, 7):
                                 time_val = st.session_state.get(f"esc_t_{level}_{cat_id}", 30)
                                 time_type = st.session_state.get(f"esc_ty_{level}_{cat_id}", "Mins")
@@ -1823,40 +1821,51 @@ def page_helpdesk_queue():
         else:
             st.markdown("### ⚙️ Helpdesk Settings")
             sett_tabs = st.tabs(["📍 Locations", "🏷️ Categories", "📊 Status"])
+            
             with sett_tabs[0]:
-                st.markdown("**Manage Locations**")
+                st.markdown("**📍 Manage Locations**")
                 locs = DB.get_locations(fc)
                 if locs:
                     for l in locs:
-                        st.markdown(f"**{l.get('location_name','')}** ({l.get('location_code','')})")
-                        subs = DB.get_sub_locations(l["id"])
-                        if subs:
-                            for s in subs:
-                                st.caption(f"  └ {s.get('sub_location_name','')}")
+                        with st.expander(f"📍 {l.get('location_name','')} ({l.get('location_code','')})"):
+                            subs = DB.get_sub_locations(l["id"])
+                            if subs:
+                                for s in subs:
+                                    st.caption(f"└ {s.get('sub_location_name','')}")
+                            else:
+                                st.caption("No sub-locations")
                 st.markdown("---")
-                with st.form("add_loc"):
+                with st.form("add_loc_form"):
                     c1, c2 = st.columns(2)
-                    with c1: new_loc_code = st.text_input("Location Code"); new_loc_name = st.text_input("Location Name")
-                    with c2: parent_loc = st.selectbox("Parent", ["None"]+[l.get("location_code","") for l in locs]) if locs else st.selectbox("Parent",["None"]); new_sub_name = st.text_input("Sub-Location Name")
-                    if st.form_submit_button("➕ Add"):
+                    with c1: 
+                        new_loc_code = st.text_input("Location Code", key="loc_code")
+                        new_loc_name = st.text_input("Location Name", key="loc_name")
+                    with c2: 
+                        parent_loc = st.selectbox("Parent Location", ["None"] + [l.get("location_code","") for l in locs]) if locs else st.selectbox("Parent", ["None"])
+                        new_sub_name = st.text_input("Sub-Location Name", key="sub_name")
+                    if st.form_submit_button("➕ Add Location"):
                         if new_loc_code and new_loc_name:
                             supabase.table("helpdesk_locations").insert({"facility_code":fc,"location_code":new_loc_code,"location_name":new_loc_name}).execute()
-                            st.success("Added!"); st.rerun()
+                            st.success("✅ Added!")
+                            st.rerun()
+            
             with sett_tabs[1]:
-                st.markdown("**Manage Categories**")
+                st.markdown("**🏷️ Manage Categories**")
                 for c in categories:
-                    st.markdown(f"- **{c.get('category_name','')}** — {c.get('department','')} ({c.get('sla_hours','4')}hrs)")
-                with st.form("add_cat"):
+                    st.markdown(f"- **{c.get('category_name','')}** — {c.get('department','')} (SLA: {c.get('sla_hours','4')}hrs)")
+                with st.form("add_cat_form"):
                     c1, c2, c3 = st.columns(3)
-                    with c1: new_cat = st.text_input("Category Name")
-                    with c2: new_dept = st.selectbox("Department", dept_list)
-                    with c3: new_sla = st.number_input("SLA Hours", 1, 72, 4)
-                    if st.form_submit_button("➕ Add"):
+                    with c1: new_cat = st.text_input("Category Name", key="cat_name")
+                    with c2: new_dept = st.selectbox("Department", dept_list, key="cat_dept")
+                    with c3: new_sla = st.number_input("SLA Hours", 1, 72, 4, key="cat_sla")
+                    if st.form_submit_button("➕ Add Category"):
                         if new_cat:
                             supabase.table("helpdesk_categories").insert({"department":new_dept,"category_name":new_cat,"sla_hours":new_sla}).execute()
-                            st.success("Added!"); st.rerun()
+                            st.success("✅ Added!")
+                            st.rerun()
+            
             with sett_tabs[2]:
-                st.markdown("**Custom Statuses**")
+                st.markdown("**📊 Custom Statuses**")
                 st.info("Default: Open, In Progress, Hold, Closed, Rejected")
 
 # ============================================
