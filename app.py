@@ -267,6 +267,23 @@ def get_nav_logo():
     # Fallback if logo missing
     return '<span style="font-weight:800;color:white;font-size:1rem;display:inline-block;vertical-align:middle;">CHURCHGATE</span>'
 
+
+def safe_text(text, default="N/A"):
+    """Remove unicode characters that break PDFs"""
+    if not text or str(text) == "None" or str(text) == "nan":
+        return default
+    replacements = {
+        '\u2014': '-', '\u2013': '-', '\u2019': "'", '\u2018': "'",
+        '\u201c': '"', '\u201d': '"', '\u2026': '...', '\u00a0': ' ',
+        '\u2012': '-', '\u2015': '-'
+    }
+    result = str(text)
+    for k, v in replacements.items():
+        result = result.replace(k, v)
+    return result
+
+def get_logo_base64():
+
 def get_logo_base64():
     """Convert churchgate-logo.png to base64 for embedding in reports"""
     p = Path("churchgate-logo.png")
