@@ -1715,7 +1715,10 @@ def page_helpdesk_queue():
             with c2:
                 if "status" in df.columns:
                     st_counts = df["status"].value_counts()
-                    fig2 = px.pie(values=st_counts.values, names=st_counts.index, title="Status Distribution", color_discrete_sequence=["#EF4444","#F59E0B","#3B82F6","#10B981","#6B7280"])
+                    colors = {"open":"#EF4444","in_progress":"#F59E0B","hold":"#3B82F6","closed":"#10B981","rejected":"#6B7280"}
+                    pie_colors = [colors.get(s,"#999") for s in st_counts.index]
+                    fig2 = px.pie(values=st_counts.values, names=st_counts.index, title="Status Distribution", color_discrete_sequence=pie_colors)
+
                     st.plotly_chart(fig2, use_container_width=True)
             
             if "created_at" in df.columns:
@@ -1763,6 +1766,45 @@ def page_helpdesk_queue():
                 st.components.v1.html(html, height=500, scrolling=True)
                 st.download_button("📥 HTML", html, f"helpdesk_{rpt_month}_{rpt_year}.html", "text/html", use_container_width=True)
                 st.download_button("📥 CSV", df.to_csv(index=False), f"helpdesk_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
+                
+                # PDF Download
+                try:
+                    from fpdf import FPDF
+                    pdf = FPDF('L', 'mm', 'A4')
+                    pdf.add_page()
+                    pdf.set_font('Helvetica', 'B', 16)
+                    pdf.set_text_color(204, 0, 0)
+                    pdf.cell(0, 10, f'Helpdesk Report - {rpt_month} {rpt_year}', 0, 1)
+                    pdf.set_font('Helvetica', '', 10)
+                    pdf.set_text_color(0, 0, 0)
+                    pdf.cell(0, 8, f'{info.get("full_name",fc)} | Generated: {datetime.now().strftime("%d %B %Y")}', 0, 1)
+                    pdf.ln(5)
+                    pdf.set_font('Helvetica', 'B', 9)
+                    pdf.set_fill_color(204, 0, 0)
+                    pdf.set_text_color(255, 255, 255)
+                    pdf.cell(45, 7, ' Ticket No', 1, 0, 'L', True)
+                    pdf.cell(60, 7, ' Title', 1, 0, 'L', True)
+                    pdf.cell(45, 7, ' Category', 1, 0, 'L', True)
+                    pdf.cell(25, 7, ' Status', 1, 0, 'L', True)
+                    pdf.cell(35, 7, ' Raised By', 1, 0, 'L', True)
+                    pdf.cell(30, 7, ' Opened', 1, 0, 'L', True)
+                    pdf.cell(30, 7, ' Closed', 1, 1, 'L', True)
+                    pdf.set_font('Helvetica', '', 8)
+                    pdf.set_text_color(0, 0, 0)
+                    for _, r in df.head(50).iterrows():
+                        pdf.cell(45, 6, f' {r.get("ticket_number","")[:20]}', 1, 0)
+                        pdf.cell(60, 6, f' {r.get("title","")[:30]}', 1, 0)
+                        pdf.cell(45, 6, f' {r.get("category","")[:22]}', 1, 0)
+                        pdf.cell(25, 6, f' {r.get("status","")[:12]}', 1, 0)
+                        pdf.cell(35, 6, f' {r.get("requester_name","")[:16]}', 1, 0)
+                        pdf.cell(30, 6, f' {r.get("created_at","")[:10]}', 1, 0)
+                        pdf.cell(30, 6, f' {r.get("closed_at","")[:10] if r.get("closed_at") else "N/A"}', 1, 1)
+                    pdf_file = f"/tmp/helpdesk_{rpt_month}_{rpt_year}.pdf"
+                    pdf.output(pdf_file)
+                    with open(pdf_file, "rb") as f:
+                        st.download_button("📥 PDF", f.read(), f"helpdesk_{rpt_month}_{rpt_year}.pdf", "application/pdf", use_container_width=True)
+                except:
+                    pass
             else:
                 st.info("No data")
     
