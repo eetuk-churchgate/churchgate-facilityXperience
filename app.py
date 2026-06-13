@@ -3363,18 +3363,6 @@ def reset_password_page(token):
 def main():
     inject_css()
     
-    st.components.v1.html("""
-    <button class="fx-sidebar-toggle" onclick="
-        var sidebar = parent.document.querySelector('[data-testid=\"stSidebar\"]');
-        if(sidebar) {
-            sidebar.style.display = 'block';
-            sidebar.style.visibility = 'visible';
-            sidebar.style.opacity = '1';
-            sidebar.style.width = '300px';
-            sidebar.style.transform = 'translateX(0)';
-        }
-    ">☰ SIDEBAR</button>
-    """, height=0)
     
     # Initialize session state
     if "authenticated" not in st.session_state:
@@ -3434,6 +3422,22 @@ def main():
     check_auto_escalation(fc)
     
     topnav()
+    
+    col1, col2 = st.columns([0.05, 0.95])
+    with col1:
+        if st.button("☰", key="sidebar_toggle_btn", help="Toggle Sidebar"):
+            st.markdown("""
+            <script>
+                var sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
+                if(sidebar) {
+                    sidebar.style.display = 'block';
+                    sidebar.style.visibility = 'visible';
+                    sidebar.style.opacity = '1';
+                    sidebar.style.width = '300px';
+                }
+            </script>
+            """, unsafe_allow_html=True)
+            st.rerun()
     
     # Greeting
     user = st.session_state.get("user", {})
