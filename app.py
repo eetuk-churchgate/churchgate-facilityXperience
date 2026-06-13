@@ -106,6 +106,19 @@ def inject_css():
         [data-testid="collapsedControl"] {{ position:fixed !important; top:80px !important; left:0 !important; z-index:99999 !important; background:#CC0000 !important; border-radius:0 8px 8px 0 !important; padding:8px 5px !important; box-shadow:0 2px 10px rgba(204,0,0,0.4) !important; cursor:pointer !important; width:28px !important; height:50px !important; display:flex !important; align-items:center !important; justify-content:center !important; opacity:1 !important; visibility:visible !important; }}
         [data-testid="collapsedControl"]:hover {{ background:#aa0000 !important; box-shadow:0 4px 20px rgba(204,0,0,0.6) !important; }}
         [data-testid="collapsedControl"] svg {{ fill:white !important; width:16px !important; height:16px !important; }}
+        button[kind="header"] {{
+            position: fixed !important;
+            top: 10px !important;
+            left: 10px !important;
+            z-index: 99999 !important;
+            background: #CC0000 !important;
+            color: white !important;
+            border-radius: 6px !important;
+            padding: 8px 12px !important;
+            font-size: 1.2rem !important;
+            border: none !important;
+            cursor: pointer !important;
+        }}
         .fx-topnav {{ background:linear-gradient(105deg,{CHURCHGATE_DARK},#2a2a2a,{CHURCHGATE_DARK}); padding:0.5rem 1.5rem; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:9998; border-bottom:2px solid {CHURCHGATE_RED}; }}
         .fx-brand {{ font-size:1.05rem; font-weight:700; color:white; }} .fx-brand span {{ color:{CHURCHGATE_RED}; font-weight:800; }}
         .churchgate-header {{ background:white; padding:1.5rem; border-radius:8px; margin-bottom:1rem; border-left:4px solid {CHURCHGATE_RED}; box-shadow:0 1px 3px rgba(0,0,0,0.06); }}
@@ -3329,34 +3342,6 @@ def reset_password_page(token):
 
 def main():
     inject_css()
-    
-    st.markdown("""
-    <style>
-        [data-testid="stSidebar"] {
-            display: block !important;
-            visibility: visible !important;
-            opacity: 1 !important;
-            width: 300px !important;
-            transform: none !important;
-        }
-        [data-testid="stSidebarContent"] {
-            display: block !important;
-        }
-    </style>
-    <script>
-        setInterval(function() {
-            var sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
-            if (sidebar) {
-                sidebar.style.display = 'block';
-                sidebar.style.visibility = 'visible';
-                sidebar.style.opacity = '1';
-                sidebar.style.width = '300px';
-                sidebar.style.transform = 'none';
-            }
-        }, 500);
-    </script>
-    """, unsafe_allow_html=True)
-
     
     # Initialize session state
     if "authenticated" not in st.session_state:
