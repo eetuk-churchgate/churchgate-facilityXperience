@@ -3312,7 +3312,20 @@ def main():
             display: block !important;
         }
     </style>
+    <script>
+        setInterval(function() {
+            var sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
+            if (sidebar) {
+                sidebar.style.display = 'block';
+                sidebar.style.visibility = 'visible';
+                sidebar.style.opacity = '1';
+                sidebar.style.width = '300px';
+                sidebar.style.transform = 'none';
+            }
+        }, 500);
+    </script>
     """, unsafe_allow_html=True)
+
     
     # Initialize session state
     if "authenticated" not in st.session_state:
