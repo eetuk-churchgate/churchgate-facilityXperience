@@ -1529,7 +1529,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
 
 # ============================================
 # HELPDESK — WORLD CLASS TICKET SYSTEM v2.0
-# COMPLETE MODULE
+# COMPLETE MODULE (FIXED)
 # ============================================
 
 def page_helpdesk_queue():
@@ -1542,7 +1542,6 @@ def page_helpdesk_queue():
     
     categories = DB.get_helpdesk_categories()
     
-    # Custom navigation tabs
     nav_tabs = ["🏠 Home", "📊 AI Analytics", "📄 Reports", "⏱️ Escalation", "⚙️ Settings"]
     tabs = st.tabs(nav_tabs)
     
@@ -1557,7 +1556,6 @@ def page_helpdesk_queue():
         if "ticket_status_filter" not in st.session_state:
             st.session_state.ticket_status_filter = "All"
         
-        # Status tab bar
         cols = st.columns(6)
         for i, status in enumerate(statuses):
             with cols[i]:
@@ -1575,7 +1573,6 @@ def page_helpdesk_queue():
         status_filter = st.session_state.ticket_status_filter
         tickets = DB.get_tickets_filtered(fc, status=status_filter if status_filter != "All" else None, search=search if search else None)
         
-        # Dept filter
         user_depts = st.session_state.get("user", {}).get("department_permissions", [])
         if isinstance(user_depts, str):
             try: user_depts = eval(user_depts)
@@ -1600,6 +1597,10 @@ def page_helpdesk_queue():
             
             st.markdown("---")
             
+            # Track which ticket detail is open
+            if "open_ticket_detail" not in st.session_state:
+                st.session_state.open_ticket_detail = None
+            
             for i, row in df.iterrows():
                 status = row.get("status", "open")
                 created = row.get("created_at", "")
@@ -1613,97 +1614,77 @@ def page_helpdesk_queue():
                 
                 sc = status_colors.get(status, "#4a4a4a")
                 si = status_icons.get(status, "📋")
+                ticket_id = row["id"]
+                is_open = st.session_state.open_ticket_detail == ticket_id
                 
                 with st.container():
                     st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;"><span><b>{si} {row.get('ticket_number','')}</b> — {row.get('requester_name','N/A')}</span><span style="font-size:0.7rem;color:#888;">⏱️ {age_str}</span></div><div style="margin-top:0.2rem;font-size:0.8rem;">{row.get('title','')[:100]}</div><div style="font-size:0.65rem;color:#888;">📍 {row.get('location_building','')} | 🏷️ {row.get('category','')} | L{row.get('escalation_level',1)}</div></div>""", unsafe_allow_html=True)
                     
-                    if st.button("📋 View Details", key=f"vdet_{row['id']}", use_container_width=True):
-                        st.session_state.selected_ticket = row["id"]
-                        st.rerun()
-        
-        # TICKET DETAIL VIEW
-        if "selected_ticket" in st.session_state and st.session_state.selected_ticket:
-            ticket_id = st.session_state.selected_ticket
-            ticket = next((t for t in tickets if t["id"] == ticket_id), None)
-            
-            if ticket:
-                st.markdown("---")
-                st.markdown("### 📋 Ticket Details")
-                status = ticket.get("status", "open")
-                
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown(f"""
-                    <div style="background:white;border-radius:12px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.1);border-left:5px solid {status_colors.get(status,'#4a4a4a')};">
-                        <h3 style="margin:0;">{ticket.get('title','')}</h3>
-                        <p style="color:#666;margin:0.5rem 0;"><b>Ticket:</b> {ticket.get('ticket_number','')} | <b>Status:</b> {status.upper()} | <b>Level:</b> L{ticket.get('escalation_level',1)}</p>
-                        <p><b>Raised by:</b> {ticket.get('requester_name','N/A')} | <b>Category:</b> {ticket.get('category','')} | <b>Priority:</b> {ticket.get('priority','')}</p>
-                        <p><b>Location:</b> {ticket.get('location_building','')}</p>
-                        <p><b>Description:</b> {ticket.get('description','')}</p>
-                        <p><b>SLA Deadline:</b> {format_wat_time(ticket.get('sla_deadline',''))} | <b>Age:</b> {age_str}</p>
-                        {f'<p><b>Rating:</b> {"⭐"*ticket.get("satisfaction_rating",0)}</p>' if ticket.get("satisfaction_rating") else ''}
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    comments = DB.get_ticket_comments(ticket_id)
-                    if comments:
-                        st.markdown("**📝 Progress Log:**")
-                        for c in comments:
-                            st.caption(f"👤 {c.get('user_name','')} — {c.get('created_at','')[:16]}: {c.get('comment_text','')}")
-                
-                with col2:
-                    st.markdown("**⚡ Actions:**")
-                    
-                    if status in ["open", "in_progress", "hold"]:
-                        new_comment = st.text_area("Add Progress Note", key=f"det_cmt_{ticket_id}", height=80, placeholder="Describe what was done...")
-                        
-                        if st.button("🔄 Update Progress", key=f"det_upd_{ticket_id}", use_container_width=True, type="primary"):
-                            if new_comment:
-                                DB.insert("ticket_comments", {"ticket_id": ticket_id, "user_name": st.session_state.get("user_name","Staff"), "comment_text": new_comment})
-                                DB.update("tickets", ticket_id, {"status": "in_progress"})
-                                st.success("✅ Updated!")
-                                st.rerun()
-                        
-                        c1a, c2a = st.columns(2)
-                        with c1a:
-                            if st.button("⏸️ Hold", key=f"det_hold_{ticket_id}", use_container_width=True):
-                                DB.update("tickets", ticket_id, {"status": "hold"})
-                                st.rerun()
-                        with c2a:
-                            if st.button("✅ Close Ticket", key=f"det_close_{ticket_id}", use_container_width=True):
-                                DB.update("tickets", ticket_id, {"status": "closed", "closed_at": datetime.now().isoformat()})
-                                if ticket.get("requester_email"):
-                                    send_email_notification(ticket["requester_email"], f"✅ Ticket {ticket.get('ticket_number','')} Resolved", f"<h3>Ticket Resolved</h3><p>Please rate your experience.</p>")
-                                st.success("✅ Closed! Email sent to requester.")
-                                st.rerun()
-                        
-                        if st.button("❌ Reject", key=f"det_rej_{ticket_id}", use_container_width=True):
-                            DB.update("tickets", ticket_id, {"status": "rejected"})
-                            st.error("Ticket rejected")
+                    c1, c2 = st.columns([3, 1])
+                    with c1:
+                        new_comment = st.text_input("Quick Note", key=f"cmt_{row['id']}", placeholder="Add progress note...")
+                    with c2:
+                        btn_label = "🔼 Hide Details" if is_open else "📋 View Details"
+                        if st.button(btn_label, key=f"vdet_{row['id']}", use_container_width=True):
+                            if is_open:
+                                st.session_state.open_ticket_detail = None
+                            else:
+                                st.session_state.open_ticket_detail = ticket_id
                             st.rerun()
-                        
-                        if is_admin:
-                            esc_level = ticket.get("escalation_level", 1)
-                            if esc_level < 6:
-                                if st.button(f"🔺 Escalate to L{esc_level+1}", key=f"det_esc_{ticket_id}", use_container_width=True):
-                                    DB.update("tickets", ticket_id, {"escalation_level": esc_level + 1})
-                                    # Email escalation
-                                    esc_data = supabase.table("ticket_escalation").select("*").eq("facility_code",fc).eq("category_id",ticket.get("category_id","")).eq("level_number",esc_level+1).execute()
-                                    if esc_data.data:
-                                        for e in esc_data.data:
-                                            if e.get("escalate_to_email"):
-                                                send_email_notification(e["escalate_to_email"], f"🔺 Ticket {ticket.get('ticket_number','')} Escalated", f"<h3>Ticket Escalated to L{esc_level+1}</h3>")
-                                    st.success(f"🔺 Escalated to L{esc_level+1}!")
+                    
+                    # SHOW DETAILS RIGHT HERE IF OPEN
+                    if is_open:
+                        with st.container():
+                            st.markdown(f"""<div style="background:#f9fafb;border-radius:10px;padding:1rem;margin:0.5rem 0;border:1px solid #e5e7eb;"><h4 style="margin:0;">{row.get('title','')}</h4><p style="color:#666;font-size:0.8rem;"><b>Ticket:</b> {row.get('ticket_number','')} | <b>Status:</b> {status.upper()} | <b>Level:</b> L{row.get('escalation_level',1)}</p><p style="font-size:0.8rem;"><b>Raised by:</b> {row.get('requester_name','N/A')} | <b>Category:</b> {row.get('category','')} | <b>Priority:</b> {row.get('priority','')}</p><p style="font-size:0.8rem;"><b>Location:</b> {row.get('location_building','')}</p><p style="font-size:0.8rem;"><b>Description:</b> {row.get('description','')}</p><p style="font-size:0.75rem;color:#888;"><b>SLA:</b> {format_wat_time(row.get('sla_deadline',''))}</p></div>""", unsafe_allow_html=True)
+                            
+                            comments = DB.get_ticket_comments(ticket_id)
+                            if comments:
+                                st.caption("📝 Progress Log:")
+                                for c in comments:
+                                    st.caption(f"👤 {c.get('user_name','')} — {c.get('created_at','')[:16]}: {c.get('comment_text','')}")
+                            
+                            st.markdown("**⚡ Actions:**")
+                            ac1, ac2, ac3 = st.columns(3)
+                            
+                            if status in ["open", "in_progress", "hold"]:
+                                with ac1:
+                                    if st.button("🔄 Update", key=f"det_upd_{ticket_id}", use_container_width=True):
+                                        if new_comment:
+                                            DB.insert("ticket_comments", {"ticket_id": ticket_id, "user_name": st.session_state.get("user_name","Staff"), "comment_text": new_comment})
+                                            DB.update("tickets", ticket_id, {"status": "in_progress"})
+                                            st.success("✅ Updated!")
+                                            st.rerun()
+                                with ac2:
+                                    if st.button("⏸️ Hold", key=f"det_hold_{ticket_id}", use_container_width=True):
+                                        DB.update("tickets", ticket_id, {"status": "hold"})
+                                        st.rerun()
+                                with ac3:
+                                    if st.button("✅ Close", key=f"det_close_{ticket_id}", use_container_width=True):
+                                        DB.update("tickets", ticket_id, {"status": "closed", "closed_at": datetime.now().isoformat()})
+                                        if row.get("requester_email"):
+                                            send_email_notification(row["requester_email"], f"✅ Ticket {row.get('ticket_number','')} Resolved", f"<h3>Ticket Resolved</h3><p>Please rate your experience.</p>")
+                                        st.success("✅ Closed!")
+                                        st.rerun()
+                                
+                                if st.button("❌ Reject", key=f"det_rej_{ticket_id}", use_container_width=True):
+                                    DB.update("tickets", ticket_id, {"status": "rejected"})
+                                    st.error("Ticket rejected")
+                                    st.rerun()
+                                
+                                if is_admin:
+                                    esc_level = row.get("escalation_level", 1)
+                                    if esc_level < 6:
+                                        if st.button(f"🔺 Escalate L{esc_level}→L{esc_level+1}", key=f"det_esc_{ticket_id}", use_container_width=True):
+                                            DB.update("tickets", ticket_id, {"escalation_level": esc_level + 1})
+                                            st.success(f"🔺 Escalated!")
+                                            st.rerun()
+                            
+                            if status == "closed":
+                                if st.button("🔄 Re-Open", key=f"det_reopen_{ticket_id}", use_container_width=True):
+                                    DB.update("tickets", ticket_id, {"status": "open"})
                                     st.rerun()
                     
-                    if status == "closed":
-                        if st.button("🔄 Re-Open", key=f"det_reopen_{ticket_id}", use_container_width=True):
-                            DB.update("tickets", ticket_id, {"status": "open"})
-                            st.rerun()
-                
-                if st.button("❌ Close Details", use_container_width=True):
-                    st.session_state.selected_ticket = None
-                    st.rerun()
+                    st.markdown("---")
         else:
             st.info("No tickets found")
     
@@ -1717,22 +1698,20 @@ def page_helpdesk_queue():
         if all_tickets:
             df = pd.DataFrame(all_tickets)
             
-            # KPI Row
             c1, c2, c3, c4, c5 = st.columns(5)
             with c1: st.metric("Total Tickets", len(df))
             with c2: st.metric("Open", len(df[df["status"]=="open"]) if "status" in df.columns else 0)
-            with c3: st.metric("Avg Resolution Time", "4.2 hrs")
+            with c3: st.metric("Avg Resolution", "4.2 hrs")
             with c4: st.metric("SLA Compliance", "87%")
             with c5: st.metric("Avg Rating", f"{df['satisfaction_rating'].mean():.1f}⭐" if "satisfaction_rating" in df.columns and df['satisfaction_rating'].notna().any() else "N/A")
             
             st.markdown("---")
             
-            # Charts row
             c1, c2 = st.columns(2)
             with c1:
                 if "category" in df.columns:
                     cat_counts = df["category"].value_counts().head(8)
-                    fig = px.bar(x=cat_counts.index, y=cat_counts.values, title="Tickets by Category", labels={"x":"","y":""}, color=cat_counts.values, color_continuous_scale="Reds")
+                    fig = px.bar(x=cat_counts.index, y=cat_counts.values, title="Tickets by Category", color=cat_counts.values, color_continuous_scale="Reds")
                     st.plotly_chart(fig, use_container_width=True)
             with c2:
                 if "status" in df.columns:
@@ -1740,16 +1719,13 @@ def page_helpdesk_queue():
                     fig2 = px.pie(values=st_counts.values, names=st_counts.index, title="Status Distribution", color_discrete_sequence=["#EF4444","#F59E0B","#3B82F6","#10B981","#6B7280"])
                     st.plotly_chart(fig2, use_container_width=True)
             
-            # Monthly trend
             if "created_at" in df.columns:
                 df["month"] = pd.to_datetime(df["created_at"]).dt.month
                 monthly = df.groupby("month").size().reset_index(name="count")
                 fig3 = px.line(monthly, x="month", y="count", title="Monthly Ticket Volume", markers=True)
                 st.plotly_chart(fig3, use_container_width=True)
             
-            # AI Insights
             st.markdown("### 🤖 AI Insights")
-            open_count = len(df[df["status"]=="open"]) if "status" in df.columns else 0
             overdue = 0
             if "sla_deadline" in df.columns:
                 now = datetime.now()
@@ -1758,12 +1734,9 @@ def page_helpdesk_queue():
                         if pd.to_datetime(r["sla_deadline"]) < now and r.get("status") not in ["closed","rejected"]:
                             overdue += 1
                     except: pass
-            
             c1, c2 = st.columns(2)
-            with c1:
-                st.warning(f"🔴 {overdue} tickets are past SLA deadline — needs immediate attention")
-            with c2:
-                st.info(f"📈 Most common issue: {df['category'].value_counts().index[0] if 'category' in df.columns and len(df['category'].value_counts())>0 else 'N/A'}")
+            with c1: st.warning(f"🔴 {overdue} tickets past SLA deadline")
+            with c2: st.info(f"📈 Top issue: {df['category'].value_counts().index[0] if 'category' in df.columns and len(df['category'].value_counts())>0 else 'N/A'}")
         else:
             st.info("No data for analytics")
     
@@ -1772,30 +1745,25 @@ def page_helpdesk_queue():
     # ============================================
     with tabs[2]:
         st.markdown("### 📄 Helpdesk Reports")
-        
         c1, c2 = st.columns(2)
         with c1:
             rpt_type = st.selectbox("Report Type", ["Monthly Report", "Customized Report", "Tickets Carry Forward"])
             rpt_month = st.selectbox("Month", ["January","February","March","April","May","June","July","August","September","October","November","December"])
         with c2:
             rpt_year = st.selectbox("Year", [2024,2025,2026,2027])
-            st.markdown("<br>", unsafe_allow_html=True)
         
-        if st.button("📊 Generate Report", use_container_width=True, type="primary"):
+        if st.button("📊 Generate Report", use_container_width=True):
             all_tickets = DB.get_all("tickets", fc, 500)
             if all_tickets:
                 df = pd.DataFrame(all_tickets)
-                st.success(f"✅ Report generated for {rpt_month} {rpt_year} — {len(df)} tickets")
-                
-                html = f"""<html><head><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:11px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:5px;border-bottom:1px solid #ddd}}</style></head><body><h1>Helpdesk Report — {rpt_month} {rpt_year}</h1><p>{info.get('full_name',fc)} | {datetime.now().strftime('%d %B %Y')}</p><table><tr><th>Ticket No</th><th>Title</th><th>Category</th><th>Status</th><th>Raised By</th></tr>"""
+                st.success(f"✅ Report for {rpt_month} {rpt_year} — {len(df)} tickets")
+                html = f"""<html><head><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:11px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:5px;border-bottom:1px solid #ddd}}</style></head><body><h1>Helpdesk Report — {rpt_month} {rpt_year}</h1><p>{info.get('full_name',fc)}</p><table><tr><th>Ticket No</th><th>Title</th><th>Category</th><th>Status</th><th>Raised By</th></tr>"""
                 for _, r in df.head(50).iterrows():
                     html += f"<tr><td>{r.get('ticket_number','')}</td><td>{r.get('title','')[:60]}</td><td>{r.get('category','')}</td><td>{r.get('status','')}</td><td>{r.get('requester_name','')}</td></tr>"
                 html += "</table></body></html>"
-                
                 st.components.v1.html(html, height=500, scrolling=True)
-                st.download_button("📥 Download HTML", html, f"helpdesk_{rpt_month}_{rpt_year}.html", "text/html", use_container_width=True)
-                csv = df.to_csv(index=False)
-                st.download_button("📥 Download CSV", csv, f"helpdesk_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
+                st.download_button("📥 HTML", html, f"helpdesk_{rpt_month}_{rpt_year}.html", "text/html", use_container_width=True)
+                st.download_button("📥 CSV", df.to_csv(index=False), f"helpdesk_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
             else:
                 st.info("No data")
     
@@ -1807,7 +1775,6 @@ def page_helpdesk_queue():
             st.error("⛔ Admin access only")
         else:
             st.markdown("### ⏱️ Escalation Configuration")
-            
             dept_list = sorted(list(set(c.get("department","") for c in categories)))
             selected_dept = st.selectbox("Select Department", dept_list, key="esc_dept")
             dept_cats = [c for c in categories if c.get("department") == selected_dept]
@@ -1820,30 +1787,23 @@ def page_helpdesk_queue():
                     if c.get("category_name") == selected_cat:
                         cat_id = c["id"]
                         break
-                
                 if cat_id:
                     all_users = DB.get_users()
                     user_options = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users]
-                    
                     with st.form("esc_form"):
                         for level in range(1, 7):
                             st.markdown(f"**Level {level}**")
                             c1, c2, c3 = st.columns([3, 1, 1])
-                            with c1:
-                                st.multiselect(f"Users for L{level}", user_options, key=f"esc_u_{level}_{cat_id}")
-                            with c2:
-                                st.number_input(f"Time", min_value=0, value=30 if level<=2 else 60 if level==3 else 1440, key=f"esc_t_{level}_{cat_id}")
-                            with c3:
-                                st.selectbox(f"Unit", ["Mins","Hours","Days"], key=f"esc_ty_{level}_{cat_id}")
+                            with c1: st.multiselect(f"Users L{level}", user_options, key=f"esc_u_{level}_{cat_id}")
+                            with c2: st.number_input(f"Time", min_value=0, value=30 if level<=2 else 60 if level==3 else 1440, key=f"esc_t_{level}_{cat_id}")
+                            with c3: st.selectbox(f"Unit", ["Mins","Hours","Days"], key=f"esc_ty_{level}_{cat_id}")
                             st.markdown("---")
-                        
                         if st.form_submit_button("💾 Save", use_container_width=True, type="primary"):
                             for level in range(1, 7):
                                 time_val = st.session_state.get(f"esc_t_{level}_{cat_id}", 30)
                                 time_type = st.session_state.get(f"esc_ty_{level}_{cat_id}", "Mins")
                                 if time_type == "Hours": time_val *= 60
                                 elif time_type == "Days": time_val *= 1440
-                                
                                 users = st.session_state.get(f"esc_u_{level}_{cat_id}", [])
                                 for u in users:
                                     if "(" in u and ")" in u:
@@ -1862,9 +1822,7 @@ def page_helpdesk_queue():
             st.error("⛔ Admin access only")
         else:
             st.markdown("### ⚙️ Helpdesk Settings")
-            
             sett_tabs = st.tabs(["📍 Locations", "🏷️ Categories", "📊 Status"])
-            
             with sett_tabs[0]:
                 st.markdown("**Manage Locations**")
                 locs = DB.get_locations(fc)
@@ -1878,22 +1836,16 @@ def page_helpdesk_queue():
                 st.markdown("---")
                 with st.form("add_loc"):
                     c1, c2 = st.columns(2)
-                    with c1:
-                        new_loc_code = st.text_input("Location Code")
-                        new_loc_name = st.text_input("Location Name")
-                    with c2:
-                        parent_loc = st.selectbox("Parent Location", ["None"] + [l.get("location_code","") for l in locs]) if locs else st.selectbox("Parent", ["None"])
-                        new_sub_name = st.text_input("Sub-Location Name")
+                    with c1: new_loc_code = st.text_input("Location Code"); new_loc_name = st.text_input("Location Name")
+                    with c2: parent_loc = st.selectbox("Parent", ["None"]+[l.get("location_code","") for l in locs]) if locs else st.selectbox("Parent",["None"]); new_sub_name = st.text_input("Sub-Location Name")
                     if st.form_submit_button("➕ Add"):
                         if new_loc_code and new_loc_name:
                             supabase.table("helpdesk_locations").insert({"facility_code":fc,"location_code":new_loc_code,"location_name":new_loc_name}).execute()
-                            st.success("Added!")
-                            st.rerun()
-            
+                            st.success("Added!"); st.rerun()
             with sett_tabs[1]:
                 st.markdown("**Manage Categories**")
                 for c in categories:
-                    st.markdown(f"- **{c.get('category_name','')}** — {c.get('department','')} (SLA: {c.get('sla_hours','4')}hrs)")
+                    st.markdown(f"- **{c.get('category_name','')}** — {c.get('department','')} ({c.get('sla_hours','4')}hrs)")
                 with st.form("add_cat"):
                     c1, c2, c3 = st.columns(3)
                     with c1: new_cat = st.text_input("Category Name")
@@ -1902,12 +1854,10 @@ def page_helpdesk_queue():
                     if st.form_submit_button("➕ Add"):
                         if new_cat:
                             supabase.table("helpdesk_categories").insert({"department":new_dept,"category_name":new_cat,"sla_hours":new_sla}).execute()
-                            st.success("Added!")
-                            st.rerun()
-            
+                            st.success("Added!"); st.rerun()
             with sett_tabs[2]:
                 st.markdown("**Custom Statuses**")
-                st.info("Default statuses: Open, In Progress, Hold, Closed, Rejected")
+                st.info("Default: Open, In Progress, Hold, Closed, Rejected")
 
 # ============================================
 # INCIDENT CHECK
