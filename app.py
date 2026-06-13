@@ -1570,8 +1570,9 @@ def page_helpdesk_queue():
         st.markdown("---")
         search = st.text_input("🔍 Search tickets", placeholder="Search by title, ID, or requester...", key="hd_search")
         
-        status_filter = st.session_state.ticket_status_filter
-        tickets = DB.get_tickets_filtered(fc, status=status_filter if status_filter != "All" else None, search=search if search else None)
+       status_filter = st.session_state.ticket_status_filter.lower().replace(" ", "_")
+        filter_status = status_filter.lower().replace(" in progress", "in_progress") if status_filter != "All" else None
+        tickets = DB.get_tickets_filtered(fc, status=filter_status, search=search if search else None)
         
         user_depts = st.session_state.get("user", {}).get("department_permissions", [])
         if isinstance(user_depts, str):
