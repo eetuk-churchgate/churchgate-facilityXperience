@@ -2165,42 +2165,49 @@ def page_helpdesk_queue():
                 if cat_id:
                     all_users = DB.get_users()
                     user_options = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users]
-                    with st.form("esc_form"):
+                    
+                    # Build form WITHOUT st.form
+                    for level in range(1, 7):
+                        st.markdown(f"**Level {level}**")
+                        c1, c2, c3 = st.columns([3, 1, 1])
+                        with c1: 
+                            st.multiselect(f"Users L{level}", user_options, key=f"esc_u_{level}_{cat_id}")
+                        with c2: 
+                            st.number_input(f"Time", min_value=0, value=30 if level<=2 else 60 if level==3 else 1440, key=f"esc_t_{level}_{cat_id}")
+                        with c3: 
+                            st.selectbox(f"Unit", ["Mins","Hours","Days"], key=f"esc_ty_{level}_{cat_id}")
+                        st.markdown("---")
+                    
+                    if st.button("💾 Save Escalation Settings", use_container_width=True, key="save_esc_btn"):
+                        saved_count = 0
                         for level in range(1, 7):
-                            st.markdown(f"**Level {level}**")
-                            c1, c2, c3 = st.columns([3, 1, 1])
-                            with c1: st.multiselect(f"Users L{level}", user_options, key=f"esc_u_{level}_{cat_id}")
-                            with c2: st.number_input(f"Time", min_value=0, value=30 if level<=2 else 60 if level==3 else 1440, key=f"esc_t_{level}_{cat_id}")
-                            with c3: st.selectbox(f"Unit", ["Mins","Hours","Days"], key=f"esc_ty_{level}_{cat_id}")
-                            st.markdown("---")
-                        
-                        if st.form_submit_button("💾 Save", use_container_width=True):
-                            for level in range(1, 7):
-                                time_val = st.session_state.get(f"esc_t_{level}_{cat_id}", 30)
-                                time_type = st.session_state.get(f"esc_ty_{level}_{cat_id}", "Mins")
-                                if time_type == "Hours": time_val *= 60
-                                elif time_type == "Days": time_val *= 1440
-                                users = st.session_state.get(f"esc_u_{level}_{cat_id}", [])
-                                
-                                try:
-                                    supabase.table("ticket_escalation").delete().eq("facility_code", fc).eq("category_id", cat_id).eq("level_number", level).execute()
-                                except: pass
-                                
-                                for u in users:
-                                    if "(" in u and ")" in u:
-                                        email = u.split("(")[-1].replace(")","").strip()
-                                        name = u.split("(")[0].strip()
-                                        try:
-                                            supabase.table("ticket_escalation").insert({
-                                                "facility_code": fc, "category_id": cat_id, "level_number": level,
-                                                "level_name": f"Level {level}", "escalate_to_name": name,
-                                                "escalate_to_email": email, "sla_minutes": time_val
-                                            }).execute()
-                                        except: pass
+                            time_val = st.session_state.get(f"esc_t_{level}_{cat_id}", 30)
+                            time_type = st.session_state.get(f"esc_ty_{level}_{cat_id}", "Mins")
+                            if time_type == "Hours": time_val *= 60
+                            elif time_type == "Days": time_val *= 1440
+                            users = st.session_state.get(f"esc_u_{level}_{cat_id}", [])
                             
-                            st.success("✅ Escalation saved!")
-                            st.balloons()
-                            st.rerun()
+                            # Delete existing
+                            try:
+                                supabase.table("ticket_escalation").delete().eq("facility_code", fc).eq("category_id", cat_id).eq("level_number", level).execute()
+                            except: pass
+                            
+                            # Insert new
+                            for u in users:
+                                if "(" in u and ")" in u:
+                                    email = u.split("(")[-1].replace(")","").strip()
+                                    name = u.split("(")[0].strip()
+                                    try:
+                                        supabase.table("ticket_escalation").insert({
+                                            "facility_code": fc, "category_id": cat_id, "level_number": level,
+                                            "level_name": f"Level {level}", "escalate_to_name": name,
+                                            "escalate_to_email": email, "sla_minutes": time_val
+                                        }).execute()
+                                        saved_count += 1
+                                    except: pass
+                        
+                        st.success(f"✅ Escalation saved! {saved_count} entries configured.")
+                        st.balloons()
     
     # ============================================
     # TAB 4: SETTINGS
