@@ -2189,15 +2189,18 @@ def page_helpdesk_queue():
                                     if "(" in u and ")" in u:
                                         email = u.split("(")[-1].replace(")","").strip()
                                         name = u.split("(")[0].strip()
-                                        supabase.table("ticket_escalation").insert({
-                                            "facility_code": fc,
-                                            "category_id": cat_id,
-                                            "level_number": level,
-                                            "level_name": f"Level {level}",
-                                            "escalate_to_name": name,
-                                            "escalate_to_email": email,
-                                            "sla_minutes": time_val
-                                        }).execute()
+                                        try:
+                                            supabase.table("ticket_escalation").insert({
+                                                "facility_code": fc,
+                                                "category_id": cat_id,
+                                                "level_number": level,
+                                                "level_name": f"Level {level}",
+                                                "escalate_to_name": name,
+                                                "escalate_to_email": email,
+                                                "sla_minutes": time_val
+                                            }).execute()
+                                        except Exception as e:
+                                            st.error(f"Save error L{level}: {str(e)}")
                             st.success("✅ Escalation saved!")
                             st.balloons()
                             st.rerun()
