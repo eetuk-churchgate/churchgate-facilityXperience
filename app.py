@@ -290,7 +290,13 @@ def check_auto_escalation(fc):
                 sla_dt = pd.to_datetime(sla_deadline)
                 if now > sla_dt:
                     next_level = current_level + 1
-                    esc_config = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("level_number", next_level).execute()
+                    ticket_cat = ticket.get("category")
+                    cat_id = None
+                    cats = supabase.table("helpdesk_categories").select("id").eq("category_name", ticket_cat).execute()
+                    if cats.data:
+                        cat_id = cats.data[0]["id"]
+                    
+                    esc_config = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("level_number", next_level).eq("category_id", cat_id).execute()
                     supabase.table("tickets").update({"escalation_level": next_level}).eq("id", ticket["id"]).execute()
                     if esc_config.data:
                         for e in esc_config.data:
@@ -1530,7 +1536,14 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                 time.sleep(1.5)
                 
                 # Send email to escalation Level 1
-                esc_data = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("level_number", 1).execute()
+                # Get category_id for this ticket
+                ticket_cat_id = None
+                for c in categories:
+                    if c.get("category_name") == category:
+                        ticket_cat_id = c["id"]
+                        break
+                
+                esc_data = supabase.table("ticket_escalation").select("*").eq("facility_code", fc).eq("level_number", 1).eq("category_id", ticket_cat_id).execute()
                 if esc_data.data:
                     for e in esc_data.data:
                         if e.get("escalate_to_email"):
