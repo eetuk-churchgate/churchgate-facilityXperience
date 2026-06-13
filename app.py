@@ -3363,7 +3363,7 @@ def reset_password_page(token):
 def main():
     inject_css()
     
-    st.markdown("""
+    components.html("""
     <button class="fx-sidebar-toggle" onclick="
         var sidebar = parent.document.querySelector('[data-testid=\"stSidebar\"]');
         if(sidebar) {
@@ -3374,7 +3374,7 @@ def main():
             sidebar.style.transform = 'translateX(0)';
         }
     ">☰ SIDEBAR</button>
-    """, unsafe_allow_html=True)
+    """, height=0)
     
     # Initialize session state
     if "authenticated" not in st.session_state:
