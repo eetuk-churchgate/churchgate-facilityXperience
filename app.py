@@ -106,39 +106,7 @@ def inject_css():
         [data-testid="collapsedControl"] {{ position:fixed !important; top:80px !important; left:0 !important; z-index:99999 !important; background:#CC0000 !important; border-radius:0 8px 8px 0 !important; padding:8px 5px !important; box-shadow:0 2px 10px rgba(204,0,0,0.4) !important; cursor:pointer !important; width:28px !important; height:50px !important; display:flex !important; align-items:center !important; justify-content:center !important; opacity:1 !important; visibility:visible !important; }}
         [data-testid="collapsedControl"]:hover {{ background:#aa0000 !important; box-shadow:0 4px 20px rgba(204,0,0,0.6) !important; }}
         [data-testid="collapsedControl"] svg {{ fill:white !important; width:16px !important; height:16px !important; }}
-        .fx-sidebar-toggle {{
-            position: fixed !important;
-            top: 50% !important;
-            left: 0 !important;
-            z-index: 999999 !important;
-            background: #CC0000 !important;
-            color: white !important;
-            border: none !important;
-            border-radius: 0 8px 8px 0 !important;
-            padding: 15px 8px !important;
-            font-size: 18px !important;
-            font-weight: bold !important;
-            cursor: pointer !important;
-            writing-mode: vertical-rl !important;
-            text-orientation: mixed !important;
-            box-shadow: 2px 2px 10px rgba(204,0,0,0.5) !important;
-        }}
-        .fx-sidebar-toggle:hover {{
-            background: #aa0000 !important;
-        }}
-        button[kind="header"] {{
-            position: fixed !important;
-            top: 10px !important;
-            left: 10px !important;
-            z-index: 99999 !important;
-            background: #CC0000 !important;
-            color: white !important;
-            border-radius: 6px !important;
-            padding: 8px 12px !important;
-            font-size: 1.2rem !important;
-            border: none !important;
-            cursor: pointer !important;
-        }}
+        [data-testid="collapsedControl"] {{ display: none !important; }}
         .fx-topnav {{ background:linear-gradient(105deg,{CHURCHGATE_DARK},#2a2a2a,{CHURCHGATE_DARK}); padding:0.5rem 1.5rem; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:9998; border-bottom:2px solid {CHURCHGATE_RED}; }}
         .fx-brand {{ font-size:1.05rem; font-weight:700; color:white; }} .fx-brand span {{ color:{CHURCHGATE_RED}; font-weight:800; }}
         .churchgate-header {{ background:white; padding:1.5rem; border-radius:8px; margin-bottom:1rem; border-left:4px solid {CHURCHGATE_RED}; box-shadow:0 1px 3px rgba(0,0,0,0.06); }}
