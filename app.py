@@ -1576,7 +1576,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
     st.markdown("---")
     st.markdown("### 📋 My Tickets")
     
-   user_name = st.session_state.get('user_name', '')
+    user_name = st.session_state.get('user_name', '')
     user_email = st.session_state.get('user', {}).get('email', '')
     
     my_tickets = supabase.table("tickets").select("*").eq("facility_code", fc).or_(f"requester_name.eq.{user_name},requester_email.eq.{user_email}").order("created_at", desc=True).limit(20).execute()
