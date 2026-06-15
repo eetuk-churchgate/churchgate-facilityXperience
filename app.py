@@ -3021,9 +3021,9 @@ def page_visitor():
         access_code = st.text_input("Enter Access Code", placeholder="Scan or type access code...", key="gate_code")
         
         if access_code:
-            visitor = supabase.table("visitors").select("*").eq("access_code", access_code).eq("facility_code", fc).single().execute()
-            if visitor.data:
-                v = visitor.data
+            visitor = supabase.table("visitors").select("*").eq("facility_code", fc).or_(f"access_code_in.eq.{access_code},access_code_out.eq.{access_code}").execute()
+            if visitor.data and len(visitor.data) > 0:
+                v = visitor.data[0]
                 st.success(f"✅ Visitor Found: {v.get('full_name','')} — {v.get('company','')}")
                 st.markdown(f"""
                 <div style="background:white;border-radius:10px;padding:1rem;border-left:4px solid #CC0000;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
