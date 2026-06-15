@@ -3239,44 +3239,43 @@ def page_visitor():
                     
                     st.markdown("---")
                     
-                    # Visitor type tabs
-                    vtypes = ["All", "Visitor", "Vendor", "Interview", "Contractor", "Delivery"]
-                    vtype_tabs = st.tabs(vtypes)
+                    # Filter by type
+                    vtype_filter = st.selectbox("Filter by Type", ["All", "Visitor", "Vendor", "Interview", "Contractor", "Delivery"], key="gate_type_filter")
+                    filtered = tv if vtype_filter == "All" else [v for v in tv if v.get("visitor_type") == vtype_filter.lower()]
                     
-                    for idx, vt in enumerate(vtypes):
-                        with vtype_tabs[idx]:
-                            filtered = tv if vt == "All" else [v for v in tv if v.get("visitor_type") == vt.lower()]
+                    if filtered:
+                        for v in filtered:
+                            status = v.get("status","expected")
+                            colors = {"checked_in":"#10B981","checked_out":"#6B7280","expected":"#F59E0B","cancelled":"#EF4444"}
+                            sc = colors.get(status,"#4a4a4a")
                             
-                            if filtered:
-                                for v in filtered:
-                                    status = v.get("status","expected")
-                                    colors = {"checked_in":"#10B981","checked_out":"#6B7280","expected":"#F59E0B","cancelled":"#EF4444"}
-                                    sc = colors.get(status,"#4a4a4a")
-                                    
-                                    overstay = False
-                                    if status == "checked_in" and v.get("expected_departure"):
-                                        try:
-                                            dep = datetime.strptime(f"{v.get('visit_date')} {v.get('expected_departure')}", "%Y-%m-%d %H:%M:%S")
-                                            if datetime.now() > dep:
-                                                overstay = True
-                                        except: pass
-                                    
-                                    st.markdown(f"""
-                                    <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.3rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                                            <b>{v.get('full_name','')}</b>
-                                            <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;">{status.upper()}</span>
-                                            {f'<span style="background:#EF4444;color:white;padding:2px 8px;border-radius:12px;font-size:0.6rem;">⚠️ OVERSTAY</span>' if overstay else ''}
-                                        </div>
-                                        <div style="font-size:0.7rem;color:#666;">
-                                            {v.get('company','')} | 🎯 {v.get('purpose_of_visit','')} | 👤 {v.get('host_name','')}
-                                        </div>
+                            overstay = False
+                            if status == "checked_in" and v.get("expected_departure"):
+                                try:
+                                    dep = datetime.strptime(f"{v.get('visit_date')} {v.get('expected_departure')}", "%Y-%m-%d %H:%M:%S")
+                                    if datetime.now() > dep:
+                                        overstay = True
+                                except: pass
+                            
+                            st.markdown(f"""
+                            <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.3rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <div>
+                                        <b>{v.get('full_name','')}</b>
+                                        <span style="font-size:0.65rem;color:#888;margin-left:0.5rem;">{v.get('visitor_type','').upper()}</span>
                                     </div>
-                                    """, unsafe_allow_html=True)
-                            else:
-                                st.info(f"No {vt} visitors today")
-                else:
-                    st.info("No visitors today")
+                                    <div>
+                                        <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;">{status.upper()}</span>
+                                        {f' <span style="background:#EF4444;color:white;padding:2px 8px;border-radius:12px;font-size:0.6rem;">⚠️ OVERSTAY</span>' if overstay else ''}
+                                    </div>
+                                </div>
+                                <div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">
+                                    {v.get('company','') or 'N/A'} | 🎯 {v.get('purpose_of_visit','') or 'N/A'} | 👤 {v.get('host_name','')}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.info(f"No {vtype_filter} visitors today")
             
             # ============================================
             # GATE TAB 2: ALERTS
