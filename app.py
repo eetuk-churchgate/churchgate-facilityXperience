@@ -3121,7 +3121,6 @@ def page_visitor():
                             is_in_code = v.get("access_code_in") == access_code
                             status = v.get("status", "expected")
                             
-                            # Determine action
                             if is_in_code and status in ["expected", "pre_registered"]:
                                 action = "CHECK IN"
                                 action_color = "#10B981"
@@ -3138,28 +3137,7 @@ def page_visitor():
                                 action = "COMPLETED"
                                 action_color = "#6B7280"
                             
-                            st.markdown(f"""
-                            <div style="background:white;border-radius:12px;padding:1.5rem;border-left:5px solid {action_color};box-shadow:0 2px 8px rgba(0,0,0,0.1);margin:1rem 0;">
-                                <div style="display:flex;justify-content:space-between;align-items:center;">
-                                    <div>
-                                        <h3 style="margin:0;">{v.get('full_name','')}</h3>
-                                        <p style="color:#666;margin:3px 0;">{v.get('company','')} | {v.get('visitor_type','').upper()}</p>
-                                    </div>
-                                    <div style="text-align:center;">
-                                        <div style="font-size:1.5rem;font-weight:800;color:{action_color};">{action}</div>
-                                        <div style="font-size:0.7rem;color:#888;">{status.upper()}</div>
-                                    </div>
-                                </div>
-                                <hr>
-                                <table style="width:100%;font-size:0.8rem;">
-                                    <tr><td><b>Pass ID:</b></td><td>{v.get('pass_id','')}</td><td><b>Host:</b></td><td>{v.get('host_name','')}</td></tr>
-                                    <tr><td><b>🟢 IN:</b></td><td style="font-family:monospace;">{v.get('access_code_in','')}</td><td><b>🔴 OUT:</b></td><td style="font-family:monospace;">{v.get('access_code_out','')}</td></tr>
-                                    <tr><td><b>📅 Date:</b></td><td>{v.get('visit_date','')}</td><td><b>⏰ Time:</b></td><td>{v.get('expected_arrival','')} - {v.get('expected_departure','')}</td></tr>
-                                    <tr><td><b>🎯 Purpose:</b></td><td colspan="3">{v.get('purpose_of_visit','')}</td></tr>
-                                    <tr><td><b>🚗 Vehicle:</b></td><td>{v.get('vehicle_plate','N/A')}</td><td><b>📦 Items:</b></td><td>{v.get('belongings','None')[:30]}</td></tr>
-                                </table>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            st.markdown(f"""<div style="background:white;border-radius:12px;padding:1.5rem;border-left:5px solid {action_color};box-shadow:0 2px 8px rgba(0,0,0,0.1);margin:1rem 0;"><div style="display:flex;justify-content:space-between;align-items:center;"><div><h3 style="margin:0;">{v.get('full_name','')}</h3><p style="color:#666;margin:3px 0;">{v.get('company','')} | {v.get('visitor_type','').upper()}</p></div><div style="text-align:center;"><div style="font-size:1.5rem;font-weight:800;color:{action_color};">{action}</div><div style="font-size:0.7rem;color:#888;">{status.upper()}</div></div></div><hr><table style="width:100%;font-size:0.8rem;"><tr><td><b>Pass ID:</b></td><td>{v.get('pass_id','')}</td><td><b>Host:</b></td><td>{v.get('host_name','')}</td></tr><tr><td><b>IN:</b></td><td style="font-family:monospace;">{v.get('access_code_in','')}</td><td><b>OUT:</b></td><td style="font-family:monospace;">{v.get('access_code_out','')}</td></tr><tr><td><b>Date:</b></td><td>{v.get('visit_date','')}</td><td><b>Time:</b></td><td>{v.get('expected_arrival','')} - {v.get('expected_departure','')}</td></tr><tr><td><b>Purpose:</b></td><td colspan="3">{v.get('purpose_of_visit','')}</td></tr><tr><td><b>Vehicle:</b></td><td>{v.get('vehicle_plate','N/A')}</td><td><b>Items:</b></td><td>{v.get('belongings','None')[:30]}</td></tr></table></div>""", unsafe_allow_html=True)
                             
                             c1, c2, c3, c4 = st.columns(4)
                             with c1:
@@ -3167,9 +3145,6 @@ def page_visitor():
                                     if st.button("✅ Confirm Check In", use_container_width=True, type="primary"):
                                         supabase.table("visitors").update({"status":"checked_in","actual_arrival":datetime.now().isoformat()}).eq("id",v["id"]).execute()
                                         supabase.table("visitor_gate_log").insert({"visitor_id":v["id"],"event_type":"check_in","gate_location":"Main Gate","scanned_by":st.session_state.get("user_name","Security")}).execute()
-                                        if v.get("host_email"):
-                                            send_email_notification(v["host_email"], f"✅ Guest Arrived: {v.get('full_name','')}",
-                                                f"""<div style="font-family:Arial;max-width:400px;border:1px solid #10B981;border-radius:8px;overflow:hidden;"><div style="background:#10B981;padding:15px;color:white;"><h3>✅ Guest Has Arrived</h3></div><div style="padding:15px;"><p>Dear {v.get('host_name','')},</p><p><b>{v.get('full_name','')}</b> from <b>{v.get('company','')}</b> has arrived.</p></div></div>""")
                                         st.success("✅ Checked In!")
                                         st.rerun()
                             with c2:
@@ -3181,66 +3156,34 @@ def page_visitor():
                                         st.rerun()
                             with c3:
                                 if st.button("📋 More Info", use_container_width=True):
-                                    with st.expander("Full Details", expanded=True):
-                                        st.json({
-                                            "Name": v.get("full_name"),
-                                            "Pass ID": v.get("pass_id"),
-                                            "Access Level": v.get("access_level"),
-                                            "ID Type": v.get("identification_type"),
-                                            "ID Number": v.get("identification_number"),
-                                            "Security Flag": v.get("security_flag"),
-                                            "NDA Signed": v.get("nda_signed"),
-                                            "Safety Briefing": v.get("safety_briefing"),
-                                        })
+                                    st.json({"Name":v.get("full_name"),"Pass ID":v.get("pass_id"),"Access Level":v.get("access_level"),"ID":v.get("identification_number")})
                             with c4:
                                 if st.button("🚩 Flag/Deny", use_container_width=True):
                                     supabase.table("visitors").update({"status":"cancelled","security_flag":True}).eq("id",v["id"]).execute()
-                                    st.error("🚩 Entry Denied & Flagged")
+                                    st.error("🚩 Flagged")
                                     st.rerun()
-                            
-                            # Overstay check
-                            if status == "checked_in" and v.get("expected_departure"):
-                                try:
-                                    dep_time = datetime.strptime(str(v.get("visit_date")) + " " + str(v.get("expected_departure")), "%Y-%m-%d %H:%M:%S")
-                                    if datetime.now() > dep_time:
-                                        st.error(f"🚨 OVERSTAY ALERT: Guest was expected to leave by {v.get('expected_departure')}")
-                                except: pass
                         else:
                             st.error("❌ Invalid access code")
-                
-                elif verify_mode == "📷 Scan QR":
-                    st.info("📷 QR Scanner — Use a QR code scanner and paste the data below:")
-                    qr_data = st.text_input("QR Data", placeholder="Paste scanned QR code data here...")
-                    if qr_data:
-                        # Extract codes from QR data
-                        if "IN:" in qr_data and "OUT:" in qr_data:
-                            parts = qr_data.replace("IN:","").replace("OUT:","").split("|")
-                            if len(parts) >= 2:
-                                st.success(f"✅ QR Scanned: IN Code = {parts[0].strip()}")
             
             # ============================================
             # GATE TAB 1: TODAY'S LOG
             # ============================================
             with gate_tabs[1]:
                 st.markdown("#### 📋 Today's Visitor Log")
-                
                 today_str = str(date.today())
                 today_visitors = supabase.table("visitors").select("*").eq("facility_code", fc).eq("visit_date", today_str).order("expected_arrival").execute()
                 
                 if today_visitors.data:
-                    # Summary cards
                     tv = today_visitors.data
                     c1, c2, c3, c4, c5 = st.columns(5)
                     with c1: st.metric("📋 Total", len(tv))
-                    with c2: st.metric("✅ Checked In", len([v for v in tv if v.get("status")=="checked_in"]))
+                    with c2: st.metric("✅ In", len([v for v in tv if v.get("status")=="checked_in"]))
                     with c3: st.metric("⏳ Expected", len([v for v in tv if v.get("status") in ["expected","pre_registered"]]))
-                    with c4: st.metric("🚪 Checked Out", len([v for v in tv if v.get("status")=="checked_out"]))
+                    with c4: st.metric("🚪 Out", len([v for v in tv if v.get("status")=="checked_out"]))
                     with c5: st.metric("🚩 Flagged", len([v for v in tv if v.get("security_flag")]))
                     
                     st.markdown("---")
-                    
-                    # Filter by type
-                    vtype_filter = st.selectbox("Filter by Type", ["All", "Visitor", "Vendor", "Interview", "Contractor", "Delivery"], key="gate_type_filter")
+                    vtype_filter = st.selectbox("Filter by Type", ["All","Visitor","Vendor","Interview","Contractor","Delivery"], key="gate_type_filter")
                     filtered = tv if vtype_filter == "All" else [v for v in tv if v.get("visitor_type") == vtype_filter.lower()]
                     
                     if filtered:
@@ -3248,90 +3191,43 @@ def page_visitor():
                             status = v.get("status","expected")
                             colors = {"checked_in":"#10B981","checked_out":"#6B7280","expected":"#F59E0B","cancelled":"#EF4444"}
                             sc = colors.get(status,"#4a4a4a")
-                            
-                            overstay = False
-                            if status == "checked_in" and v.get("expected_departure"):
-                                try:
-                                    dep = datetime.strptime(f"{v.get('visit_date')} {v.get('expected_departure')}", "%Y-%m-%d %H:%M:%S")
-                                    if datetime.now() > dep:
-                                        overstay = True
-                                except: pass
-                            
-                            st.markdown(f"""
-                            <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.3rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                                <div style="display:flex;justify-content:space-between;align-items:center;">
-                                    <div>
-                                        <b>{v.get('full_name','')}</b>
-                                        <span style="font-size:0.65rem;color:#888;margin-left:0.5rem;">{v.get('visitor_type','').upper()}</span>
-                                    </div>
-                                    <div>
-                                        <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;">{status.upper()}</span>
-                                        {f' <span style="background:#EF4444;color:white;padding:2px 8px;border-radius:12px;font-size:0.6rem;">⚠️ OVERSTAY</span>' if overstay else ''}
-                                    </div>
-                                </div>
-                                <div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">
-                                    {v.get('company','') or 'N/A'} | 🎯 {v.get('purpose_of_visit','') or 'N/A'} | 👤 {v.get('host_name','')}
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem 0.8rem;margin:0.2rem 0;border-left:4px solid {sc};box-shadow:0 1px 2px rgba(0,0,0,0.04);"><b>{v.get('full_name','')}</b> <span style="background:{sc};color:white;padding:1px 8px;border-radius:10px;font-size:0.6rem;">{status.upper()}</span> | {v.get('company','') or 'N/A'} | 👤 {v.get('host_name','')}</div>""", unsafe_allow_html=True)
                     else:
                         st.info(f"No {vtype_filter} visitors today")
+                else:
+                    st.info("No visitors today")
             
             # ============================================
             # GATE TAB 2: ALERTS
             # ============================================
             with gate_tabs[2]:
                 st.markdown("#### 🚨 Security Alerts")
-                
-                # Overstay alerts
                 all_active = supabase.table("visitors").select("*").eq("facility_code", fc).eq("status", "checked_in").execute()
-                
                 overstays = []
                 if all_active.data:
                     for v in all_active.data:
                         if v.get("expected_departure"):
                             try:
                                 dep = datetime.strptime(f"{v.get('visit_date')} {v.get('expected_departure')}", "%Y-%m-%d %H:%M:%S")
-                                if datetime.now() > dep:
-                                    overstays.append(v)
+                                if datetime.now() > dep: overstays.append(v)
                             except: pass
-                
                 if overstays:
                     st.error(f"🚨 {len(overstays)} OVERSTAY ALERTS")
                     for v in overstays:
-                        st.markdown(f"""
-                        <div style="background:#FEF2F2;border:1px solid #EF4444;border-radius:8px;padding:1rem;margin:0.5rem 0;">
-                            <b>⚠️ {v.get('full_name','')}</b> — {v.get('company','')}
-                            <br>Expected departure: {v.get('expected_departure','')}
-                            <br>Host: {v.get('host_name','')} | Pass: {v.get('pass_id','')}
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown(f"""<div style="background:#FEF2F2;border:1px solid #EF4444;border-radius:8px;padding:0.8rem;margin:0.3rem 0;"><b>⚠️ {v.get('full_name','')}</b> — {v.get('company','')}<br>Expected: {v.get('expected_departure','')} | Host: {v.get('host_name','')}</div>""", unsafe_allow_html=True)
                 else:
                     st.success("✅ No overstay alerts")
-                
-                # Flagged visitors
-                flagged = supabase.table("visitors").select("*").eq("facility_code", fc).eq("security_flag", True).order("created_at", desc=True).limit(20).execute()
-                if flagged.data:
-                    st.markdown("---")
-                    st.markdown("#### 🚩 Flagged Visitors")
-                    for v in flagged.data:
-                        st.markdown(f"🚩 {v.get('full_name','')} — {v.get('company','')} | Status: {v.get('status','').upper()}")
             
             # ============================================
             # GATE TAB 3: LIVE FEED
             # ============================================
             with gate_tabs[3]:
                 st.markdown("#### 📊 Live Activity Feed")
-                
-                recent_logs = supabase.table("visitor_gate_log").select("*, visitors(full_name, company)").order("event_time", desc=True).limit(30).execute()
-                
+                recent_logs = supabase.table("visitor_gate_log").select("*").order("event_time", desc=True).limit(20).execute()
                 if recent_logs.data:
                     for log in recent_logs.data:
-                        icon = "✅" if log.get("event_type") == "check_in" else "🚪" if log.get("event_type") == "check_out" else "🚩"
-                        v_info = log.get("visitors", {})
-                        name = v_info.get("full_name","Unknown") if v_info else "Unknown"
-                        company = v_info.get("company","") if v_info else ""
-                        st.markdown(f"{icon} **{name}** ({company}) — {log.get('event_type','').upper()} at {log.get('event_time','')} by {log.get('scanned_by','')}")
+                        icon = "✅" if log.get("event_type")=="check_in" else "🚪" if log.get("event_type")=="check_out" else "🚩"
+                        st.caption(f"{icon} {log.get('event_type','').upper()} at {log.get('event_time','')} by {log.get('scanned_by','')}")
                 else:
                     st.info("No activity yet")
     
