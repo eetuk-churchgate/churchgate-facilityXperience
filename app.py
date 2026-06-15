@@ -2883,14 +2883,66 @@ def page_visitor():
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Send email
+                    # Send rich email to visitor
                     if email:
-                        send_email_notification(email, f"🛂 Visitor Access Pass - {pass_id}",
-                            f"""<div style="font-family:Arial;max-width:400px;border:2px solid #CC0000;border-radius:12px;overflow:hidden;text-align:center;"><div style="background:#CC0000;color:white;padding:12px;font-weight:bold;">VISITOR ACCESS PASS</div><div style="padding:15px;">{f'<img src="{logo_src}" height="25">' if logo_src else ''}<h3>{first_name} {last_name}</h3><p>{company}</p><img src="{qr_url}" width="160"><p><b>🟢 IN:</b> {access_code_in} | <b>🔴 OUT:</b> {access_code_out}</p><p>{visit_date} | {arrival_time} - {departure_time}</p><p>Host: {host_name}</p></div></div>""")
+                        send_email_notification(email, f"🛂 Your Access Pass - {info.get('full_name',fc)}",
+                            f"""
+                            <div style="font-family:Arial;max-width:450px;margin:0 auto;border:2px solid #CC0000;border-radius:12px;overflow:hidden;">
+                                <div style="background:#CC0000;padding:15px;color:white;text-align:center;">
+                                    {f'<img src="{logo_src}" height="30" style="margin-bottom:8px;"><br>' if logo_src else ''}
+                                    <h2 style="margin:0;">VISITOR ACCESS PASS</h2>
+                                    <p style="margin:3px 0 0 0;font-size:11px;opacity:0.9;">{info.get('full_name',fc)}</p>
+                                </div>
+                                <div style="padding:20px;text-align:center;">
+                                    <h3 style="margin:0 0 5px 0;">{first_name} {last_name}</h3>
+                                    <p style="color:#666;margin:0 0 10px 0;">{company}</p>
+                                    <img src="{qr_url}" width="180" style="border:1px solid #ddd;padding:5px;border-radius:8px;">
+                                    <div style="display:flex;justify-content:center;gap:30px;margin:15px 0;">
+                                        <div style="text-align:center;">
+                                            <div style="font-size:10px;color:#888;">🟢 ENTRY CODE</div>
+                                            <div style="font-size:1.3rem;font-weight:bold;font-family:monospace;color:#10B981;">{access_code_in}</div>
+                                        </div>
+                                        <div style="text-align:center;">
+                                            <div style="font-size:10px;color:#888;">🔴 EXIT CODE</div>
+                                            <div style="font-size:1.3rem;font-weight:bold;font-family:monospace;color:#EF4444;">{access_code_out}</div>
+                                        </div>
+                                    </div>
+                                    <table style="width:100%;font-size:11px;text-align:left;margin-top:10px;">
+                                        <tr><td style="padding:4px;font-weight:bold;">📅 Date:</td><td>{visit_date}</td></tr>
+                                        <tr><td style="padding:4px;font-weight:bold;">⏰ Time:</td><td>{arrival_time} - {departure_time}</td></tr>
+                                        <tr><td style="padding:4px;font-weight:bold;">👤 Host:</td><td>{host_name}</td></tr>
+                                        <tr><td style="padding:4px;font-weight:bold;">🆔 Pass ID:</td><td>{pass_id}</td></tr>
+                                    </table>
+                                    <div style="margin-top:15px;padding:10px;background:#FFF3CD;border-radius:8px;font-size:10px;color:#92400E;">
+                                        ⚠️ Please present this QR code at the gate. Overstaying beyond your scheduled time will flag security.
+                                    </div>
+                                </div>
+                                <div style="background:#f9f9f9;padding:10px;text-align:center;font-size:9px;color:#999;">
+                                    Churchgate Group | facilityXperience | Auto-generated Pass
+                                </div>
+                            </div>
+                            """)
                     
+                    # Send rich email to host
                     if host_email:
-                        send_email_notification(host_email, f"🛂 New Visitor: {first_name} {last_name}",
-                            f"<h3>Visitor Pre-Registered</h3><p><b>{first_name} {last_name}</b> from <b>{company}</b> on {visit_date}.</p>")
+                        send_email_notification(host_email, f"🛂 Visitor Expected: {first_name} {last_name}",
+                            f"""
+                            <div style="font-family:Arial;max-width:400px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
+                                <div style="background:#CC0000;padding:15px;color:white;">
+                                    <h3 style="margin:0;">📋 Visitor Pre-Registered</h3>
+                                </div>
+                                <div style="padding:15px;">
+                                    <p><b>{first_name} {last_name}</b> from <b>{company}</b> is scheduled to visit.</p>
+                                    <table style="width:100%;font-size:12px;">
+                                        <tr><td style="padding:3px;"><b>📅 Date:</b></td><td>{visit_date}</td></tr>
+                                        <tr><td style="padding:3px;"><b>⏰ Time:</b></td><td>{arrival_time} - {departure_time}</td></tr>
+                                        <tr><td style="padding:3px;"><b>🎯 Purpose:</b></td><td>{purpose}</td></tr>
+                                        <tr><td style="padding:3px;"><b>🚗 Vehicle:</b></td><td>{vehicle or 'N/A'}</td></tr>
+                                    </table>
+                                    <p style="font-size:10px;color:#888;margin-top:10px;">You'll be notified when your guest arrives.</p>
+                                </div>
+                            </div>
+                            """)
                     
                     st.balloons()
                     st.rerun()
