@@ -2927,24 +2927,26 @@ def page_visitor():
                                 pass_id = f"VIS-{fc}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.digits,k=4))}"
                                 access_code_in = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
                                 access_code_out = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-                                supabase.table("visitors").insert({
-                                    "facility_code": fc, "visitor_type": "visitor", "pass_id": pass_id,
-                                    "access_code": f"IN:{access_code_in}|OUT:{access_code_out}",
-                                    "access_code_in": access_code_in, "access_code_out": access_code_out,
-                                    "qr_code_url": f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IN:{access_code_in}%7COUT:{access_code_out}",
-                                    "first_name": first, "last_name": last,
-                                    "email": str(row.get("Email","") or row.get("email","")),
-                                    "mobile": str(row.get("Mobile","") or row.get("mobile","")),
-                                    "company": str(row.get("Company","") or row.get("company","")),
-                                    "purpose_of_visit": bulk_purpose, "host_name": bulk_host,
-                                    "host_email": bulk_email, "visit_date": str(bulk_date),
-                                    "expected_arrival": str(bulk_arrival), "expected_departure": str(bulk_departure),
-                                    "status": "pre_registered", "pass_type": "one_time", "access_level": "standard"
-                                }).execute()
-                                count += 1
-                        st.success(f"✅ {count} visitors registered!")
-                        st.balloons()
-                        st.rerun()
+                                try:
+                        supabase.table("visitors").insert({
+                            "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
+                            "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
+                            "qr_code_url": qr_url,
+                            "first_name": first_name, "last_name": last_name, "gender": gender,
+                            "email": email, "mobile": mobile, "whatsapp_number": whatsapp or mobile,
+                            "company": company, "identification_type": id_type, "identification_number": id_number,
+                            "vehicle_plate": vehicle, "purpose_of_visit": purpose,
+                            "host_name": host_name, "host_email": host_email, "host_phone": host_phone,
+                            "visit_date": str(visit_date), "expected_arrival": str(arrival_time),
+                            "expected_departure": str(departure_time),
+                            "pass_type": pass_type.lower().replace(" ", "_"), "access_level": access_level.lower(),
+                            "belongings": belongings, "status": "pre_registered",
+                            "pre_registered_by": None,
+                            "created_at": datetime.now().isoformat()
+                        }).execute()
+                    except Exception as e:
+                        st.error(f"Insert error: {str(e)}")
+                        st.stop()
         
         elif reg_mode == "Quick Batch Entry":
             st.markdown("#### 📝 Quick Batch Entry")
