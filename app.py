@@ -732,113 +732,107 @@ def page_wp():
                 title = row.get('title', 'No Title')[:80]
                 permit_no = row.get('permit_number', 'N/A')
                 
-                with st.expander(f"{icon} {permit_no} — {title} | {stage.upper()}", expanded=(stage == "submitted")):
-                    c1, c2 = st.columns([3, 1])
-                    
-                    with c1:
-                        st.markdown(f"**👤 Raised by:** {row.get('raised_by_name', 'N/A')} ({row.get('raised_by_designation', '')})")
-                        st.markdown(f"**📅 Period:** {format_wat_time(row.get('start_datetime', ''))} → {format_wat_time(row.get('end_datetime', ''))}")
-                        st.markdown(f"**📍 Location:** {row.get('work_location', '')}")
-                        st.markdown(f"**📝 Description:** {row.get('description', '')[:200]}")
-                        st.markdown(f"**🏢 Department:** {row.get('department', '')}")
+                # Custom card with inline expand
+                card_key = f"wp_card_{row['id']}"
+                if card_key not in st.session_state:
+                    st.session_state[card_key] = False
+                
+                st.markdown(f"""
+                <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;border-left:4px solid {status_colors.get(stage,'#4a4a4a')};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span><b>{icon} {permit_no}</b> — {title[:60]}</span>
+                        <span style="background:{status_colors.get(stage,'#4a4a4a')};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;font-weight:600;">{stage.upper()}</span>
+                    </div>
+                    <div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">
+                        👤 {row.get('raised_by_name','N/A')} | 📅 {format_wat_time(row.get('start_datetime',''))} | 📍 {row.get('work_location','')[:40]}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c1, c2 = st.columns([3,1])
+                with c1:
+                    pass
+                with c2:
+                    btn_text = "🔼 Hide Details" if st.session_state[card_key] else "📋 View Details"
+                    if st.button(btn_text, key=f"toggle_{row['id']}", use_container_width=True):
+                        st.session_state[card_key] = not st.session_state[card_key]
+                        st.rerun()
+                
+                if st.session_state[card_key]:
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="background:#f9fafb;border-radius:10px;padding:1rem;margin:0.5rem 0;border:1px solid #e5e7eb;">
+                            <p><b>👤 Raised by:</b> {row.get('raised_by_name','N/A')} ({row.get('raised_by_designation','')})</p>
+                            <p><b>📅 Period:</b> {format_wat_time(row.get('start_datetime',''))} → {format_wat_time(row.get('end_datetime',''))}</p>
+                            <p><b>📍 Location:</b> {row.get('work_location','')}</p>
+                            <p><b>📝 Description:</b> {row.get('description','')[:200]}</p>
+                            <p><b>🏢 Department:</b> {row.get('department','')}</p>
+                            <hr>
+                            <p><b>🔄 Audit Trail:</b></p>
+                            <p style="font-size:0.75rem;">📤 Submitted: {format_wat_time(row.get('submitted_at',row.get('created_at','')))} by {row.get('raised_by_name','N/A')}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
-                        st.markdown("---")
-                        st.markdown("**🔄 Audit Trail:**")
-                        st.caption(f"📤 Submitted: {format_wat_time(row.get('submitted_at', row.get('created_at', '')))} by {row.get('raised_by_name', 'N/A')}")
                         if row.get("authorized_at"):
-                            st.caption(f"🔐 Authorized: {format_wat_time(row['authorized_at'])} by {row.get('authorized_by_name', '')}")
+                            st.caption(f"🔐 Authorized: {format_wat_time(row['authorized_at'])} by {row.get('authorized_by_name','')}")
                         if row.get("confirmed_at"):
-                            st.caption(f"✅ Confirmed: {format_wat_time(row['confirmed_at'])} by {row.get('confirmed_by_name', '')}")
+                            st.caption(f"✅ Confirmed: {format_wat_time(row['confirmed_at'])} by {row.get('confirmed_by_name','')}")
                         if row.get("approved_at"):
-                            st.caption(f"🟢 Approved: {format_wat_time(row['approved_at'])} by {row.get('approved_by_name', '')}")
+                            st.caption(f"🟢 Approved: {format_wat_time(row['approved_at'])} by {row.get('approved_by_name','')}")
                         if stage == "rejected" and row.get("rejected_reason"):
-                            st.error(f"❌ Rejected: {row.get('rejected_reason', '')}")
+                            st.error(f"❌ Rejected: {row.get('rejected_reason','')}")
                             st.info("📝 Requester can resubmit with corrections")
-                    
-                    with c2:
+                        
                         st.markdown("**⚡ Actions:**")
                         now = datetime.now().isoformat()
                         dept = row.get("department", "")
                         
                         if can_authorize and stage == "submitted":
-                            auth_comment = st.text_area("Authorization Comment", key=f"auth_cmt_{row['id']}", height=60, placeholder="Enter reason for authorization...")
-                            if st.button("🔐 Authorize", key=f"auth_btn_{row['id']}", use_container_width=True, type="primary"):
+                            auth_comment = st.text_area("Authorization Comment", key=f"auth_cmt_{row['id']}", height=60)
+                            if st.button("🔐 Authorize", key=f"auth_btn_{row['id']}", use_container_width=True):
                                 if auth_comment:
-                                    auth_name = st.session_state.get("user_name", "Authorizer")
-                                    DB.update("work_permits", row["id"], {"workflow_stage": "authorized", "authorized_by_name": auth_name, "authorized_at": now})
-                                    confirmers = get_workflow_people(fc, 2)
-                                    for c in confirmers:
-                                        send_email_notification(c.get("person_email", ""), f"🔐 Permit {permit_no} Requires Confirmation", f"<h3>Permit Authorized</h3><p><b>{permit_no}</b> authorized by {auth_name}.</p><p><b>Comment:</b> {auth_comment}</p>")
-                                    st.success(f"🔐 Authorized!")
+                                    auth_name = st.session_state.get("user_name","Authorizer")
+                                    DB.update("work_permits", row["id"], {"workflow_stage":"authorized","authorized_by_name":auth_name,"authorized_at":now})
+                                    st.success("🔐 Authorized!")
                                     st.balloons()
                                     st.rerun()
-                                else:
-                                    st.error("Please add a comment before authorizing")
                         
                         if can_confirm and stage == "authorized":
-                            conf_comment = st.text_area("Confirmation Comment", key=f"conf_cmt_{row['id']}", height=60, placeholder="Enter confirmation notes...")
-                            if st.button("✅ Confirm", key=f"conf_btn_{row['id']}", use_container_width=True, type="primary"):
+                            conf_comment = st.text_area("Confirmation Comment", key=f"conf_cmt_{row['id']}", height=60)
+                            if st.button("✅ Confirm", key=f"conf_btn_{row['id']}", use_container_width=True):
                                 if conf_comment:
-                                    conf_name = st.session_state.get("user_name", "Confirmer")
-                                    DB.update("work_permits", row["id"], {"workflow_stage": "confirmed", "confirmed_by_name": conf_name, "confirmed_at": now})
-                                    approvers = get_workflow_people(fc, 3)
-                                    for a in approvers:
-                                        send_email_notification(a.get("person_email", ""), f"✅ Permit {permit_no} Requires Approval", f"<h3>Permit Confirmed</h3><p><b>{permit_no}</b> confirmed by {conf_name}.</p><p><b>Comment:</b> {conf_comment}</p>")
-                                    st.success(f"✅ Confirmed!")
+                                    conf_name = st.session_state.get("user_name","Confirmer")
+                                    DB.update("work_permits", row["id"], {"workflow_stage":"confirmed","confirmed_by_name":conf_name,"confirmed_at":now})
+                                    st.success("✅ Confirmed!")
                                     st.balloons()
                                     st.rerun()
-                                else:
-                                    st.error("Please add a comment before confirming")
                         
-                        if can_approve and stage in ["authorized", "confirmed"]:
-                            app_comment = st.text_area("Approval Comment", key=f"app_cmt_{row['id']}", height=60, placeholder="Enter approval notes...")
-                            if st.button("🟢 Approve", key=f"app_btn_{row['id']}", use_container_width=True, type="primary"):
+                        if can_approve and stage in ["authorized","confirmed"]:
+                            app_comment = st.text_area("Approval Comment", key=f"app_cmt_{row['id']}", height=60)
+                            if st.button("🟢 Approve", key=f"app_btn_{row['id']}", use_container_width=True):
                                 if app_comment:
-                                    app_name = st.session_state.get("user_name", "Approver")
-                                    DB.update("work_permits", row["id"], {"workflow_stage": "approved", "status": "approved", "approved_by_name": app_name, "approved_at": now})
-                                    send_email_notification(row.get("requester_contact", ""), f"🟢 Permit {permit_no} APPROVED", f"<h3>Permit Approved!</h3><p>Your permit <b>{permit_no}</b> has been <b>APPROVED</b> by {app_name}.</p><p><b>Comment:</b> {app_comment}</p>")
-                                    st.success(f"🟢 Approved!")
+                                    app_name = st.session_state.get("user_name","Approver")
+                                    DB.update("work_permits", row["id"], {"workflow_stage":"approved","status":"approved","approved_by_name":app_name,"approved_at":now})
+                                    st.success("🟢 Approved!")
                                     st.balloons()
                                     st.rerun()
-                                else:
-                                    st.error("Please add a comment before approving")
-
                         
-                        if stage not in ["rejected", "approved"] and (is_admin or can_authorize or can_confirm or can_approve):
-                            rej_comment = st.text_area("Rejection Reason", key=f"rej_cmt_{row['id']}", height=60, placeholder="Enter reason for rejection...")
+                        if stage not in ["rejected","approved"] and (is_admin or can_authorize or can_confirm or can_approve):
+                            rej_comment = st.text_area("Rejection Reason", key=f"rej_cmt_{row['id']}", height=60)
                             if st.button("❌ Reject", key=f"rej_btn_{row['id']}", use_container_width=True):
                                 if rej_comment:
-                                    rej_name = st.session_state.get("user_name", "Reviewer")
-                                    DB.update("work_permits", row["id"], {
-                                        "workflow_stage": "rejected", 
-                                        "status": "rejected", 
-                                        "rejected_at": now, 
-                                        "rejected_by": rej_name,
-                                        "rejected_reason": rej_comment
-                                    })
-                                    st.error(f"❌ Permit Rejected! Email sent to requester.")
+                                    DB.update("work_permits", row["id"], {"workflow_stage":"rejected","status":"rejected","rejected_at":now,"rejected_reason":rej_comment})
+                                    st.error("❌ Permit Rejected!")
                                     st.rerun()
-                                else:
-                                    st.error("Please provide a reason for rejection")
                         
                         if stage == "rejected" and (is_admin or can_raise):
-                            if st.button("🔄 Resubmit Permit", key=f"resubmit_{row['id']}", use_container_width=True, type="primary"):
-                                DB.update("work_permits", row["id"], {
-                                    "workflow_stage": "submitted",
-                                    "status": "pending",
-                                    "submitted_at": now,
-                                    "authorized_at": None,
-                                    "authorized_by_name": None,
-                                    "confirmed_at": None,
-                                    "confirmed_by_name": None,
-                                    "approved_at": None,
-                                    "approved_by_name": None,
-                                    "rejected_at": None,
-                                    "rejected_reason": None
-                                })
-                                st.success("🔄 Permit resubmitted for approval!")
+                            if st.button("🔄 Resubmit", key=f"resubmit_{row['id']}", use_container_width=True):
+                                DB.update("work_permits", row["id"], {"workflow_stage":"submitted","status":"pending","submitted_at":now,"authorized_at":None,"authorized_by_name":None,"confirmed_at":None,"confirmed_by_name":None,"approved_at":None,"approved_by_name":None,"rejected_at":None,"rejected_reason":None})
+                                st.success("🔄 Resubmitted!")
                                 st.balloons()
                                 st.rerun()
+                
+                st.markdown("---")
             st.info("📋 No work permits found. Raise your first permit in the '➕ Raise Permit' tab!")
     
     # ============================================
