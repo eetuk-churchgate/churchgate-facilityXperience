@@ -3565,16 +3565,33 @@ def page_feedback():
             # Broadcast email to tenants
             st.markdown("### 📧 Broadcast Survey to Tenants")
             
-            if st.button("📧 Send Survey to All Tenants", use_container_width=True):
-                if selected_survey and survey_options:
-                    survey_link = f"https://facilityxperience.streamlit.app/?survey={survey_options[selected_survey]}"
-                    
-                    # Get all tenant emails
-                    tenants = supabase.table("organizations").select("primary_contact_email, name").eq("type", "tenant").eq("is_active", True).execute()
-                    
-                    sent_count = 0
-                    if tenants.data:
-                        for t in tenants.data:
+            # Get all tenants
+            tenants = supabase.table("organizations").select("*").eq("type", "tenant").eq("is_active", True).execute()
+            
+            if tenants.data:
+                # Show tenant list with checkboxes
+                st.markdown("**Select tenants to receive the survey:**")
+                
+                tenant_options = {}
+                for t in tenants.data:
+                    tenant_options[f"{t.get('name','')} ({t.get('primary_contact_email','')})"] = t
+                
+                selected_tenants = st.multiselect(
+                    "Choose tenants",
+                    list(tenant_options.keys()),
+                    default=list(tenant_options.keys()),
+                    key="broadcast_tenants"
+                )
+                
+                st.caption(f"📋 {len(selected_tenants)} of {len(tenant_options)} tenants selected")
+                
+                if st.button("📧 Send Survey to Selected Tenants", use_container_width=True):
+                    if selected_survey and survey_options:
+                        survey_link = f"https://facilityxperience.streamlit.app/?survey={survey_options[selected_survey]}"
+                        sent_count = 0
+                        
+                        for name in selected_tenants:
+                            t = tenant_options[name]
                             if t.get("primary_contact_email"):
                                 send_email_notification(
                                     t["primary_contact_email"],
@@ -3598,11 +3615,13 @@ def page_feedback():
                                     """
                                 )
                                 sent_count += 1
-                    
-                    st.success(f"✅ Survey sent to {sent_count} tenants!")
-                    st.balloons()
-                else:
-                    st.error("Please select a survey first")
+                        
+                        st.success(f"✅ Survey sent to {sent_count} tenants!")
+                        st.balloons()
+                    else:
+                        st.error("Please select a survey first")
+            else:
+                st.info("No tenants found in the database")
 
 # ============================================
 # UTILITY DASHBOARD
