@@ -732,6 +732,7 @@ def page_wp():
                 title = row.get('title', 'No Title')[:80]
                 permit_no = row.get('permit_number', 'N/A')
                 
+                status_colors = {"submitted":"#F59E0B","authorized":"#3B82F6","confirmed":"#8B5CF6","approved":"#10B981","rejected":"#EF4444"}
                 # Custom card with inline expand
                 card_key = f"wp_card_{row['id']}"
                 if card_key not in st.session_state:
