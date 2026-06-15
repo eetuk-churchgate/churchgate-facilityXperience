@@ -2927,9 +2927,11 @@ def page_visitor():
                                 pass_id = f"VIS-{fc}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.digits,k=4))}"
                                 access_code_in = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
                                 access_code_out = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-                                try:
+                    access_code = f"IN:{access_code_in}|OUT:{access_code_out}"
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IN:{access_code_in}%7COUT:{access_code_out}"
+                    
+                    try:
                         supabase.table("visitors").insert({
-
                             "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
                             "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
                             "qr_code_url": qr_url,
