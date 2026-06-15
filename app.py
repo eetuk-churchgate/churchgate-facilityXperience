@@ -2985,14 +2985,14 @@ def page_visitor():
                         access_code_out = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
                         
                         try:
-                        supabase.table("visitors").insert({
-                            "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
-                            "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
-                            "qr_code_url": qr_url,
-                            "first_name": first_name, "last_name": last_name, "gender": gender,
-                            "email": email, "mobile": mobile, "whatsapp_number": whatsapp or mobile,
-                            "company": company, "identification_type": id_type, "identification_number": id_number,
-                            "vehicle_plate": vehicle, "purpose_of_visit": purpose,
+                            supabase.table("visitors").insert({
+                                "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
+                                "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
+                                "qr_code_url": qr_url,
+                                "first_name": first_name, "last_name": last_name, "gender": gender,
+                                "email": email, "mobile": mobile, "whatsapp_number": whatsapp or mobile,
+                                "company": company, "identification_type": id_type, "identification_number": id_number,
+                                "vehicle_plate": vehicle, "purpose_of_visit": purpose,
                             "host_name": host_name, "host_email": host_email, "host_phone": host_phone,
                             "visit_date": str(visit_date), "expected_arrival": str(arrival_time),
                             "expected_departure": str(departure_time),
