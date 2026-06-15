@@ -3346,9 +3346,9 @@ def page_feedback():
     # ============================================
     with tabs[0]:
         # Get active survey
-        survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).eq("is_active", True).single().execute()
+        survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).eq("is_active", True).execute()
         
-        if not survey.data:
+        if not survey.data or len(survey.data) == 0:
             st.info("📝 No active survey at this time. Check back during survey period.")
         else:
             s = survey.data
