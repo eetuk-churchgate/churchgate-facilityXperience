@@ -3906,9 +3906,7 @@ def page_feedback():
             st.markdown("### 📧 Broadcast Survey to Tenants")
             
             # Get all tenants
-            tenants = supabase.table("organizations").select("*").eq("type", "tenant").eq("is_active", True).execute()
-            if not tenants.data or len(tenants.data) == 0:
-                tenants = supabase.table("organizations").select("*").eq("is_active", True).execute()
+            tenants = supabase.table("organizations").select("*").eq("is_active", True).execute()
             
             if tenants.data:
                 # Show tenant list with checkboxes
