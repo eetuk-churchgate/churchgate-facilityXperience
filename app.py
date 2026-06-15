@@ -7,7 +7,6 @@ SmartCheck Killer — AI-Powered Enterprise Grade
 import streamlit as st
 from datetime import datetime, date, time, timedelta
 import pandas as pd
-import time
 import base64
 from pathlib import Path
 import os
