@@ -2724,23 +2724,7 @@ def page_visitor():
                 colors = {"checked_in": "#10B981", "checked_out": "#6B7280", "expected": "#F59E0B", "pre_registered": "#3B82F6", "cancelled": "#EF4444"}
                 sc = colors.get(status, "#4a4a4a")
                 
-                st.markdown(f"""
-                <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div>
-                            <b>{v.get('full_name','')}</b>
-                            <span style="font-size:0.7rem;color:#888;margin-left:0.5rem;">{v.get('company','')}</span>
-                        </div>
-                        <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;font-weight:600;">{status.upper()}</span>
-                    </div>
-                    <div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">
-                        🎯 {v.get('purpose_of_visit','')} | 👤 Host: {v.get('host_name','')} | ⏰ {v.get('expected_arrival','')}
-                    </div>
-                    <div style="font-size:0.65rem;color:#888;">
-                        📧 {v.get('email','N/A')} | 📱 {v.get('mobile','N/A')} | 🚗 {v.get('vehicle_plate','No vehicle')}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{v.get('full_name','')}</b><span style="font-size:0.7rem;color:#888;margin-left:0.5rem;">{v.get('company','')}</span></div><span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;">{status.upper()}</span></div><div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">🎯 {v.get('purpose_of_visit','')} | 👤 {v.get('host_name','')} | ⏰ {v.get('expected_arrival','')}</div><div style="font-size:0.65rem;color:#888;">📧 {v.get('email','N/A')} | 📱 {v.get('mobile','N/A')} | 🚗 {v.get('vehicle_plate','No vehicle')}</div></div>""", unsafe_allow_html=True)
                 
                 # Quick actions
                 c1, c2, c3 = st.columns([1,1,1])
