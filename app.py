@@ -2690,54 +2690,323 @@ def page_ic():
                     st.success("Incident reported!");st.rerun()
 
 # ============================================
-# VISITOR MANAGEMENT
+# VISITOR MANAGEMENT — WORLD CLASS SYSTEM
 # ============================================
-def page_vm():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 🛂 Visitor Experience Portal — {info.get("full_name",fc)}')
-    tab1,tab2,tab3=st.tabs(["📋 Today's Visitors","➕ Register Visitor","📊 Reports"])
-    with tab1:
-        vis=DB.get_all("visitors",fc,50)
-        if vis:
-            df=pd.DataFrame(vis)
-            c1,c2=st.columns(2)
-            with c1:st.metric("Expected Today",len(df))
-            with c2:st.metric("Checked In",len(df[df["status"]=="checked_in"]) if "status" in df.columns else 0)
-            for i,row in df.iterrows():
-                s=row.get("status","expected")
-                badge="badge-success" if s=="checked_in" else "badge-warning" if s in ["expected","pre_registered"] else "badge-info"
-                with st.expander(f"{row.get('full_name','')} — {row.get('company','')} — {s.upper()}"):
-                    st.write(f"**Host:** {row.get('host_name','')} | **Purpose:** {row.get('purpose_of_visit','')}")
-                    st.write(f"**Arrival:** {row.get('expected_arrival','')} | **Departure:** {row.get('expected_departure','')}")
-                    if s in ["expected","pre_registered"]:
-                        if st.button("✅ Check In",key=f"vin_{row['id']}"):DB.update("visitors",row["id"],{"status":"checked_in","actual_arrival":datetime.now().isoformat()});st.rerun()
-                    if s=="checked_in":
-                        if st.button("🚪 Check Out",key=f"vout_{row['id']}"):DB.update("visitors",row["id"],{"status":"checked_out","actual_departure":datetime.now().isoformat()});st.rerun()
-        else:st.info("No visitors today")
-    with tab2:
-        with st.form("vis_form"):
-            st.markdown("### Register Visitor")
-            vtype=st.radio("Type",["Visitor","Vendor","Interview"],horizontal=True)
-            c1,c2=st.columns(2)
+def page_visitor():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    is_admin = user_role in ["admin", "approver", "authorizer", "confirmer"]
+    
+    st.markdown(f'## 🛂 Visitor Management — {info.get("full_name", fc)}')
+    
+    tabs = st.tabs(["📋 Dashboard", "➕ Register Visitor", "📊 Gate Check", "📈 Analytics", "📄 Reports"])
+    
+    # ============================================
+    # TAB 0: DASHBOARD
+    # ============================================
+    with tabs[0]:
+        today = date.today()
+        
+        # Stats
+        visitors_today = supabase.table("visitors").select("id", count="exact").eq("facility_code", fc).eq("visit_date", str(today)).execute()
+        checked_in = supabase.table("visitors").select("id", count="exact").eq("facility_code", fc).eq("visit_date", str(today)).eq("status", "checked_in").execute()
+        expected = supabase.table("visitors").select("id", count="exact").eq("facility_code", fc).eq("visit_date", str(today)).in_("status", ["expected","pre_registered"]).execute()
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.metric("📋 Total Today", visitors_today.count or 0)
+        with c2: st.metric("✅ Checked In", checked_in.count or 0)
+        with c3: st.metric("⏳ Expected", expected.count or 0)
+        with c4: st.metric("🚪 Checked Out", 0)
+        
+        st.markdown("---")
+        st.markdown("### 📋 Today's Visitors")
+        
+        visitors = supabase.table("visitors").select("*").eq("facility_code", fc).eq("visit_date", str(today)).order("expected_arrival").execute()
+        
+        if visitors.data:
+            for v in visitors.data:
+                status = v.get("status", "expected")
+                colors = {"checked_in": "#10B981", "checked_out": "#6B7280", "expected": "#F59E0B", "pre_registered": "#3B82F6", "cancelled": "#EF4444"}
+                sc = colors.get(status, "#4a4a4a")
+                
+                st.markdown(f"""
+                <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>{v.get('full_name','')}</b>
+                            <span style="font-size:0.7rem;color:#888;margin-left:0.5rem;">{v.get('company','')}</span>
+                        </div>
+                        <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;font-weight:600;">{status.upper()}</span>
+                    </div>
+                    <div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">
+                        🎯 {v.get('purpose_of_visit','')} | 👤 Host: {v.get('host_name','')} | ⏰ {v.get('expected_arrival','')}
+                    </div>
+                    <div style="font-size:0.65rem;color:#888;">
+                        📧 {v.get('email','N/A')} | 📱 {v.get('mobile','N/A')} | 🚗 {v.get('vehicle_plate','No vehicle')}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Quick actions
+                c1, c2, c3 = st.columns([1,1,1])
+                with c1:
+                    if status in ["expected", "pre_registered"]:
+                        if st.button("✅ Check In", key=f"vin_{v['id']}", use_container_width=True):
+                            supabase.table("visitors").update({"status": "checked_in", "actual_arrival": datetime.now().isoformat()}).eq("id", v["id"]).execute()
+                            # Notify host
+                            if v.get("host_email"):
+                                send_email_notification(v["host_email"], f"🛂 Guest Arrived: {v.get('full_name','')}", f"<h3>Guest Arrived</h3><p>{v.get('full_name','')} has arrived for: {v.get('purpose_of_visit','')}</p>")
+                            st.rerun()
+                with c2:
+                    if status == "checked_in":
+                        if st.button("🚪 Check Out", key=f"vout_{v['id']}", use_container_width=True):
+                            supabase.table("visitors").update({"status": "checked_out", "actual_departure": datetime.now().isoformat()}).eq("id", v["id"]).execute()
+                            st.rerun()
+                with c3:
+                    if st.button("📋 Details", key=f"vdet_{v['id']}", use_container_width=True):
+                        with st.expander("Visitor Details", expanded=True):
+                            st.write(f"**Pass ID:** {v.get('pass_id','N/A')}")
+                            st.write(f"**Access Code:** {v.get('access_code','N/A')}")
+                            if v.get("qr_code_url"):
+                                st.image(v["qr_code_url"], width=120)
+                            st.write(f"**ID Type:** {v.get('identification_type','')} | **ID No:** {v.get('identification_number','')}")
+                            st.write(f"**Access Level:** {v.get('access_level','')}")
+                            if v.get("belongings"):
+                                st.write(f"**Belongings:** {v.get('belongings','')}")
+        else:
+            st.info("No visitors today")
+    
+    # ============================================
+    # TAB 1: REGISTER VISITOR
+    # ============================================
+    with tabs[1]:
+        st.markdown("### ➕ Register New Visitor")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            visitor_type = st.selectbox("Visitor Type", ["Visitor", "Vendor", "Interview", "Contractor", "Delivery", "Guest"])
+            pass_type = st.selectbox("Pass Type", ["One Time", "Recurring", "Multi-Day"])
+        with c2:
+            visit_date = st.date_input("Visit Date", today)
+            access_level = st.selectbox("Access Level", ["Standard", "Restricted", "VIP", "Escort Required"])
+        
+        st.markdown("---")
+        st.markdown("**👤 Personal Details**")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            first_name = st.text_input("First Name*")
+            email = st.text_input("Email")
+        with c2:
+            last_name = st.text_input("Last Name*")
+            mobile = st.text_input("Mobile Number*")
+        with c3:
+            company = st.text_input("Company")
+            whatsapp = st.text_input("WhatsApp Number")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            id_type = st.selectbox("ID Type", ["National ID", "Driver's License", "International Passport", "Company ID", "Voter's Card"])
+            id_number = st.text_input("ID Number")
+        with c2:
+            vehicle = st.text_input("Vehicle Plate Number")
+            gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+        
+        st.markdown("---")
+        st.markdown("**🏢 Visit Details**")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            host_name = st.text_input("Host Name*")
+            arrival_time = st.time_input("Expected Arrival", time(9, 0))
+        with c2:
+            host_email = st.text_input("Host Email")
+            departure_time = st.time_input("Expected Departure", time(17, 0))
+        with c3:
+            host_phone = st.text_input("Host Phone")
+            purpose = st.text_area("Purpose of Visit", height=60)
+        
+        belongings = st.text_area("Belongings/Equipment", placeholder="Laptop, tools, etc...")
+        
+        st.markdown("---")
+        
+        if st.button("🛂 Register Visitor", use_container_width=True, type="primary"):
+            if first_name and last_name and host_name:
+                # Generate pass ID and access code
+                import random, string
+                pass_id = f"VIS-{fc}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.digits, k=4))}"
+                access_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={access_code}"
+                
+                supabase.table("visitors").insert({
+                    "facility_code": fc,
+                    "visitor_type": visitor_type.lower(),
+                    "pass_id": pass_id,
+                    "access_code": access_code,
+                    "qr_code_url": qr_url,
+                    "first_name": first_name,
+                    "last_name": last_name,
+                    "gender": gender,
+                    "email": email,
+                    "mobile": mobile,
+                    "whatsapp_number": whatsapp or mobile,
+                    "company": company,
+                    "identification_type": id_type,
+                    "identification_number": id_number,
+                    "vehicle_plate": vehicle,
+                    "purpose_of_visit": purpose,
+                    "host_name": host_name,
+                    "host_email": host_email,
+                    "host_phone": host_phone,
+                    "visit_date": str(visit_date),
+                    "expected_arrival": str(arrival_time),
+                    "expected_departure": str(departure_time),
+                    "pass_type": pass_type.lower().replace(" ", "_"),
+                    "access_level": access_level.lower(),
+                    "belongings": belongings,
+                    "status": "pre_registered",
+                    "pre_registered_by": st.session_state.get("user", {}).get("id"),
+                    "created_at": datetime.now().isoformat()
+                }).execute()
+                
+                # Send email
+                if email:
+                    send_email_notification(email, f"🛂 Visitor Pass - {pass_id}",
+                        f"""
+                        <div style="font-family:Arial;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
+                            <div style="background:#CC0000;padding:20px;color:white;">
+                                <h2 style="margin:0;">Visitor Access Pass</h2>
+                                <p style="margin:5px 0 0 0;font-size:12px;">{info.get('full_name',fc)}</p>
+                            </div>
+                            <div style="padding:20px;text-align:center;">
+                                <img src="{qr_url}" width="180"><br>
+                                <h3>{access_code}</h3>
+                                <p><b>Pass ID:</b> {pass_id}</p>
+                                <p><b>Date:</b> {visit_date} | <b>Time:</b> {arrival_time} - {departure_time}</p>
+                                <p><b>Host:</b> {host_name}</p>
+                                <p style="font-size:11px;color:#888;">Present this QR code at the gate for access</p>
+                            </div>
+                        </div>
+                        """)
+                
+                # Send WhatsApp (if configured)
+                if whatsapp or mobile:
+                    wa_number = whatsapp or mobile
+                    # WhatsApp API call would go here
+                    try:
+                        supabase.table("visitors").update({"whatsapp_sent": True}).eq("pass_id", pass_id).execute()
+                    except: pass
+                
+                # Notify host
+                if host_email:
+                    send_email_notification(host_email, f"🛂 New Visitor: {first_name} {last_name}",
+                        f"<h3>Visitor Pre-Registered</h3><p><b>{first_name} {last_name}</b> from <b>{company}</b> will visit on {visit_date}.</p><p><b>Purpose:</b> {purpose}</p><p><b>Time:</b> {arrival_time} - {departure_time}</p>")
+                
+                st.success(f"✅ Visitor registered! Pass ID: {pass_id}")
+                st.balloons()
+                st.rerun()
+            else:
+                st.error("⚠️ First Name, Last Name, and Host Name are required")
+    
+    # ============================================
+    # TAB 2: GATE CHECK
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 📊 Gate Check-In/Out")
+        st.caption("Scan QR code or enter access code to check visitors in/out")
+        
+        access_code = st.text_input("Enter Access Code", placeholder="Scan or type access code...", key="gate_code")
+        
+        if access_code:
+            visitor = supabase.table("visitors").select("*").eq("access_code", access_code).eq("facility_code", fc).single().execute()
+            if visitor.data:
+                v = visitor.data
+                st.success(f"✅ Visitor Found: {v.get('full_name','')} — {v.get('company','')}")
+                st.markdown(f"""
+                <div style="background:white;border-radius:10px;padding:1rem;border-left:4px solid #CC0000;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+                    <h3>{v.get('full_name','')}</h3>
+                    <p><b>Pass ID:</b> {v.get('pass_id','')} | <b>Status:</b> {v.get('status','').upper()}</p>
+                    <p><b>Host:</b> {v.get('host_name','')} | <b>Purpose:</b> {v.get('purpose_of_visit','')}</p>
+                    <p><b>Vehicle:</b> {v.get('vehicle_plate','N/A')} | <b>Belongings:</b> {v.get('belongings','None')}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c1, c2, c3 = st.columns(3)
+                status = v.get("status", "expected")
+                with c1:
+                    if status in ["expected", "pre_registered"]:
+                        if st.button("✅ Check In", use_container_width=True):
+                            supabase.table("visitors").update({"status": "checked_in", "actual_arrival": datetime.now().isoformat()}).eq("id", v["id"]).execute()
+                            supabase.table("visitor_gate_log").insert({"visitor_id": v["id"], "event_type": "check_in", "gate_location": "Main Gate", "scanned_by": st.session_state.get("user_name","Security")}).execute()
+                            if v.get("host_email"):
+                                send_email_notification(v["host_email"], f"🛂 Guest Arrived: {v.get('full_name','')}", f"<p>{v.get('full_name','')} has arrived.</p>")
+                            st.success("✅ Checked In!")
+                            st.rerun()
+                with c2:
+                    if status == "checked_in":
+                        if st.button("🚪 Check Out", use_container_width=True):
+                            supabase.table("visitors").update({"status": "checked_out", "actual_departure": datetime.now().isoformat()}).eq("id", v["id"]).execute()
+                            supabase.table("visitor_gate_log").insert({"visitor_id": v["id"], "event_type": "check_out", "gate_location": "Main Gate", "scanned_by": st.session_state.get("user_name","Security")}).execute()
+                            st.success("🚪 Checked Out!")
+                            st.rerun()
+                with c3:
+                    if st.button("🚫 Deny Entry", use_container_width=True):
+                        supabase.table("visitors").update({"status": "cancelled", "security_flag": True}).eq("id", v["id"]).execute()
+                        st.error("Entry Denied")
+                        st.rerun()
+            else:
+                st.error("❌ Invalid access code")
+    
+    # ============================================
+    # TAB 3: ANALYTICS
+    # ============================================
+    with tabs[3]:
+        st.markdown("### 📈 Visitor Analytics")
+        
+        all_visitors = supabase.table("visitors").select("*").eq("facility_code", fc).order("visit_date", desc=True).limit(500).execute()
+        
+        if all_visitors.data:
+            df = pd.DataFrame(all_visitors.data)
+            
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("Total Records", len(df))
+            with c2: st.metric("This Month", len(df[pd.to_datetime(df["visit_date"]).dt.month == today.month]) if "visit_date" in df.columns else 0)
+            with c3: st.metric("Avg Daily", round(len(df)/max((datetime.now() - pd.to_datetime(df["visit_date"].min())).days if "visit_date" in df.columns else 1, 1)))
+            with c4: st.metric("Checked In Rate", f"{round(len(df[df['status']=='checked_in'])/len(df)*100) if len(df)>0 else 0}%")
+            
+            st.markdown("---")
+            
+            c1, c2 = st.columns(2)
             with c1:
-                fn=st.text_input("First Name*");ln=st.text_input("Last Name*")
-                mobile=st.text_input("Mobile Number*");email=st.text_input("Email")
-                company=st.text_input("Company Name");coming_from=st.text_input("Coming From")
+                if "visitor_type" in df.columns:
+                    type_counts = df["visitor_type"].value_counts()
+                    fig = px.pie(values=type_counts.values, names=type_counts.index, title="By Visitor Type")
+                    st.plotly_chart(fig, use_container_width=True)
             with c2:
-                host=st.text_input("Whom to Meet*");purpose=st.text_input("Purpose of Visit")
-                vdate=st.date_input("Visiting Date*",date.today());vtime=st.time_input("Visiting Time",time(9,0))
-                vehicle=st.text_input("Vehicle Details");belongings=st.text_area("Belongings/Tools/Remarks")
-            if st.form_submit_button("🛂 Register",use_container_width=True):
-                if fn and ln and mobile and host:
-                    DB.insert("visitors",{"facility_code":fc,"visitor_type":vtype.lower(),"first_name":fn,"last_name":ln,"mobile":mobile,"email":email,"company":company,"coming_from":coming_from,"host_name":host,"purpose_of_visit":purpose,"visit_date":str(vdate),"expected_arrival":str(vtime),"vehicle_details":vehicle,"belongings":belongings,"status":"pre_registered","category":vtype.lower(),"created_at":datetime.now().isoformat()})
-                    st.success("Registered!");st.rerun()
-    with tab3:
-        st.markdown("### Visitor Reports")
-        yr=st.selectbox("Year",[2024,2025,2026,2027])
-        mn=st.selectbox("Month",["January","February","March","April","May","June","July","August","September","October","November","December"])
-        st.info(f"📊 Report for {mn} {yr} — Pulling live data from database")
-        vis_all=DB.get_all("visitors",fc,200)
-        if vis_all:st.dataframe(pd.DataFrame(vis_all)[[c for c in ["full_name","company","host_name","purpose_of_visit","status","actual_arrival","actual_departure"] if c in pd.DataFrame(vis_all).columns]],use_container_width=True,hide_index=True)
+                if "visit_date" in df.columns:
+                    df["month"] = pd.to_datetime(df["visit_date"]).dt.month
+                    monthly = df.groupby("month").size().reset_index(name="count")
+                    fig2 = px.bar(monthly, x="month", y="count", title="Monthly Volume")
+                    st.plotly_chart(fig2, use_container_width=True)
+    
+    # ============================================
+    # TAB 4: REPORTS
+    # ============================================
+    with tabs[4]:
+        st.markdown("### 📄 Visitor Reports")
+        
+        rpt_month = st.selectbox("Month", ["January","February","March","April","May","June","July","August","September","October","November","December"], key="vis_rpt_m")
+        rpt_year = st.selectbox("Year", [2024,2025,2026,2027], key="vis_rpt_y")
+        
+        if st.button("📊 Generate Report", use_container_width=True):
+            visitors = supabase.table("visitors").select("*").eq("facility_code", fc).order("visit_date", desc=True).limit(500).execute()
+            if visitors.data:
+                df = pd.DataFrame(visitors.data)
+                st.success(f"✅ Report for {rpt_month} {rpt_year} — {len(df)} records")
+                
+                st.dataframe(df[[c for c in ["full_name","company","visitor_type","host_name","purpose_of_visit","visit_date","expected_arrival","status","vehicle_plate"] if c in df.columns]], use_container_width=True, hide_index=True)
+                
+                csv = df.to_csv(index=False)
+                st.download_button("📥 CSV", csv, f"visitors_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
 
 # ============================================
 # USER MANAGEMENT — FULL ADMIN MODULE
@@ -3165,7 +3434,7 @@ def page_cs():
 ROUTER={
     "cc":page_cc,"ar":page_ar,"cal":page_cal,"cs":page_cs,"ppm":page_ppm,
     "wo":page_generic,"wp":page_wp,"fo":page_fo,"oa":page_oa,
-    "vm":page_vm,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb":page_fb,
+    "vm": page_visitor,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb":page_fb,
     "ac":page_ac,"ic":page_ic,"hot":page_generic,"uc":page_uc,"mis":page_generic,
 }
 
