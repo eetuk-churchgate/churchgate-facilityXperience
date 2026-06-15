@@ -3915,7 +3915,7 @@ def page_feedback():
                 st.markdown("**Select tenants to receive the survey:**")
                 
                 tenant_options = {}
-                for t in tenants.data::
+                for t in tenants.data:
                     tenant_options[f"{t.get('name','')} ({t.get('primary_contact_email','')})"] = t
                 
                 selected_tenants = st.multiselect(
