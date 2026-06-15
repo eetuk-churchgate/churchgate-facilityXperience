@@ -3191,7 +3191,15 @@ def page_visitor():
                             status = v.get("status","expected")
                             colors = {"checked_in":"#10B981","checked_out":"#6B7280","expected":"#F59E0B","cancelled":"#EF4444"}
                             sc = colors.get(status,"#4a4a4a")
-                            st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem 0.8rem;margin:0.2rem 0;border-left:4px solid {sc};box-shadow:0 1px 2px rgba(0,0,0,0.04);"><b>{v.get('full_name','')}</b> <span style="background:{sc};color:white;padding:1px 8px;border-radius:10px;font-size:0.6rem;">{status.upper()}</span> | {v.get('company','') or 'N/A'} | 👤 {v.get('host_name','')}</div>""", unsafe_allow_html=True)
+                            st.markdown(f"""
+<div style="background:white;border-radius:10px;padding:0.8rem;margin:0.3rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+<div style="display:flex;justify-content:space-between;align-items:center;">
+<b>{v.get('full_name','')}</b>
+<span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;">{status.upper()}</span>
+</div>
+<div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">{v.get('company','') or 'N/A'} | 🎯 {v.get('purpose_of_visit','') or 'N/A'} | 👤 {v.get('host_name','')}</div>
+</div>
+""", unsafe_allow_html=True)
                     else:
                         st.info(f"No {vtype_filter} visitors today")
                 else:
