@@ -2927,19 +2927,27 @@ def page_visitor():
                     if host_email:
                         send_email_notification(host_email, f"🛂 Visitor Expected: {first_name} {last_name}",
                             f"""
-                            <div style="font-family:Arial;max-width:400px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
+                            <div style="font-family:Arial;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
                                 <div style="background:#CC0000;padding:15px;color:white;">
                                     <h3 style="margin:0;">📋 Visitor Pre-Registered</h3>
+                                    <p style="margin:3px 0 0 0;font-size:11px;opacity:0.9;">{info.get('full_name',fc)}</p>
                                 </div>
                                 <div style="padding:15px;">
-                                    <p><b>{first_name} {last_name}</b> from <b>{company}</b> is scheduled to visit.</p>
-                                    <table style="width:100%;font-size:12px;">
-                                        <tr><td style="padding:3px;"><b>📅 Date:</b></td><td>{visit_date}</td></tr>
-                                        <tr><td style="padding:3px;"><b>⏰ Time:</b></td><td>{arrival_time} - {departure_time}</td></tr>
-                                        <tr><td style="padding:3px;"><b>🎯 Purpose:</b></td><td>{purpose}</td></tr>
-                                        <tr><td style="padding:3px;"><b>🚗 Vehicle:</b></td><td>{vehicle or 'N/A'}</td></tr>
+                                    <p>Dear {host_name},</p>
+                                    <p><b>{first_name} {last_name}</b> from <b>{company}</b> is scheduled to visit you.</p>
+                                    <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                                        <tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">📅 Date</td><td style="padding:5px;border-bottom:1px solid #eee;">{visit_date}</td></tr>
+                                        <tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">⏰ Time</td><td style="padding:5px;border-bottom:1px solid #eee;">{arrival_time} - {departure_time}</td></tr>
+                                        <tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">🎯 Purpose</td><td style="padding:5px;border-bottom:1px solid #eee;">{purpose}</td></tr>
+                                        <tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">🆔 Pass ID</td><td style="padding:5px;border-bottom:1px solid #eee;">{pass_id}</td></tr>
+                                        <tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">🟢 Entry Code</td><td style="padding:5px;border-bottom:1px solid #eee;font-family:monospace;color:#10B981;">{access_code_in}</td></tr>
+                                        <tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">🔴 Exit Code</td><td style="padding:5px;border-bottom:1px solid #eee;font-family:monospace;color:#EF4444;">{access_code_out}</td></tr>
+                                        <tr><td style="padding:5px;font-weight:bold;">🚗 Vehicle</td><td style="padding:5px;">{vehicle or 'N/A'}</td></tr>
                                     </table>
-                                    <p style="font-size:10px;color:#888;margin-top:10px;">You'll be notified when your guest arrives.</p>
+                                    <div style="margin-top:12px;padding:10px;background:#f0f8ff;border-radius:6px;font-size:11px;">
+                                        💡 <b>Forward this email</b> to your guest — it contains their access codes and QR pass for entry.
+                                    </div>
+                                    <p style="font-size:10px;color:#888;margin-top:10px;">You'll be notified when your guest arrives at the gate.</p>
                                 </div>
                             </div>
                             """)
@@ -3094,7 +3102,27 @@ def page_visitor():
                             supabase.table("visitors").update({"status": "checked_in", "actual_arrival": datetime.now().isoformat()}).eq("id", v["id"]).execute()
                             supabase.table("visitor_gate_log").insert({"visitor_id": v["id"], "event_type": "check_in", "gate_location": "Main Gate", "scanned_by": st.session_state.get("user_name","Security")}).execute()
                             if v.get("host_email"):
-                                send_email_notification(v["host_email"], f"🛂 Guest Arrived: {v.get('full_name','')}", f"<p>{v.get('full_name','')} has arrived.</p>")
+                                send_email_notification(v["host_email"], f"✅ Guest Arrived: {v.get('full_name','')}",
+                                    f"""
+                                    <div style="font-family:Arial;max-width:400px;border:1px solid #10B981;border-radius:8px;overflow:hidden;">
+                                        <div style="background:#10B981;padding:15px;color:white;">
+                                            <h3 style="margin:0;">✅ Guest Has Arrived</h3>
+                                            <p style="margin:3px 0 0 0;font-size:11px;">{info.get('full_name',fc)}</p>
+                                        </div>
+                                        <div style="padding:15px;">
+                                            <p>Dear {v.get('host_name','')},</p>
+                                            <p><b>{v.get('full_name','')}</b> from <b>{v.get('company','')}</b> has arrived and is waiting for you.</p>
+                                            <table style="width:100%;font-size:12px;">
+                                                <tr><td style="padding:3px;"><b>🕐 Check-in:</b></td><td>{datetime.now().strftime('%I:%M %p')}</td></tr>
+                                                <tr><td style="padding:3px;"><b>📍 Location:</b></td><td>{v.get('gate_location','Main Gate')}</td></tr>
+                                                <tr><td style="padding:3px;"><b>🎯 Purpose:</b></td><td>{v.get('purpose_of_visit','')}</td></tr>
+                                            </table>
+                                            <div style="margin-top:12px;text-align:center;">
+                                                <a href="https://facilityxperience.streamlit.app" style="background:#CC0000;color:white;padding:8px 20px;text-decoration:none;border-radius:6px;font-size:12px;">View in facilityXperience</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    """)
                             st.success("✅ Checked In!")
                             st.rerun()
                 with c2:
