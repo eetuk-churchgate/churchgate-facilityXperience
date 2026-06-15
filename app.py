@@ -2980,18 +2980,25 @@ def page_visitor():
                         access_code_in = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
                         access_code_out = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
                         
+                        try:
                         supabase.table("visitors").insert({
-                            "facility_code": fc, "visitor_type": "visitor", "pass_id": pass_id,
-                            "access_code": f"IN:{access_code_in}|OUT:{access_code_out}",
-                            "access_code_in": access_code_in, "access_code_out": access_code_out,
-                            "qr_code_url": f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IN:{access_code_in}%7COUT:{access_code_out}",
-                            "first_name": first, "last_name": last,
-                            "purpose_of_visit": batch_purpose, "host_name": batch_host,
-                            "host_email": batch_email, "visit_date": str(batch_date),
-                            "expected_arrival": str(batch_arrival), "expected_departure": str(batch_departure),
-                            "status": "pre_registered", "pass_type": "one_time", "access_level": "standard"
+                            "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
+                            "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
+                            "qr_code_url": qr_url,
+                            "first_name": first_name, "last_name": last_name, "gender": gender,
+                            "email": email, "mobile": mobile, "whatsapp_number": whatsapp or mobile,
+                            "company": company, "identification_type": id_type, "identification_number": id_number,
+                            "vehicle_plate": vehicle, "purpose_of_visit": purpose,
+                            "host_name": host_name, "host_email": host_email, "host_phone": host_phone,
+                            "visit_date": str(visit_date), "expected_arrival": str(arrival_time),
+                            "expected_departure": str(departure_time),
+                            "pass_type": pass_type.lower().replace(" ", "_"), "access_level": access_level.lower(),
+                            "belongings": belongings, "status": "pre_registered",
+                            "created_at": datetime.now().isoformat()
                         }).execute()
-                        count += 1
+                    except Exception as e:
+                        st.error(f"INSERT ERROR: {str(e)}")
+                        st.stop()
                     
                     st.success(f"✅ {count} visitors registered!")
                     st.balloons()
