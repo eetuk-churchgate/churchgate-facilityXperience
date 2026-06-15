@@ -2856,7 +2856,7 @@ def page_visitor():
                         "expected_departure": str(departure_time),
                         "pass_type": pass_type.lower().replace(" ", "_"), "access_level": access_level.lower(),
                         "belongings": belongings, "status": "pre_registered",
-                        "pre_registered_by": st.session_state.get("user", {}).get("id"),
+                        "pre_registered_by": None,
                         "created_at": datetime.now().isoformat()
                     }).execute()
                     
