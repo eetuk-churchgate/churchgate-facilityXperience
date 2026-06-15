@@ -3329,26 +3329,280 @@ def page_ac():
                     st.success(f"Score: {score}%");st.rerun()
 
 # ============================================
-# FEEDBACK
+# VOICE OF CUSTOMER — FEEDBACK SYSTEM
 # ============================================
-def page_fb():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## ⭐ Voice of Customer — {info.get("full_name",fc)}')
-    tab1,tab2=st.tabs(["📋 Feedback","✍️ Submit"])
-    with tab1:
-        fb=DB.get_all("feedback",fc,20)
-        if fb:
-            for f in fb:st.write(f"**{'⭐'*f.get('rating',0)}** — {f.get('title','')} — {f.get('comments','')}")
-        else:st.info("No feedback yet")
-    with tab2:
-        with st.form("fb_f"):
-            rating=st.slider("Rating",1,5,5);title=st.text_input("Title")
-            cat=st.selectbox("Category",["Facility","Service","Cleanliness","Security","Other"])
-            comments=st.text_area("Comments*")
-            if st.form_submit_button("⭐ Submit",use_container_width=True):
-                if comments:
-                    DB.insert("feedback",{"facility_code":fc,"rating":rating,"title":title,"category":cat,"comments":comments,"sentiment":"positive" if rating>=4 else "neutral","status":"new","created_at":datetime.now().isoformat()})
-                    st.success("Thank you!");st.rerun()
+def page_feedback():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    is_admin = user_role in ["admin", "approver"]
+    
+    st.markdown(f'## ⭐ Voice of Customer — {info.get("full_name", fc)}')
+    
+    tabs = st.tabs(["📝 Take Survey", "📊 Feedback Dashboard", "📈 AI Analytics", "⚙️ Survey Admin"])
+    
+    # ============================================
+    # TAB 0: TAKE SURVEY
+    # ============================================
+    with tabs[0]:
+        # Get active survey
+        survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).eq("is_active", True).single().execute()
+        
+        if not survey.data:
+            st.info("📝 No active survey at this time. Check back during survey period.")
+        else:
+            s = survey.data
+            st.markdown(f"### 📝 {s.get('title','')}")
+            st.caption(s.get('description',''))
+            
+            questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
+            
+            if questions.data:
+                with st.form("feedback_form"):
+                    st.markdown("---")
+                    
+                    # Respondent info
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        resp_name = st.text_input("Your Name", value=st.session_state.get("user_name",""))
+                        resp_company = st.text_input("Company")
+                    with c2:
+                        resp_email = st.text_input("Your Email", value=st.session_state.get("user",{}).get("email",""))
+                        anon = st.checkbox("Submit anonymously")
+                    
+                    st.markdown("---")
+                    st.markdown("### Rate Your Experience")
+                    st.caption("4 = Excellent | 3 = Good | 2 = Average | 1 = Below Average")
+                    
+                    scores = {}
+                    for q in questions.data:
+                        qnum = q.get("question_number")
+                        qtype = q.get("question_type","rating")
+                        
+                        if qtype == "rating":
+                            emoji_map = {4: "😍", 3: "🙂", 2: "😐", 1: "😞"}
+                            st.markdown(f"**{qnum}. {q.get('question_text','')}**")
+                            st.caption(f"Category: {q.get('category','')}")
+                            score = st.select_slider(
+                                f"Rating for Q{qnum}",
+                                options=[1, 2, 3, 4],
+                                value=3,
+                                format_func=lambda x: f"{'⭐'*x} {['','Below Average','Average','Good','Excellent'][x]}",
+                                key=f"q_{q['id']}"
+                            )
+                            scores[q["id"]] = {"score": score}
+                        else:
+                            st.markdown(f"**{qnum}. {q.get('question_text','')}**")
+                            text_answer = st.text_area(f"Your answer for Q{qnum}", key=f"q_{q['id']}", height=80)
+                            scores[q["id"]] = {"text": text_answer}
+                        
+                        st.markdown("---")
+                    
+                    submitted = st.form_submit_button("📩 Submit Feedback", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        if resp_email or anon:
+                            # Create response
+                            res = supabase.table("feedback_responses").insert({
+                                "survey_id": s["id"],
+                                "respondent_email": resp_email if not anon else None,
+                                "respondent_name": resp_name if not anon else "Anonymous",
+                                "company": resp_company,
+                                "facility_code": fc,
+                                "is_anonymous": anon,
+                                "submitted_at": datetime.now().isoformat()
+                            }).execute()
+                            
+                            if res.data:
+                                resp_id = res.data[0]["id"]
+                                for qid, data in scores.items():
+                                    supabase.table("feedback_scores").insert({
+                                        "response_id": resp_id,
+                                        "question_id": qid,
+                                        "score": data.get("score"),
+                                        "text_answer": data.get("text")
+                                    }).execute()
+                                
+                                st.success("✅ Thank you for your feedback! Your response has been recorded.")
+                                st.balloons()
+                                st.rerun()
+                        else:
+                            st.error("Please enter your email or submit anonymously")
+    
+    # ============================================
+    # TAB 1: FEEDBACK DASHBOARD
+    # ============================================
+    with tabs[1]:
+        st.markdown("### 📊 Feedback Dashboard")
+        
+        survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(1).execute()
+        
+        if survey.data:
+            s = survey.data[0]
+            responses = supabase.table("feedback_responses").select("id", count="exact").eq("survey_id", s["id"]).execute()
+            questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
+            
+            total_responses = responses.count or 0
+            
+            st.markdown(f"**Survey:** {s.get('title','')}")
+            st.metric("Total Responses", total_responses)
+            
+            if total_responses > 0 and questions.data:
+                st.markdown("---")
+                st.markdown("### 📈 Category Scores")
+                
+                for q in questions.data:
+                    if q.get("question_type") == "rating":
+                        scores = supabase.table("feedback_scores").select("score").eq("question_id", q["id"]).execute()
+                        if scores.data:
+                            avg_score = sum(sc["score"] for sc in scores.data) / len(scores.data)
+                            stars = "⭐" * round(avg_score)
+                            st.markdown(f"**{q.get('question_number')}. {q.get('category','')}**")
+                            st.markdown(f"{stars} **{avg_score:.1f}/4**")
+                            st.progress(avg_score / 4)
+        else:
+            st.info("No survey data yet")
+    
+    # ============================================
+    # TAB 2: AI ANALYTICS
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 🤖 AI-Powered Feedback Analytics")
+        
+        survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(1).execute()
+        
+        if survey.data:
+            s = survey.data[0]
+            questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
+            
+            if questions.data:
+                categories = []
+                avg_scores = []
+                
+                for q in questions.data:
+                    if q.get("question_type") == "rating":
+                        scores = supabase.table("feedback_scores").select("score").eq("question_id", q["id"]).execute()
+                        if scores.data:
+                            avg = sum(sc["score"] for sc in scores.data) / len(scores.data)
+                            categories.append(q.get("category",""))
+                            avg_scores.append(round(avg, 1))
+                
+                if categories:
+                    # Bar chart
+                    fig = px.bar(x=categories, y=avg_scores, title="Satisfaction by Category", 
+                                labels={"x":"","y":"Score"}, color=avg_scores, 
+                                color_continuous_scale=["#EF4444","#F59E0B","#3B82F6","#10B981"],
+                                range_color=[1,4])
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # AI Insights
+                    st.markdown("### 🤖 AI Recommendations")
+                    best = categories[avg_scores.index(max(avg_scores))]
+                    worst = categories[avg_scores.index(min(avg_scores))]
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.success(f"🌟 **Strength:** {best} ({max(avg_scores)}/4)")
+                        st.caption("Continue investing in this area")
+                    with col2:
+                        st.error(f"⚠️ **Needs Attention:** {worst} ({min(avg_scores)}/4)")
+                        st.caption("Priority improvement area")
+                    
+                    if min(avg_scores) < 2.5:
+                        st.warning(f"🚨 **Retention Risk:** Low satisfaction in {worst} may impact tenant retention. Recommend immediate action plan.")
+                    
+                    if max(avg_scores) >= 3.5:
+                        st.info(f"💡 **Marketing Opportunity:** High satisfaction in {best} can be leveraged in marketing materials.")
+        else:
+            st.info("No data for analytics")
+    
+    # ============================================
+    # TAB 3: SURVEY ADMIN (ADMIN ONLY)
+    # ============================================
+    with tabs[3]:
+        if not is_admin:
+            st.error("⛔ Admin access only")
+        else:
+            st.markdown("### ⚙️ Survey Administration")
+            
+            # Current surveys
+            surveys = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).order("created_at", desc=True).execute()
+            
+            if surveys.data:
+                st.markdown("**Existing Surveys:**")
+                for s in surveys.data:
+                    status_badge = "🟢 Active" if s.get("is_active") else "⚪ Inactive"
+                    st.markdown(f"- **{s.get('title','')}** — {status_badge} | {s.get('start_date','')} to {s.get('end_date','')}")
+            
+            st.markdown("---")
+            
+            # Activate/Deactivate survey
+            with st.form("survey_admin"):
+                st.markdown("**Manage Survey**")
+                
+                survey_options = {s.get("title",""): s["id"] for s in surveys.data} if surveys.data else {}
+                selected_survey = st.selectbox("Select Survey", list(survey_options.keys())) if survey_options else None
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.form_submit_button("🟢 Activate Survey", use_container_width=True):
+                        if selected_survey:
+                            # Deactivate all others
+                            supabase.table("feedback_surveys").update({"is_active": False}).eq("facility_code", fc).execute()
+                            # Activate selected
+                            supabase.table("feedback_surveys").update({"is_active": True}).eq("id", survey_options[selected_survey]).execute()
+                            st.success(f"✅ {selected_survey} activated!")
+                            st.rerun()
+                with c2:
+                    if st.form_submit_button("⚪ Deactivate All", use_container_width=True):
+                        supabase.table("feedback_surveys").update({"is_active": False}).eq("facility_code", fc).execute()
+                        st.success("All surveys deactivated")
+                        st.rerun()
+            
+            st.markdown("---")
+            
+            # Broadcast email to tenants
+            st.markdown("### 📧 Broadcast Survey to Tenants")
+            
+            if st.button("📧 Send Survey to All Tenants", use_container_width=True):
+                if selected_survey and survey_options:
+                    survey_link = f"https://facilityxperience.streamlit.app/?survey={survey_options[selected_survey]}"
+                    
+                    # Get all tenant emails
+                    tenants = supabase.table("organizations").select("primary_contact_email, name").eq("type", "tenant").eq("is_active", True).execute()
+                    
+                    sent_count = 0
+                    if tenants.data:
+                        for t in tenants.data:
+                            if t.get("primary_contact_email"):
+                                send_email_notification(
+                                    t["primary_contact_email"],
+                                    f"📝 Tenant Satisfaction Survey — {info.get('full_name',fc)}",
+                                    f"""
+                                    <div style="font-family:Arial;max-width:600px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
+                                        <div style="background:#CC0000;padding:20px;color:white;">
+                                            <h2 style="margin:0;">We Value Your Feedback</h2>
+                                            <p style="margin:5px 0 0 0;font-size:12px;">{info.get('full_name',fc)} — Tenant Satisfaction Survey</p>
+                                        </div>
+                                        <div style="padding:20px;">
+                                            <p>Dear {t.get('name','Valued Tenant')},</p>
+                                            <p>We invite you to participate in our half-yearly tenant satisfaction survey. Your feedback helps us improve our services.</p>
+                                            <p><b>Time to complete:</b> Less than 5 minutes</p>
+                                            <div style="text-align:center;margin:25px 0;">
+                                                <a href="{survey_link}" style="background:#CC0000;color:white;padding:12px 30px;text-decoration:none;border-radius:6px;font-weight:bold;">Take Survey Now</a>
+                                            </div>
+                                            <p style="font-size:11px;color:#888;">Your responses are confidential and will be used to enhance your workplace experience.</p>
+                                        </div>
+                                    </div>
+                                    """
+                                )
+                                sent_count += 1
+                    
+                    st.success(f"✅ Survey sent to {sent_count} tenants!")
+                    st.balloons()
+                else:
+                    st.error("Please select a survey first")
 
 # ============================================
 # UTILITY DASHBOARD
@@ -3434,7 +3688,7 @@ def page_cs():
 ROUTER={
     "cc":page_cc,"ar":page_ar,"cal":page_cal,"cs":page_cs,"ppm":page_ppm,
     "wo":page_generic,"wp":page_wp,"fo":page_fo,"oa":page_oa,
-    "vm": page_visitor,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb":page_fb,
+    "vm": page_visitor,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb": page_feedback,
     "ac":page_ac,"ic":page_ic,"hot":page_generic,"uc":page_uc,"mis":page_generic,
 }
 
