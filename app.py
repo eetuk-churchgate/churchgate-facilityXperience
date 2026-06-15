@@ -3906,7 +3906,7 @@ def page_feedback():
             st.markdown("### 📧 Broadcast Survey to Tenants")
             
             # Get all tenants
-             tenants = supabase.table("organizations").select("*").eq("type", "tenant").eq("is_active", True).execute()
+            tenants = supabase.table("organizations").select("*").eq("type", "tenant").eq("is_active", True).execute()
             if not tenants.data or len(tenants.data) == 0:
                 tenants = supabase.table("organizations").select("*").eq("is_active", True).execute()
             
@@ -3915,7 +3915,7 @@ def page_feedback():
                 st.markdown("**Select tenants to receive the survey:**")
                 
                 tenant_options = {}
-                for t in tenants.data:
+                for t in tenants.data::
                     tenant_options[f"{t.get('name','')} ({t.get('primary_contact_email','')})"] = t
                 
                 selected_tenants = st.multiselect(
