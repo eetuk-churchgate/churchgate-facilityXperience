@@ -3351,7 +3351,7 @@ def page_feedback():
         if not survey.data or len(survey.data) == 0:
             st.info("📝 No active survey at this time. Check back during survey period.")
         else:
-            s = survey.data
+            s = survey.data[0]
             st.markdown(f"### 📝 {s.get('title','')}")
             st.caption(s.get('description',''))
             
