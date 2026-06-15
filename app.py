@@ -2929,6 +2929,7 @@ def page_visitor():
                                 access_code_out = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
                                 try:
                         supabase.table("visitors").insert({
+
                             "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
                             "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
                             "qr_code_url": qr_url,
