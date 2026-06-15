@@ -2843,21 +2843,25 @@ def page_visitor():
                         logo_b64 = get_logo_base64()
                         logo_src = f"data:image/png;base64,{logo_b64}" if logo_b64 else ""
                     
-                    supabase.table("visitors").insert({
-                        "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
-                        "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
-                        "qr_code_url": qr_url,
-                        "first_name": first_name, "last_name": last_name, "gender": gender,
-                        "email": email, "mobile": mobile, "whatsapp_number": whatsapp or mobile,
-                        "company": company, "identification_type": id_type, "identification_number": id_number,
-                        "vehicle_plate": vehicle, "purpose_of_visit": purpose,
-                        "host_name": host_name, "host_email": host_email, "host_phone": host_phone,
-                        "visit_date": str(visit_date), "expected_arrival": str(arrival_time),
-                        "expected_departure": str(departure_time),
-                        "pass_type": pass_type.lower().replace(" ", "_"), "access_level": access_level.lower(),
-                        "belongings": belongings, "status": "pre_registered",
-                        "created_at": datetime.now().isoformat()
-                    }).execute()
+                    try:
+                        supabase.table("visitors").insert({
+                            "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
+                            "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
+                            "qr_code_url": qr_url,
+                            "first_name": first_name, "last_name": last_name, "gender": gender,
+                            "email": email, "mobile": mobile, "whatsapp_number": whatsapp or mobile,
+                            "company": company, "identification_type": id_type, "identification_number": id_number,
+                            "vehicle_plate": vehicle, "purpose_of_visit": purpose,
+                            "host_name": host_name, "host_email": host_email, "host_phone": host_phone,
+                            "visit_date": str(visit_date), "expected_arrival": str(arrival_time),
+                            "expected_departure": str(departure_time),
+                            "pass_type": pass_type.lower().replace(" ", "_"), "access_level": access_level.lower(),
+                            "belongings": belongings, "status": "pre_registered",
+                            "created_at": datetime.now().isoformat()
+                        }).execute()
+                    except Exception as e:
+                        st.error(f"INSERT ERROR: {str(e)}")
+                        st.stop()
                     
                     # Show generated pass
                     st.success(f"✅ Visitor registered! Pass ID: {pass_id}")
