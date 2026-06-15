@@ -2750,7 +2750,27 @@ def page_visitor():
                             supabase.table("visitors").update({"status": "checked_in", "actual_arrival": datetime.now().isoformat()}).eq("id", v["id"]).execute()
                             # Notify host
                             if v.get("host_email"):
-                                send_email_notification(v["host_email"], f"🛂 Guest Arrived: {v.get('full_name','')}", f"<h3>Guest Arrived</h3><p>{v.get('full_name','')} has arrived for: {v.get('purpose_of_visit','')}</p>")
+                                send_email_notification(v["host_email"], f"✅ Guest Arrived: {v.get('full_name','')}",
+                                    f"""
+                                    <div style="font-family:Arial;max-width:400px;border:1px solid #10B981;border-radius:8px;overflow:hidden;">
+                                        <div style="background:#10B981;padding:15px;color:white;">
+                                            <h3 style="margin:0;">✅ Guest Has Arrived</h3>
+                                            <p style="margin:3px 0 0 0;font-size:11px;">{info.get('full_name',fc)}</p>
+                                        </div>
+                                        <div style="padding:15px;">
+                                            <p>Dear {v.get('host_name','')},</p>
+                                            <p><b>{v.get('full_name','')}</b> from <b>{v.get('company','')}</b> has arrived and is waiting for you.</p>
+                                            <table style="width:100%;font-size:12px;">
+                                                <tr><td style="padding:3px;"><b>🕐 Check-in:</b></td><td>{datetime.now().strftime('%I:%M %p')}</td></tr>
+                                                <tr><td style="padding:3px;"><b>📍 Location:</b></td><td>{v.get('gate_location','Main Gate')}</td></tr>
+                                                <tr><td style="padding:3px;"><b>🎯 Purpose:</b></td><td>{v.get('purpose_of_visit','')}</td></tr>
+                                            </table>
+                                            <div style="margin-top:12px;text-align:center;">
+                                                <a href="https://facilityxperience.streamlit.app" style="background:#CC0000;color:white;padding:8px 20px;text-decoration:none;border-radius:6px;font-size:12px;">View in facilityXperience</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    """)
                             st.rerun()
                 with c2:
                     if status == "checked_in":
