@@ -2993,14 +2993,14 @@ def page_visitor():
                                 "email": email, "mobile": mobile, "whatsapp_number": whatsapp or mobile,
                                 "company": company, "identification_type": id_type, "identification_number": id_number,
                                 "vehicle_plate": vehicle, "purpose_of_visit": purpose,
-                            "host_name": host_name, "host_email": host_email, "host_phone": host_phone,
-                            "visit_date": str(visit_date), "expected_arrival": str(arrival_time),
-                            "expected_departure": str(departure_time),
-                            "pass_type": pass_type.lower().replace(" ", "_"), "access_level": access_level.lower(),
-                            "belongings": belongings, "status": "pre_registered",
-                            "created_at": datetime.now().isoformat()
-                        }).execute()
-                    except Exception as e:
+                                "host_name": host_name, "host_email": host_email, "host_phone": host_phone,
+                                "visit_date": str(visit_date), "expected_arrival": str(arrival_time),
+                                "expected_departure": str(departure_time),
+                                "pass_type": pass_type.lower().replace(" ", "_"), "access_level": access_level.lower(),
+                                "belongings": belongings, "status": "pre_registered",
+                                "created_at": datetime.now().isoformat()
+                            }).execute()
+                        except Exception as e:
                             st.error(f"INSERT ERROR: {str(e)}")
                             st.stop()
                     
