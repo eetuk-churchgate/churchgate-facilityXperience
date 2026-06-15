@@ -3001,8 +3001,8 @@ def page_visitor():
                             "created_at": datetime.now().isoformat()
                         }).execute()
                     except Exception as e:
-                        st.error(f"INSERT ERROR: {str(e)}")
-                        st.stop()
+                            st.error(f"INSERT ERROR: {str(e)}")
+                            st.stop()
                     
                     st.success(f"✅ {count} visitors registered!")
                     st.balloons()
