@@ -2775,129 +2775,225 @@ def page_visitor():
     # TAB 1: REGISTER VISITOR
     # ============================================
     with tabs[1]:
-        st.markdown("### ➕ Register New Visitor")
+        st.markdown("### ➕ Register Visitor")
         
-        c1, c2 = st.columns(2)
-        with c1:
-            visitor_type = st.selectbox("Visitor Type", ["Visitor", "Vendor", "Interview", "Contractor", "Delivery", "Guest"])
-            pass_type = st.selectbox("Pass Type", ["One Time", "Recurring", "Multi-Day"])
-        with c2:
-            visit_date = st.date_input("Visit Date", today)
-            access_level = st.selectbox("Access Level", ["Standard", "Restricted", "VIP", "Escort Required"])
+        reg_mode = st.radio("Registration Mode", ["Single Visitor", "Bulk Registration (CSV)", "Quick Batch Entry"], horizontal=True)
         
-        st.markdown("---")
-        st.markdown("**👤 Personal Details**")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            first_name = st.text_input("First Name*")
-            email = st.text_input("Email")
-        with c2:
-            last_name = st.text_input("Last Name*")
-            mobile = st.text_input("Mobile Number*")
-        with c3:
-            company = st.text_input("Company")
-            whatsapp = st.text_input("WhatsApp Number")
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            id_type = st.selectbox("ID Type", ["National ID", "Driver's License", "International Passport", "Company ID", "Voter's Card"])
-            id_number = st.text_input("ID Number")
-        with c2:
-            vehicle = st.text_input("Vehicle Plate Number")
-            gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-        
-        st.markdown("---")
-        st.markdown("**🏢 Visit Details**")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            host_name = st.text_input("Host Name*")
-            arrival_time = st.time_input("Expected Arrival", time(9, 0))
-        with c2:
-            host_email = st.text_input("Host Email")
-            departure_time = st.time_input("Expected Departure", time(17, 0))
-        with c3:
-            host_phone = st.text_input("Host Phone")
-            purpose = st.text_area("Purpose of Visit", height=60)
-        
-        belongings = st.text_area("Belongings/Equipment", placeholder="Laptop, tools, etc...")
-        
-        st.markdown("---")
-        
-        if st.button("🛂 Register Visitor", use_container_width=True, type="primary"):
-            if first_name and last_name and host_name:
-                # Generate pass ID and access code
-                import random, string
-                pass_id = f"VIS-{fc}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.digits, k=4))}"
-                access_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
-                qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={access_code}"
-                
-                supabase.table("visitors").insert({
-                    "facility_code": fc,
-                    "visitor_type": visitor_type.lower(),
-                    "pass_id": pass_id,
-                    "access_code": access_code,
-                    "qr_code_url": qr_url,
-                    "first_name": first_name,
-                    "last_name": last_name,
-                    "gender": gender,
-                    "email": email,
-                    "mobile": mobile,
-                    "whatsapp_number": whatsapp or mobile,
-                    "company": company,
-                    "identification_type": id_type,
-                    "identification_number": id_number,
-                    "vehicle_plate": vehicle,
-                    "purpose_of_visit": purpose,
-                    "host_name": host_name,
-                    "host_email": host_email,
-                    "host_phone": host_phone,
-                    "visit_date": str(visit_date),
-                    "expected_arrival": str(arrival_time),
-                    "expected_departure": str(departure_time),
-                    "pass_type": pass_type.lower().replace(" ", "_"),
-                    "access_level": access_level.lower(),
-                    "belongings": belongings,
-                    "status": "pre_registered",
-                    "pre_registered_by": st.session_state.get("user", {}).get("id"),
-                    "created_at": datetime.now().isoformat()
-                }).execute()
-                
-                # Send email
-                if email:
-                    send_email_notification(email, f"🛂 Visitor Pass - {pass_id}",
-                        f"""
-                        <div style="font-family:Arial;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
-                            <div style="background:#CC0000;padding:20px;color:white;">
-                                <h2 style="margin:0;">Visitor Access Pass</h2>
-                                <p style="margin:5px 0 0 0;font-size:12px;">{info.get('full_name',fc)}</p>
+        if reg_mode == "Single Visitor":
+            c1, c2 = st.columns(2)
+            with c1:
+                visitor_type = st.selectbox("Visitor Type", ["Visitor", "Vendor", "Interview", "Contractor", "Delivery", "Guest"])
+                pass_type = st.selectbox("Pass Type", ["One Time", "Recurring", "Multi-Day"])
+            with c2:
+                visit_date = st.date_input("Visit Date", today)
+                access_level = st.selectbox("Access Level", ["Standard", "Restricted", "VIP", "Escort Required"])
+            
+            st.markdown("---")
+            st.markdown("**👤 Personal Details**")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                first_name = st.text_input("First Name*")
+                email = st.text_input("Email")
+            with c2:
+                last_name = st.text_input("Last Name*")
+                mobile = st.text_input("Mobile Number*")
+            with c3:
+                company = st.text_input("Company")
+                whatsapp = st.text_input("WhatsApp Number")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                id_type = st.selectbox("ID Type", ["National ID", "Driver's License", "International Passport", "Company ID", "Voter's Card"])
+                id_number = st.text_input("ID Number")
+            with c2:
+                vehicle = st.text_input("Vehicle Plate Number")
+                gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+            
+            st.markdown("---")
+            st.markdown("**🏢 Visit Details**")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                host_name = st.text_input("Host Name*")
+                arrival_time = st.time_input("Expected Arrival", time(9, 0))
+            with c2:
+                host_email = st.text_input("Host Email")
+                departure_time = st.time_input("Expected Departure", time(17, 0))
+            with c3:
+                host_phone = st.text_input("Host Phone")
+                purpose = st.text_area("Purpose of Visit", height=60)
+            
+            belongings = st.text_area("Belongings/Equipment", placeholder="Laptop, tools, etc...")
+            
+            st.markdown("---")
+            
+            if st.button("🛂 Register Visitor", use_container_width=True, type="primary"):
+                if first_name and last_name and host_name:
+                    import random, string
+                    pass_id = f"VIS-{fc}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.digits, k=4))}"
+                    access_code_in = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                    access_code_out = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                    access_code = f"IN:{access_code_in}|OUT:{access_code_out}"
+                    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IN:{access_code_in}%7COUT:{access_code_out}"
+                    
+                    # Get logo for pass
+                    if fc == "WTC":
+                        logo_b64 = base64.b64encode(open("WTC-logo.jpg","rb").read()).decode() if Path("WTC-logo.jpg").exists() else ""
+                        logo_src = f"data:image/jpeg;base64,{logo_b64}"
+                    else:
+                        logo_b64 = get_logo_base64()
+                        logo_src = f"data:image/png;base64,{logo_b64}" if logo_b64 else ""
+                    
+                    supabase.table("visitors").insert({
+                        "facility_code": fc, "visitor_type": visitor_type.lower(), "pass_id": pass_id,
+                        "access_code": access_code, "access_code_in": access_code_in, "access_code_out": access_code_out,
+                        "qr_code_url": qr_url,
+                        "first_name": first_name, "last_name": last_name, "gender": gender,
+                        "email": email, "mobile": mobile, "whatsapp_number": whatsapp or mobile,
+                        "company": company, "identification_type": id_type, "identification_number": id_number,
+                        "vehicle_plate": vehicle, "purpose_of_visit": purpose,
+                        "host_name": host_name, "host_email": host_email, "host_phone": host_phone,
+                        "visit_date": str(visit_date), "expected_arrival": str(arrival_time),
+                        "expected_departure": str(departure_time),
+                        "pass_type": pass_type.lower().replace(" ", "_"), "access_level": access_level.lower(),
+                        "belongings": belongings, "status": "pre_registered",
+                        "pre_registered_by": st.session_state.get("user", {}).get("id"),
+                        "created_at": datetime.now().isoformat()
+                    }).execute()
+                    
+                    # Show generated pass
+                    st.success(f"✅ Visitor registered! Pass ID: {pass_id}")
+                    st.markdown(f"""
+                    <div style="max-width:350px;margin:0 auto;background:white;border:2px solid #CC0000;border-radius:12px;overflow:hidden;text-align:center;">
+                        <div style="background:#CC0000;color:white;padding:10px;font-weight:bold;font-size:0.9rem;">VISITOR ACCESS PASS</div>
+                        <div style="padding:15px;">
+                            {f'<img src="{logo_src}" height="25" style="margin-bottom:8px;">' if logo_src else ''}
+                            <p style="font-weight:bold;margin:5px 0;">{first_name} {last_name}</p>
+                            <p style="font-size:0.8rem;color:#666;">{company} | {visitor_type}</p>
+                            <img src="{qr_url}" width="160" style="margin:10px 0;">
+                            <div style="display:flex;justify-content:center;gap:20px;margin:8px 0;">
+                                <div><b>🟢 IN:</b><br><span style="font-size:1.1rem;font-family:monospace;">{access_code_in}</span></div>
+                                <div><b>🔴 OUT:</b><br><span style="font-size:1.1rem;font-family:monospace;">{access_code_out}</span></div>
                             </div>
-                            <div style="padding:20px;text-align:center;">
-                                <img src="{qr_url}" width="180"><br>
-                                <h3>{access_code}</h3>
-                                <p><b>Pass ID:</b> {pass_id}</p>
-                                <p><b>Date:</b> {visit_date} | <b>Time:</b> {arrival_time} - {departure_time}</p>
-                                <p><b>Host:</b> {host_name}</p>
-                                <p style="font-size:11px;color:#888;">Present this QR code at the gate for access</p>
-                            </div>
+                            <p style="font-size:0.7rem;color:#888;">{visit_date} | {arrival_time} - {departure_time}</p>
+                            <p style="font-size:0.7rem;">Host: {host_name} | Pass ID: {pass_id}</p>
                         </div>
-                        """)
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Send email
+                    if email:
+                        send_email_notification(email, f"🛂 Visitor Access Pass - {pass_id}",
+                            f"""<div style="font-family:Arial;max-width:400px;border:2px solid #CC0000;border-radius:12px;overflow:hidden;text-align:center;"><div style="background:#CC0000;color:white;padding:12px;font-weight:bold;">VISITOR ACCESS PASS</div><div style="padding:15px;">{f'<img src="{logo_src}" height="25">' if logo_src else ''}<h3>{first_name} {last_name}</h3><p>{company}</p><img src="{qr_url}" width="160"><p><b>🟢 IN:</b> {access_code_in} | <b>🔴 OUT:</b> {access_code_out}</p><p>{visit_date} | {arrival_time} - {departure_time}</p><p>Host: {host_name}</p></div></div>""")
+                    
+                    if host_email:
+                        send_email_notification(host_email, f"🛂 New Visitor: {first_name} {last_name}",
+                            f"<h3>Visitor Pre-Registered</h3><p><b>{first_name} {last_name}</b> from <b>{company}</b> on {visit_date}.</p>")
+                    
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("⚠️ First Name, Last Name, and Host Name are required")
+        
+        elif reg_mode == "Bulk Registration (CSV)":
+            st.markdown("#### 📋 Bulk Visitor Registration via CSV")
+            st.caption("Upload a CSV file with columns: First Name, Last Name, Email, Mobile, Company")
+            
+            uploaded_file = st.file_uploader("Upload CSV", type="csv")
+            
+            if uploaded_file:
+                csv_data = pd.read_csv(uploaded_file)
+                st.dataframe(csv_data.head(10), use_container_width=True)
+                st.caption(f"📋 {len(csv_data)} visitors found")
                 
-                # Send WhatsApp (if configured)
-                if whatsapp or mobile:
-                    wa_number = whatsapp or mobile
-                    # WhatsApp API call would go here
-                    try:
-                        supabase.table("visitors").update({"whatsapp_sent": True}).eq("pass_id", pass_id).execute()
-                    except: pass
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    bulk_host = st.text_input("Host Name*")
+                    bulk_date = st.date_input("Visit Date", today)
+                with c2:
+                    bulk_purpose = st.text_input("Purpose of Visit*")
+                    bulk_arrival = st.time_input("Arrival Time", time(9,0))
+                with c3:
+                    bulk_email = st.text_input("Host Email")
+                    bulk_departure = st.time_input("Departure Time", time(17,0))
                 
-                # Notify host
-                if host_email:
-                    send_email_notification(host_email, f"🛂 New Visitor: {first_name} {last_name}",
-                        f"<h3>Visitor Pre-Registered</h3><p><b>{first_name} {last_name}</b> from <b>{company}</b> will visit on {visit_date}.</p><p><b>Purpose:</b> {purpose}</p><p><b>Time:</b> {arrival_time} - {departure_time}</p>")
-                
-                st.success(f"✅ Visitor registered! Pass ID: {pass_id}")
-                st.balloons()
-                st.rerun()
+                if st.button(f"🛂 Register {len(csv_data)} Visitors", use_container_width=True, type="primary"):
+                    if bulk_host and bulk_purpose:
+                        import random, string
+                        count = 0
+                        for _, row in csv_data.iterrows():
+                            first = str(row.get("First Name","") or row.get("first_name",""))
+                            last = str(row.get("Last Name","") or row.get("last_name",""))
+                            if first and last:
+                                pass_id = f"VIS-{fc}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.digits,k=4))}"
+                                access_code_in = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                                access_code_out = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                                supabase.table("visitors").insert({
+                                    "facility_code": fc, "visitor_type": "visitor", "pass_id": pass_id,
+                                    "access_code": f"IN:{access_code_in}|OUT:{access_code_out}",
+                                    "access_code_in": access_code_in, "access_code_out": access_code_out,
+                                    "qr_code_url": f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IN:{access_code_in}%7COUT:{access_code_out}",
+                                    "first_name": first, "last_name": last,
+                                    "email": str(row.get("Email","") or row.get("email","")),
+                                    "mobile": str(row.get("Mobile","") or row.get("mobile","")),
+                                    "company": str(row.get("Company","") or row.get("company","")),
+                                    "purpose_of_visit": bulk_purpose, "host_name": bulk_host,
+                                    "host_email": bulk_email, "visit_date": str(bulk_date),
+                                    "expected_arrival": str(bulk_arrival), "expected_departure": str(bulk_departure),
+                                    "status": "pre_registered", "pass_type": "one_time", "access_level": "standard"
+                                }).execute()
+                                count += 1
+                        st.success(f"✅ {count} visitors registered!")
+                        st.balloons()
+                        st.rerun()
+        
+        elif reg_mode == "Quick Batch Entry":
+            st.markdown("#### 📝 Quick Batch Entry")
+            st.caption("Enter visitor names (one per line) for quick registration")
+            
+            batch_names = st.text_area("Visitor Names", height=150, placeholder="John Doe\nJane Smith\nBob Johnson\n...")
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                batch_host = st.text_input("Host Name*", key="batch_host")
+                batch_date = st.date_input("Visit Date", today, key="batch_date")
+            with c2:
+                batch_purpose = st.text_input("Purpose of Visit*", key="batch_purpose")
+                batch_arrival = st.time_input("Arrival Time", time(9,0), key="batch_arrival")
+            with c3:
+                batch_email = st.text_input("Host Email", key="batch_email")
+                batch_departure = st.time_input("Departure Time", time(17,0), key="batch_departure")
+            
+            if st.button("🛂 Register Batch", use_container_width=True, type="primary"):
+                if batch_host and batch_purpose and batch_names:
+                    import random, string
+                    names = [n.strip() for n in batch_names.split("\n") if n.strip()]
+                    count = 0
+                    for name in names:
+                        parts = name.split(" ", 1)
+                        first = parts[0]
+                        last = parts[1] if len(parts) > 1 else ""
+                        
+                        pass_id = f"VIS-{fc}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.digits,k=4))}"
+                        access_code_in = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                        access_code_out = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                        
+                        supabase.table("visitors").insert({
+                            "facility_code": fc, "visitor_type": "visitor", "pass_id": pass_id,
+                            "access_code": f"IN:{access_code_in}|OUT:{access_code_out}",
+                            "access_code_in": access_code_in, "access_code_out": access_code_out,
+                            "qr_code_url": f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=IN:{access_code_in}%7COUT:{access_code_out}",
+                            "first_name": first, "last_name": last,
+                            "purpose_of_visit": batch_purpose, "host_name": batch_host,
+                            "host_email": batch_email, "visit_date": str(batch_date),
+                            "expected_arrival": str(batch_arrival), "expected_departure": str(batch_departure),
+                            "status": "pre_registered", "pass_type": "one_time", "access_level": "standard"
+                        }).execute()
+                        count += 1
+                    
+                    st.success(f"✅ {count} visitors registered!")
+                    st.balloons()
+                    st.rerun()
+
             else:
                 st.error("⚠️ First Name, Last Name, and Host Name are required")
     
