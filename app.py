@@ -661,6 +661,27 @@ def page_cc():
                 """, unsafe_allow_html=True)
         else:st.info("No tickets")
 
+def fix_date(val):
+    """Convert DD-MM-YYYY to YYYY-MM-DD, return None if invalid"""
+    if val is None or pd.isna(val) or str(val).strip() in ["", "NA", "na", "null", "None"]:
+        return None
+    val_str = str(val).strip()
+    # Already in YYYY-MM-DD format
+    if len(val_str) == 10 and val_str[4] == "-":
+        return val_str
+    # DD-MM-YYYY format
+    parts = val_str.replace("/", "-").split("-")
+    if len(parts) == 3:
+        try:
+            day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+            if year < 100:
+                year += 2000
+            return f"{year:04d}-{month:02d}-{day:02d}"
+        except:
+            return None
+    return None
+
+
 # ============================================
 # ASSET COMMAND CENTER — FORTUNE 500 GRADE
 # WORLD-CLASS AI-POWERED ASSET MANAGEMENT
@@ -1257,12 +1278,12 @@ def page_ar():
                             "barcode": str(row.get("Barcode", "")).strip(),
                             "geo_location": str(row.get("Geo Location", "")).strip(),
                             "purchase_cost": purchase_price,
-                            "purchase_date": str(row.get("Purchase Date", "")) if pd.notna(row.get("Purchase Date")) and str(row.get("Purchase Date", "")).strip() != "" else None,
+                            "purchase_date": fix_date(row.get("Purchase Date")),
                             "currency": str(row.get("Currency", "NGN")).strip(),
                             "useful_life": int(float(str(row.get("Useful Life", "10")).strip())) if pd.notna(row.get("Useful Life")) and str(row.get("Useful Life", "")).strip() != "" else 10,
-                            "installation_date": str(row.get("Installation Date", "")) if pd.notna(row.get("Installation Date")) and str(row.get("Installation Date", "")).strip() != "" else None,
-                            "warranty_start": str(row.get("Warrenty Start Date", row.get("Warranty Start Date", ""))) if pd.notna(row.get("Warrenty Start Date", row.get("Warranty Start Date", ""))) and str(row.get("Warrenty Start Date", row.get("Warranty Start Date", ""))).strip() != "" else None,
-                            "warranty_expiry": str(row.get("Warrenty End Date", row.get("Warranty End Date", ""))) if pd.notna(row.get("Warrenty End Date", row.get("Warranty End Date", ""))) and str(row.get("Warrenty End Date", row.get("Warranty End Date", ""))).strip() != "" else None,
+                            "installation_date": fix_date(row.get("Installation Date")),
+                            "warranty_start": fix_date(row.get("Warrenty Start Date", row.get("Warranty Start Date"))),
+                            "warranty_expiry": fix_date(row.get("Warrenty End Date", row.get("Warranty End Date"))),
                             "depreciation_method": str(row.get("Depreciation Method", "")).strip(),
                             "residual_value": float(str(row.get("Residual Value / Percentage", "10")).replace("%", "").strip()) if pd.notna(row.get("Residual Value / Percentage")) else 10,
                             "invoice_no": str(row.get("Invioce NO", row.get("Invoice NO", ""))).strip(),
@@ -1278,7 +1299,7 @@ def page_ar():
                             "total_operational_hrs": float(str(row.get("Total Operational Hrs", "0")).strip()) if pd.notna(row.get("Total Operational Hrs")) else 0,
                             "gross_weight": str(row.get("Gross Weight", "")).strip(),
                             "dimensions": str(row.get("Size and Dimensions", "")).strip(),
-                            "sap_created_date": str(row.get("SAP Created Date", "")) if pd.notna(row.get("SAP Created Date")) and str(row.get("SAP Created Date", "")).strip() != "" else None,
+                            "sap_created_date": fix_date(row.get("SAP Created Date")),Date", "")).strip() != "" else None,
 
                             "plan_year_to_replace": int(float(str(row.get("Plan Year to replace", "2030")).strip())) if pd.notna(row.get("Plan Year to replace")) else 2030,
                             "condition_rating": 5,
