@@ -245,7 +245,7 @@ class DB:
         except: return []
 
     @staticmethod
-    def get_assets(fc, limit=10000):
+    def get_assets(fc, limit=50000):
         try:
             res=supabase.table("assets").select("*, asset_categories(name,code)").eq("facility_code",fc).limit(limit).execute()
             return res.data if res.data else []
@@ -693,7 +693,7 @@ def page_ar():
     st.markdown(f'## 🏗️ Asset Command Center — {info.get("full_name", fc)}')
     
     # Fetch all assets
-    all_assets = DB.get_assets(fc, 10000)
+    all_assets = DB.get_assets(fc, 50000)
     
     # Build dataframe
     if all_assets:
@@ -1222,7 +1222,7 @@ def page_ar():
                     try:
                         raw_dept = str(row.get("Department", "")).strip()
                         
-                        # Department mapping based on your CSV "Department" column
+                        # Department mapping
                         dept_mapping = {
                             "Engineering — Electrical": ("Engineering", "Electrical"),
                             "Engineering — Fire Fighting": ("Engineering", "Fire Fighting"),
@@ -1251,7 +1251,7 @@ def page_ar():
                         purchase_price = 0
                         try:
                             pp = row.get("Purchase Price", 0)
-                            if pd.notna(pp) and str(pp).strip() != "":
+                            if pd.notna(pp) and str(pp).strip() != "" and str(pp).strip() != "NA":
                                 purchase_price = float(str(pp).replace(",", "").replace("₦", "").strip())
                         except:
                             pass
@@ -1259,7 +1259,7 @@ def page_ar():
                         asset_data = {
                             "facility_code": fc,
                             "name": str(row.get("Assetname", row.get("Asset Name", ""))).strip(),
-                            "asset_tag": str(row.get("Asset Code", "")).strip(),
+                            "asset_tag": str(row.get("Asset Code", "")).strip() or f"AUTO-{fc}-{success+1}",
                             "department": mapped_dept,
                             "sub_division": mapped_sub,
                             "category_name": str(row.get("Category", "")).strip(),
@@ -1279,35 +1279,45 @@ def page_ar():
                             "geo_location": str(row.get("Geo Location", "")).strip(),
                             "purchase_cost": purchase_price,
                             "purchase_date": fix_date(row.get("Purchase Date")),
-                            "currency": str(row.get("Currency", "NGN")).strip(),
-                            "useful_life": int(float(str(row.get("Useful Life", "10")).strip())) if pd.notna(row.get("Useful Life")) and str(row.get("Useful Life", "")).strip() != "" else 10,
                             "installation_date": fix_date(row.get("Installation Date")),
                             "warranty_start": fix_date(row.get("Warrenty Start Date", row.get("Warranty Start Date"))),
                             "warranty_expiry": fix_date(row.get("Warrenty End Date", row.get("Warranty End Date"))),
+                            "sap_created_date": fix_date(row.get("SAP Created Date")),
                             "depreciation_method": str(row.get("Depreciation Method", "")).strip(),
-                            "residual_value": float(str(row.get("Residual Value / Percentage", "10")).replace("%", "").strip()) if pd.notna(row.get("Residual Value / Percentage")) else 10,
+                            "residual_value": str(row.get("Residual Value / Percentage", "")).strip(),
                             "invoice_no": str(row.get("Invioce NO", row.get("Invoice NO", ""))).strip(),
                             "po_number": str(row.get("PO Number", "")).strip(),
                             "vendor": str(row.get("Vendor", "")).strip(),
-                            "assigned_to_name": str(row.get("Assigned User", "")).strip(),
+                            "assigned_user": str(row.get("Assigned User", "")).strip(),
                             "additional_user": str(row.get("Additional User", "")).strip(),
-                            "maintenance_team": str(row.get("Department", "")).strip(),
-                            "checklist_template": str(row.get("Checklist", "")).strip(),
-                            "ppm_frequency": str(row.get("PPM", "")).strip(),
+                            "checklist": str(row.get("Checklist", "")).strip(),
+                            "ppm": str(row.get("PPM", "")).strip(),
                             "verification_frequency": str(row.get("Verification Frequency", "")).strip(),
-                            "standard_running_hrs": float(str(row.get("Standard Running Hrs", "0")).strip()) if pd.notna(row.get("Standard Running Hrs")) else 0,
-                            "total_operational_hrs": float(str(row.get("Total Operational Hrs", "0")).strip()) if pd.notna(row.get("Total Operational Hrs")) else 0,
                             "gross_weight": str(row.get("Gross Weight", "")).strip(),
                             "dimensions": str(row.get("Size and Dimensions", "")).strip(),
-                            "sap_created_date": fix_date(row.get("SAP Created Date")),
-
-                            "plan_year_to_replace": int(float(str(row.get("Plan Year to replace", "2030")).strip())) if pd.notna(row.get("Plan Year to replace")) else 2030,
+                            "health_condition": str(row.get("Health Condition", "")).strip(),
+                            "region": str(row.get("Region", "")).strip(),
+                            "city": str(row.get("City", "")).strip(),
+                            "plan_year_to_replace": str(row.get("Plan Year to replace", "")).strip(),
+                            "warranty_applicable": str(row.get("Warrenty Applicable", "")).strip(),
+                            "standard_running_hrs": str(row.get("Standard Running Hrs", "")).strip(),
+                            "total_operational_hrs": str(row.get("Total Operational Hrs", "")).strip(),
+                            "currency": str(row.get("Currency", "")).strip() or "NGN",
+                            "useful_life": str(row.get("Useful Life", "")).strip(),
                             "condition_rating": 5,
                             "created_at": datetime.now().isoformat()
                         }
                         
+                        # Remove None values that should be NULL in DB
+                        asset_data = {k: v for k, v in asset_data.items() if v is not None and v != "" and v != "NA" and v != "na"}
+                        
                         DB.insert("assets", asset_data)
                         success += 1
+                        
+                        # Progress update every 500 rows
+                        if success % 500 == 0:
+                            st.write(f"⏳ Uploaded {success} assets...")
+                            
                     except Exception as e:
                         continue
                 st.success(f"✅ {success} assets uploaded!")
