@@ -892,19 +892,27 @@ def page_ar():
         if len(df) == 0:
             st.info("No assets registered yet. Add assets to see them here.")
         else:
-            c1, c2, c3, c4 = st.columns(4)
+            c1, c2, c3, c4, c5 = st.columns(5)
             with c1:
-                dept_filter = st.selectbox("Department", ["All"] + sorted(df["department"].unique().tolist()), key="ar_dept")
+                # Create combined department — sub_division labels
+                df["dept_display"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') != 'N/A' else row['department'], axis=1)
+                dept_options = ["All"] + sorted(df["dept_display"].unique().tolist())
+                dept_filter = st.selectbox("Department", dept_options, key="ar_dept")
             with c2:
-                status_filter = st.selectbox("Status", ["All", "active", "inactive", "breakdown"], key="ar_status")
+                building_options = ["All"] + sorted(df["location_building"].unique().tolist())
+                building_filter = st.selectbox("Building", building_options, key="ar_bldg_filter")
             with c3:
-                priority_filter = st.selectbox("Priority", ["All", "critical", "high", "medium", "low"], key="ar_pri")
+                status_filter = st.selectbox("Status", ["All", "active", "inactive", "breakdown"], key="ar_status")
             with c4:
+                priority_filter = st.selectbox("Priority", ["All", "critical", "high", "medium", "low"], key="ar_pri")
+            with c5:
                 search = st.text_input("🔍 Search", placeholder="Name, code, location...", key="ar_search")
             
             display_df = df.copy()
             if dept_filter != "All":
-                display_df = display_df[display_df["department"] == dept_filter]
+                display_df = display_df[display_df["dept_display"] == dept_filter]
+            if building_filter != "All" and "location_building" in display_df.columns:
+                display_df = display_df[display_df["location_building"] == building_filter]
             if status_filter != "All" and "status" in display_df.columns:
                 display_df = display_df[display_df["status"] == status_filter]
             if priority_filter != "All" and "priority" in display_df.columns:
