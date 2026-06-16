@@ -1179,9 +1179,21 @@ def page_ar():
         uploaded = st.file_uploader("Upload filled CSV", type="csv")
         
         if uploaded:
-            bulk_df = pd.read_csv(uploaded)
+            # Try to detect separator (tab or comma)
+            try:
+                bulk_df = pd.read_csv(uploaded, sep=None, engine='python', skiprows=1)
+            except:
+                bulk_df = pd.read_csv(uploaded, skiprows=1)
+            
+            # Remove completely empty rows
+            bulk_df = bulk_df.dropna(how='all')
+            
+            # Filter out rows where Assetname is empty or NA
+            if "Assetname" in bulk_df.columns:
+                bulk_df = bulk_df[bulk_df["Assetname"].notna() & (bulk_df["Assetname"] != "") & (bulk_df["Assetname"] != "NA")]
+            
             st.dataframe(bulk_df.head(10), use_container_width=True)
-            st.caption(f"{len(bulk_df)} assets found")
+            st.caption(f"{len(bulk_df)} valid assets found (empty rows skipped)")
             
             if st.button(f"🚀 Upload {len(bulk_df)} Assets", use_container_width=True, type="primary"):
                 success = 0
