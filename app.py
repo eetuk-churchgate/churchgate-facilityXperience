@@ -671,106 +671,30 @@ def page_ar():
     
     st.markdown(f'## 🏗️ Asset Command Center — {info.get("full_name", fc)}')
     
-    # Fetch all assets with categories
+    # Fetch all assets
     all_assets = DB.get_assets(fc, 1000)
     
-    if not all_assets:
-        st.warning("No assets registered for this facility.")
-        return
-    
-    df = pd.DataFrame(all_assets)
-    
-    # Extract category name from nested object
-    df["department"] = df["asset_categories"].apply(lambda x: x.get("name", "N/A") if isinstance(x, dict) else "N/A")
-    
-    # ============================================
-    # DATA PREPARATION
-    # ============================================
-    today = date.today()
-    current_year = today.year
-    
-    # Status counts
-    total_assets = len(df)
-    active_count = len(df[df["status"] == "active"]) if "status" in df.columns else 0
-    inactive_count = len(df[df["status"] == "inactive"]) if "status" in df.columns else 0
-    breakdown_count = len(df[df["status"] == "breakdown"]) if "status" in df.columns else 0
-    
-    # Critical vs Non-Critical
-    critical_mask = df.get("criticality", pd.Series(["low"] * len(df))).isin(["critical", "high"])
-    critical_count = critical_mask.sum()
-    non_critical_count = total_assets - critical_count
-    
-    critical_active = len(df[critical_mask & (df["status"] == "active")]) if "status" in df.columns else 0
-    critical_inactive = len(df[critical_mask & (df["status"] == "inactive")]) if "status" in df.columns else 0
-    critical_breakdown = len(df[critical_mask & (df["status"] == "breakdown")]) if "status" in df.columns else 0
-    
-    non_critical_active = len(df[~critical_mask & (df["status"] == "active")]) if "status" in df.columns else 0
-    non_critical_inactive = len(df[~critical_mask & (df["status"] == "inactive")]) if "status" in df.columns else 0
-    non_critical_breakdown = len(df[~critical_mask & (df["status"] == "breakdown")]) if "status" in df.columns else 0
-    
-    # Asset Health (based on condition_rating)
-    if "condition_rating" in df.columns:
-        excellent_mask = df["condition_rating"] >= 4.5
-        good_mask = (df["condition_rating"] >= 3.5) & (df["condition_rating"] < 4.5)
-        average_mask = (df["condition_rating"] >= 2.5) & (df["condition_rating"] < 3.5)
-        poor_mask = df["condition_rating"] < 2.5
+    # Build dataframe
+    if all_assets:
+        df = pd.DataFrame(all_assets)
+        # Get category names
+        try:
+            cat_res = supabase.table("asset_categories").select("*").execute()
+            cat_dict = {c["id"]: c.get("name", "N/A") for c in cat_res.data} if cat_res.data else {}
+        except:
+            cat_dict = {}
         
-        excellent_count = excellent_mask.sum()
-        good_count = good_mask.sum()
-        average_count = average_mask.sum()
-        poor_count = poor_mask.sum()
-        
-        critical_excellent = len(df[critical_mask & excellent_mask])
-        critical_good = len(df[critical_mask & good_mask])
-        critical_average = len(df[critical_mask & average_mask])
-        critical_poor = len(df[critical_mask & poor_mask])
-        
-        non_critical_excellent = len(df[~critical_mask & excellent_mask])
-        non_critical_good = len(df[~critical_mask & good_mask])
-        non_critical_average = len(df[~critical_mask & average_mask])
-        non_critical_poor = len(df[~critical_mask & poor_mask])
+        if "category_id" in df.columns:
+            df["department"] = df["category_id"].apply(lambda x: cat_dict.get(x, "N/A"))
+        else:
+            df["department"] = "N/A"
     else:
-        excellent_count = good_count = average_count = poor_count = 0
-        critical_excellent = critical_good = critical_average = critical_poor = 0
-        non_critical_excellent = non_critical_good = non_critical_average = non_critical_poor = 0
+        df = pd.DataFrame()
     
-    # Department count
-    dept_count = df["department"].nunique() if "department" in df.columns else 0
-    
-    # Parent assets (those that are parent of others)
-    parent_asset_names = set()
-    if "name" in df.columns:
-        parent_asset_names = set(df["name"].dropna().unique())
-    parent_count = len(parent_asset_names)
-    
-    # Warranty analysis
-    expiring_soon_30 = 0
-    expiring_soon_90 = 0
-    expiring_soon_180 = 0
-    expired_count = 0
-    
-    if "warranty_expiry" in df.columns:
-        for _, row in df.iterrows():
-            try:
-                we = pd.to_datetime(row["warranty_expiry"])
-                if we.date() < today:
-                    expired_count += 1
-                elif (we.date() - today).days <= 30:
-                    expiring_soon_30 += 1
-                elif (we.date() - today).days <= 90:
-                    expiring_soon_90 += 1
-                elif (we.date() - today).days <= 180:
-                    expiring_soon_180 += 1
-            except:
-                pass
-    
-    # Financial calculations
-    total_asset_value = 0
-    if "purchase_cost" in df.columns:
-        total_asset_value = df["purchase_cost"].fillna(0).sum()
+    today = date.today()
     
     # ============================================
-    # TOP NAVIGATION TABS
+    # MAIN NAVIGATION TABS
     # ============================================
     ar_tabs = st.tabs([
         "📊 Dashboard", 
@@ -788,174 +712,139 @@ def page_ar():
     # TAB 0: DASHBOARD
     # ============================================
     with ar_tabs[0]:
-        # --- EXECUTIVE SUMMARY ROW ---
-        st.markdown("### 🎯 Executive Asset Overview")
-        
-        c1, c2, c3, c4, c5 = st.columns(5)
-        with c1:
-            st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Total Assets</div><div style="font-size:2.2rem;font-weight:800;color:#1a1a1a;">{total_assets}</div><div style="font-size:0.65rem;color:#888;">Across {dept_count} Departments</div></div>""", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Active</div><div style="font-size:2.2rem;font-weight:800;color:#10B981;">{active_count}</div><div style="font-size:0.65rem;color:#888;">{round(active_count/total_assets*100) if total_assets > 0 else 0}% of total</div></div>""", unsafe_allow_html=True)
-        with c3:
-            st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Critical Assets</div><div style="font-size:2.2rem;font-weight:800;color:#F59E0B;">{critical_count}</div><div style="font-size:0.65rem;color:#888;">{critical_active} Active</div></div>""", unsafe_allow_html=True)
-        with c4:
-            st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #EF4444;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Breakdown</div><div style="font-size:2.2rem;font-weight:800;color:#EF4444;">{breakdown_count}</div><div style="font-size:0.65rem;color:#888;">{critical_breakdown} Critical</div></div>""", unsafe_allow_html=True)
-        with c5:
-            st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Total Value</div><div style="font-size:1.5rem;font-weight:800;color:#3B82F6;">₦{total_asset_value:,.0f}</div><div style="font-size:0.65rem;color:#888;">Portfolio Value</div></div>""", unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # --- ASSET STATUS BREAKDOWN ---
-        st.markdown("### 📊 Asset Status Breakdown")
-        
-        c1, c2 = st.columns(2)
-        
-        with c1:
-            st.markdown("#### 🔴 Critical Assets")
-            st.markdown(f"""
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
-                <div style="background:#ECFDF5;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#10B981;">{critical_active}</div><div style="font-size:0.6rem;color:#666;">Active</div></div>
-                <div style="background:#FEF3C7;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#F59E0B;">{critical_inactive}</div><div style="font-size:0.6rem;color:#666;">Inactive</div></div>
-                <div style="background:#FEF2F2;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#EF4444;">{critical_breakdown}</div><div style="font-size:0.6rem;color:#666;">Breakdown</div></div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with c2:
-            st.markdown("#### 🟢 Non-Critical Assets")
-            st.markdown(f"""
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
-                <div style="background:#ECFDF5;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#10B981;">{non_critical_active}</div><div style="font-size:0.6rem;color:#666;">Active</div></div>
-                <div style="background:#FEF3C7;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#F59E0B;">{non_critical_inactive}</div><div style="font-size:0.6rem;color:#666;">Inactive</div></div>
-                <div style="background:#FEF2F2;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#EF4444;">{non_critical_breakdown}</div><div style="font-size:0.6rem;color:#666;">Breakdown</div></div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # --- ASSET HEALTH MATRIX ---
-        st.markdown("### 🏥 Asset Health Matrix")
-        
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.markdown(f"""
-            <div style="background:white;border-radius:10px;padding:0.8rem;border-left:4px solid #10B981;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <div style="font-weight:700;color:#10B981;margin-bottom:0.3rem;">⭐ Excellent</div>
-                <div style="display:flex;justify-content:space-between;font-size:0.8rem;">
-                    <span>Critical: <b>{critical_excellent}</b></span>
-                    <span>Non-Critical: <b>{non_critical_excellent}</b></span>
+        if len(df) == 0:
+            st.info("🏗️ No assets registered yet. Start by adding assets in the '➕ Add Asset' or '📦 Bulk Upload' tabs.")
+        else:
+            # Calculations
+            total_assets = len(df)
+            active_count = len(df[df["status"] == "active"]) if "status" in df.columns else 0
+            inactive_count = len(df[df["status"] == "inactive"]) if "status" in df.columns else 0
+            breakdown_count = len(df[df["status"] == "breakdown"]) if "status" in df.columns else 0
+            
+            critical_mask = df.get("priority", pd.Series(["low"] * len(df))).isin(["critical", "high"])
+            critical_count = critical_mask.sum()
+            non_critical_count = total_assets - critical_count
+            
+            critical_active = len(df[critical_mask & (df["status"] == "active")]) if "status" in df.columns else 0
+            critical_breakdown = len(df[critical_mask & (df["status"] == "breakdown")]) if "status" in df.columns else 0
+            non_critical_active = len(df[~critical_mask & (df["status"] == "active")]) if "status" in df.columns else 0
+            non_critical_breakdown = len(df[~critical_mask & (df["status"] == "breakdown")]) if "status" in df.columns else 0
+            
+            # Health
+            if "condition_rating" in df.columns:
+                excellent_count = len(df[df["condition_rating"] >= 4.5])
+                good_count = len(df[(df["condition_rating"] >= 3.5) & (df["condition_rating"] < 4.5)])
+                average_count = len(df[(df["condition_rating"] >= 2.5) & (df["condition_rating"] < 3.5)])
+                poor_count = len(df[df["condition_rating"] < 2.5])
+            else:
+                excellent_count = good_count = average_count = poor_count = 0
+            
+            # Financial
+            total_value = df["purchase_cost"].fillna(0).sum() if "purchase_cost" in df.columns else 0
+            dept_count = df["department"].nunique() if "department" in df.columns else 0
+            
+            # Warranty
+            expired_count = expiring_30 = expiring_90 = expiring_180 = 0
+            if "warranty_expiry" in df.columns:
+                for _, row in df.iterrows():
+                    try:
+                        we = pd.to_datetime(row["warranty_expiry"])
+                        days_left = (we.date() - today).days
+                        if days_left < 0:
+                            expired_count += 1
+                        elif days_left <= 30:
+                            expiring_30 += 1
+                        elif days_left <= 90:
+                            expiring_90 += 1
+                        elif days_left <= 180:
+                            expiring_180 += 1
+                    except:
+                        pass
+            
+            # ============================================
+            # EXECUTIVE KPI ROW
+            # ============================================
+            st.markdown("### 🎯 Executive Asset Overview")
+            
+            c1, c2, c3, c4, c5 = st.columns(5)
+            with c1:
+                st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Total Assets</div><div style="font-size:2.2rem;font-weight:800;color:#1a1a1a;">{total_assets}</div><div style="font-size:0.65rem;color:#888;">Across {dept_count} Depts</div></div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Active</div><div style="font-size:2.2rem;font-weight:800;color:#10B981;">{active_count}</div><div style="font-size:0.65rem;color:#888;">{round(active_count/total_assets*100) if total_assets > 0 else 0}% of total</div></div>""", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Critical</div><div style="font-size:2.2rem;font-weight:800;color:#F59E0B;">{critical_count}</div><div style="font-size:0.65rem;color:#888;">{critical_active} Active</div></div>""", unsafe_allow_html=True)
+            with c4:
+                st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #EF4444;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Breakdown</div><div style="font-size:2.2rem;font-weight:800;color:#EF4444;">{breakdown_count}</div><div style="font-size:0.65rem;color:#888;">{critical_breakdown} Critical</div></div>""", unsafe_allow_html=True)
+            with c5:
+                st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Portfolio Value</div><div style="font-size:1.4rem;font-weight:800;color:#3B82F6;">₦{total_value:,.0f}</div><div style="font-size:0.65rem;color:#888;">Total</div></div>""", unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # Status Breakdown
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("#### 🔴 Critical Assets")
+                st.markdown(f"""
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
+                    <div style="background:#ECFDF5;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#10B981;">{critical_active}</div><div style="font-size:0.6rem;color:#666;">Active</div></div>
+                    <div style="background:#FEF3C7;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#F59E0B;">{critical_count - critical_active - critical_breakdown}</div><div style="font-size:0.6rem;color:#666;">Inactive</div></div>
+                    <div style="background:#FEF2F2;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#EF4444;">{critical_breakdown}</div><div style="font-size:0.6rem;color:#666;">Breakdown</div></div>
                 </div>
-                <div style="font-size:1.5rem;font-weight:800;color:#1a1a1a;">{excellent_count}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"""
-            <div style="background:white;border-radius:10px;padding:0.8rem;border-left:4px solid #3B82F6;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <div style="font-weight:700;color:#3B82F6;margin-bottom:0.3rem;">👍 Good</div>
-                <div style="display:flex;justify-content:space-between;font-size:0.8rem;">
-                    <span>Critical: <b>{critical_good}</b></span>
-                    <span>Non-Critical: <b>{non_critical_good}</b></span>
+                """, unsafe_allow_html=True)
+            with c2:
+                st.markdown("#### 🟢 Non-Critical Assets")
+                st.markdown(f"""
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.5rem;">
+                    <div style="background:#ECFDF5;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#10B981;">{non_critical_active}</div><div style="font-size:0.6rem;color:#666;">Active</div></div>
+                    <div style="background:#FEF3C7;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#F59E0B;">{non_critical_count - non_critical_active - non_critical_breakdown}</div><div style="font-size:0.6rem;color:#666;">Inactive</div></div>
+                    <div style="background:#FEF2F2;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#EF4444;">{non_critical_breakdown}</div><div style="font-size:0.6rem;color:#666;">Breakdown</div></div>
                 </div>
-                <div style="font-size:1.5rem;font-weight:800;color:#1a1a1a;">{good_count}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with c3:
-            st.markdown(f"""
-            <div style="background:white;border-radius:10px;padding:0.8rem;border-left:4px solid #F59E0B;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <div style="font-weight:700;color:#F59E0B;margin-bottom:0.3rem;">⚠️ Average</div>
-                <div style="display:flex;justify-content:space-between;font-size:0.8rem;">
-                    <span>Critical: <b>{critical_average}</b></span>
-                    <span>Non-Critical: <b>{non_critical_average}</b></span>
-                </div>
-                <div style="font-size:1.5rem;font-weight:800;color:#1a1a1a;">{average_count}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with c4:
-            st.markdown(f"""
-            <div style="background:white;border-radius:10px;padding:0.8rem;border-left:4px solid #EF4444;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <div style="font-weight:700;color:#EF4444;margin-bottom:0.3rem;">🔴 Poor</div>
-                <div style="display:flex;justify-content:space-between;font-size:0.8rem;">
-                    <span>Critical: <b>{critical_poor}</b></span>
-                    <span>Non-Critical: <b>{non_critical_poor}</b></span>
-                </div>
-                <div style="font-size:1.5rem;font-weight:800;color:#1a1a1a;">{poor_count}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # --- WARRANTY & FINANCIAL OVERVIEW ---
-        c1, c2 = st.columns(2)
-        
-        with c1:
-            st.markdown("### 📋 Warranty Status")
-            st.markdown(f"""
-            <div style="background:white;border-radius:10px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # Health Matrix
+            st.markdown("### 🏥 Asset Health Matrix")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;border-left:4px solid #10B981;"><div style="font-weight:700;color:#10B981;">⭐ Excellent</div><div style="font-size:1.5rem;font-weight:800;">{excellent_count}</div></div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;border-left:4px solid #3B82F6;"><div style="font-weight:700;color:#3B82F6;">👍 Good</div><div style="font-size:1.5rem;font-weight:800;">{good_count}</div></div>""", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;border-left:4px solid #F59E0B;"><div style="font-weight:700;color:#F59E0B;">⚠️ Average</div><div style="font-size:1.5rem;font-weight:800;">{average_count}</div></div>""", unsafe_allow_html=True)
+            with c4:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;border-left:4px solid #EF4444;"><div style="font-weight:700;color:#EF4444;">🔴 Poor</div><div style="font-size:1.5rem;font-weight:800;">{poor_count}</div></div>""", unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # Warranty & Financial
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("### 📋 Warranty Status")
+                st.markdown(f"""
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
-                    <div style="background:#FEF2F2;border-radius:8px;padding:0.6rem;text-align:center;">
-                        <div style="font-size:1.2rem;font-weight:800;color:#EF4444;">{expired_count}</div>
-                        <div style="font-size:0.6rem;color:#666;">Expired</div>
-                    </div>
-                    <div style="background:#FFFBEB;border-radius:8px;padding:0.6rem;text-align:center;">
-                        <div style="font-size:1.2rem;font-weight:800;color:#F59E0B;">{expiring_soon_30}</div>
-                        <div style="font-size:0.6rem;color:#666;">Expiring ≤30 days</div>
-                    </div>
-                    <div style="background:#EFF6FF;border-radius:8px;padding:0.6rem;text-align:center;">
-                        <div style="font-size:1.2rem;font-weight:800;color:#3B82F6;">{expiring_soon_90}</div>
-                        <div style="font-size:0.6rem;color:#666;">≤90 days</div>
-                    </div>
-                    <div style="background:#ECFDF5;border-radius:8px;padding:0.6rem;text-align:center;">
-                        <div style="font-size:1.2rem;font-weight:800;color:#10B981;">{expiring_soon_180}</div>
-                        <div style="font-size:0.6rem;color:#666;">≤180 days</div>
-                    </div>
+                    <div style="background:#FEF2F2;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#EF4444;">{expired_count}</div><div style="font-size:0.6rem;">Expired</div></div>
+                    <div style="background:#FFFBEB;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#F59E0B;">{expiring_30}</div><div style="font-size:0.6rem;">≤30 days</div></div>
+                    <div style="background:#EFF6FF;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#3B82F6;">{expiring_90}</div><div style="font-size:0.6rem;">≤90 days</div></div>
+                    <div style="background:#ECFDF5;border-radius:8px;padding:0.6rem;text-align:center;"><div style="font-size:1.2rem;font-weight:800;color:#10B981;">{expiring_180}</div><div style="font-size:0.6rem;">≤180 days</div></div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with c2:
-            st.markdown("### 💰 Financial Summary")
+                """, unsafe_allow_html=True)
+            with c2:
+                st.markdown("### 💰 Financial Summary")
+                st.markdown(f"""
+                <div style="background:white;border-radius:10px;padding:1rem;">
+                    <table style="width:100%;font-size:0.8rem;">
+                        <tr><td>📊 Portfolio Value</td><td style="text-align:right;font-weight:700;">₦{total_value:,.2f}</td></tr>
+                        <tr><td>📈 Avg Asset Value</td><td style="text-align:right;font-weight:700;">₦{total_value/total_assets:,.2f}</td></tr>
+                        <tr><td>🏢 Departments</td><td style="text-align:right;font-weight:700;">{dept_count}</td></tr>
+                    </table>
+                </div>
+                """, unsafe_allow_html=True)
             
-            # Calculate financials
-            amc_total = 0
-            breakdown_cost_total = 0
-            
-            st.markdown(f"""
-            <div style="background:white;border-radius:10px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <table style="width:100%;font-size:0.8rem;border-collapse:collapse;">
-                    <tr style="border-bottom:1px solid #eee;"><td style="padding:0.5rem;">📊 Total Portfolio Value</td><td style="text-align:right;font-weight:700;">₦{total_asset_value:,.2f}</td></tr>
-                    <tr style="border-bottom:1px solid #eee;"><td style="padding:0.5rem;">🛡️ Total AMC Costs</td><td style="text-align:right;font-weight:700;">₦{amc_total:,.2f}</td></tr>
-                    <tr style="border-bottom:1px solid #eee;"><td style="padding:0.5rem;">🔧 Total Breakdown Costs</td><td style="text-align:right;font-weight:700;color:#EF4444;">₦{breakdown_cost_total:,.2f}</td></tr>
-                    <tr style="border-bottom:1px solid #eee;"><td style="padding:0.5rem;">📈 Avg Asset Value</td><td style="text-align:right;font-weight:700;">₦{total_asset_value/total_assets:,.2f}</td></tr>
-                    <tr><td style="padding:0.5rem;">🏢 Departments</td><td style="text-align:right;font-weight:700;">{dept_count}</td></tr>
-                </table>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # --- DEPARTMENT DISTRIBUTION CHART ---
-        st.markdown("### 📊 Asset Distribution by Department")
-        
-        if "department" in df.columns:
-            dept_dist = df["department"].value_counts().head(10)
-            fig_dept = px.bar(
-                x=dept_dist.values,
-                y=dept_dist.index,
-                orientation='h',
-                title="Assets by Department",
-                color=dept_dist.values,
-                color_continuous_scale="Reds",
-                labels={"x": "Number of Assets", "y": ""}
-            )
-            fig_dept.update_layout(height=350)
-            st.plotly_chart(fig_dept, use_container_width=True)
-        
-        # --- CRITICAL ASSETS ALERT ---
-        if critical_breakdown > 0:
-            st.error(f"🚨 **CRITICAL ALERT:** {critical_breakdown} critical assets are in BREAKDOWN status. Immediate attention required!")
-        if expired_count > 0:
-            st.warning(f"⚠️ **WARRANTY ALERT:** {expired_count} assets have expired warranties. Review and renew.")
-        if expiring_soon_30 > 0:
-            st.warning(f"⏰ **EXPIRING SOON:** {expiring_soon_30} asset warranties expire within 30 days.")
+            if critical_breakdown > 0:
+                st.error(f"🚨 {critical_breakdown} critical assets in BREAKDOWN!")
+            if expired_count > 0:
+                st.warning(f"⚠️ {expired_count} assets with expired warranties!")
     
     # ============================================
     # TAB 1: ASSET REGISTER TABLE
@@ -963,74 +852,44 @@ def page_ar():
     with ar_tabs[1]:
         st.markdown("### 📋 Asset Register")
         
-        # Filters
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            dept_filter = st.selectbox("Department", ["All"] + sorted(df["department"].unique().tolist()) if "department" in df.columns else ["All"], key="ar_dept_filter")
-        with c2:
-            status_filter = st.selectbox("Status", ["All", "active", "inactive", "breakdown"], key="ar_status_filter")
-        with c3:
-            criticality_filter = st.selectbox("Criticality", ["All", "critical", "high", "medium", "low"], key="ar_crit_filter")
-        with c4:
-            search = st.text_input("🔍 Search assets", placeholder="Name, code, location...", key="ar_search")
-        
-        # Apply filters
-        display_df = df.copy()
-        if dept_filter != "All" and "department" in display_df.columns:
-            display_df = display_df[display_df["department"] == dept_filter]
-        if status_filter != "All" and "status" in display_df.columns:
-            display_df = display_df[display_df["status"] == status_filter]
-        if criticality_filter != "All" and "criticality" in display_df.columns:
-            display_df = display_df[display_df["criticality"] == criticality_filter]
-        if search:
-            mask = False
-            for col in ["name", "asset_tag", "location_building", "manufacturer", "model", "serial_number"]:
-                if col in display_df.columns:
-                    mask = mask | display_df[col].astype(str).str.contains(search, case=False, na=False)
-            display_df = display_df[mask]
-        
-        st.caption(f"📋 Showing {len(display_df)} of {total_assets} assets")
-        
-        # Build display table
-        display_cols = [c for c in ["asset_tag", "name", "department", "location_building", "location_floor", "status", "criticality", "manufacturer", "model", "condition_rating", "purchase_cost"] if c in display_df.columns]
-        
-        if len(display_df) > 0:
-            # Style the dataframe
-            def highlight_status(val):
-                if val == "active":
-                    return 'background-color: #ECFDF5; color: #065F46; font-weight: 600;'
-                elif val == "breakdown":
-                    return 'background-color: #FEF2F2; color: #991B1B; font-weight: 600;'
-                elif val == "inactive":
-                    return 'background-color: #FFFBEB; color: #92400E; font-weight: 600;'
-                return ''
-            
-            def highlight_criticality(val):
-                if val in ["critical", "high"]:
-                    return 'background-color: #FEF2F2; color: #991B1B; font-weight: 600;'
-                return ''
-            
-            styled_df = display_df[display_cols].style
-            if "status" in display_cols:
-                styled_df = styled_df.applymap(highlight_status, subset=["status"])
-            if "criticality" in display_cols:
-                styled_df = styled_df.applymap(highlight_criticality, subset=["criticality"])
-            
-            st.dataframe(
-                styled_df,
-                use_container_width=True,
-                hide_index=True,
-                height=500
-            )
-            
-            # Export
-            csv = display_df.to_csv(index=False)
-            st.download_button("📥 Export to CSV", csv, f"asset_register_{fc}_{today}.csv", "text/csv", use_container_width=True)
+        if len(df) == 0:
+            st.info("No assets registered yet. Add assets to see them here.")
         else:
-            st.info("No assets match your filters")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                dept_filter = st.selectbox("Department", ["All"] + sorted(df["department"].unique().tolist()), key="ar_dept")
+            with c2:
+                status_filter = st.selectbox("Status", ["All", "active", "inactive", "breakdown"], key="ar_status")
+            with c3:
+                priority_filter = st.selectbox("Priority", ["All", "critical", "high", "medium", "low"], key="ar_pri")
+            with c4:
+                search = st.text_input("🔍 Search", placeholder="Name, code, location...", key="ar_search")
+            
+            display_df = df.copy()
+            if dept_filter != "All":
+                display_df = display_df[display_df["department"] == dept_filter]
+            if status_filter != "All" and "status" in display_df.columns:
+                display_df = display_df[display_df["status"] == status_filter]
+            if priority_filter != "All" and "priority" in display_df.columns:
+                display_df = display_df[display_df["priority"] == priority_filter]
+            if search:
+                mask = False
+                for col in ["name", "asset_tag", "location_building", "manufacturer", "model"]:
+                    if col in display_df.columns:
+                        mask = mask | display_df[col].astype(str).str.contains(search, case=False, na=False)
+                display_df = display_df[mask]
+            
+            st.caption(f"Showing {len(display_df)} of {len(df)} assets")
+            
+            display_cols = [c for c in ["asset_tag", "name", "department", "location_building", "location_floor", "status", "priority", "manufacturer", "model", "serial_number", "condition_rating", "purchase_cost"] if c in display_df.columns]
+            
+            st.dataframe(display_df[display_cols], use_container_width=True, hide_index=True, height=500)
+            
+            csv = display_df.to_csv(index=False)
+            st.download_button("📥 Export CSV", csv, f"assets_{fc}_{today}.csv", "text/csv", use_container_width=True)
     
     # ============================================
-    # TAB 2: ADD ASSET — MULTI-STEP WIZARD (COMPLETE)
+    # TAB 2: ADD ASSET — 6-STEP WIZARD
     # ============================================
     with ar_tabs[2]:
         st.markdown("### ➕ Register New Asset")
@@ -1038,99 +897,88 @@ def page_ar():
         if "add_asset_step" not in st.session_state:
             st.session_state.add_asset_step = 1
         
-        steps = ["1. Asset Info", "2. Specifications", "3. Financial", "4. Assignment", "5. Maintenance", "6. Service"]
+        steps = ["1. Asset Info", "2. Specifications", "3. Financial", "4. Assignment", "5. Maintenance", "6. Review"]
         step_cols = st.columns(6)
-        for i, (col, step_name) in enumerate(zip(step_cols, steps)):
+        for i, (col, name) in enumerate(zip(step_cols, steps)):
             with col:
                 if i + 1 == st.session_state.add_asset_step:
-                    st.markdown(f"""<div style="background:#CC0000;color:white;padding:0.5rem;border-radius:8px;text-align:center;font-weight:600;font-size:0.7rem;">{step_name}</div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:#CC0000;color:white;padding:0.5rem;border-radius:8px;text-align:center;font-weight:600;font-size:0.7rem;">{name}</div>""", unsafe_allow_html=True)
                 elif i + 1 < st.session_state.add_asset_step:
-                    st.markdown(f"""<div style="background:#10B981;color:white;padding:0.5rem;border-radius:8px;text-align:center;font-weight:600;font-size:0.7rem;">✅ {step_name}</div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:#10B981;color:white;padding:0.5rem;border-radius:8px;text-align:center;font-weight:600;font-size:0.7rem;">✅ {name}</div>""", unsafe_allow_html=True)
                 else:
-                    st.markdown(f"""<div style="background:#f5f5f5;color:#999;padding:0.5rem;border-radius:8px;text-align:center;font-size:0.7rem;">{step_name}</div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:#f5f5f5;color:#999;padding:0.5rem;border-radius:8px;text-align:center;font-size:0.7rem;">{name}</div>""", unsafe_allow_html=True)
         
         st.markdown("---")
         
-        # ============================================
-        # STEP 1: ASSET INFORMATION
-        # ============================================
+        cats = DB.get_categories()
+        cat_names = sorted([c.get("name","") for c in cats]) if cats else ["MEP-ELECTRICAL", "MEP-HVAC", "MEP-PLUMBING", "ELV-FIRE ALARM", "CIVIL", "VERTICAL TRANSPORT"]
+        
+        # STEP 1
         if st.session_state.add_asset_step == 1:
-            with st.form("add_asset_step1"):
+            with st.form("add_step1"):
                 c1, c2 = st.columns(2)
                 with c1:
-                    asset_name = st.text_input("Asset Name*", placeholder="e.g. DG 1 - CT-3 - DG Yard", key="ar_name")
-                    asset_code = st.text_input("Asset Code*", placeholder="Auto-generated or manual", key="ar_code")
-                    asset_image = st.file_uploader("Asset Image", type=["png", "jpg", "jpeg"], key="ar_image")
-                    category = st.selectbox("Category*", sorted(df["department"].unique().tolist()) if "department" in df.columns else ["MEP-ELECTRICAL", "MEP-HVAC", "MEP-PLUMBING", "ELV-FIRE ALARM", "ELV-CCTV", "CIVIL", "VERTICAL TRANSPORT"], key="ar_cat")
-                    parent_asset = st.text_input("Parent Asset", placeholder="e.g. Diesel Generator Set", key="ar_parent")
-                    priority = st.selectbox("Priority*", ["critical", "high", "medium", "low"], key="ar_priority")
-                    ownership = st.selectbox("Ownership*", ["Churchgate Group", "Leased", "Tenant Owned", "Government", "Third Party"], key="ar_own")
+                    s1_name = st.text_input("Asset Name*", placeholder="e.g. DG 1 - CT-3 - DG Yard")
+                    s1_code = st.text_input("Asset Code*", placeholder="e.g. WTC-DG-001")
+                    s1_cat = st.selectbox("Category*", cat_names)
+                    s1_parent = st.text_input("Parent Asset", placeholder="e.g. Diesel Generator Set")
+                    s1_priority = st.selectbox("Priority*", ["critical", "high", "medium", "low"])
+                    s1_ownership = st.selectbox("Ownership*", ["Churchgate Group", "Leased", "Tenant Owned", "Government"])
                 with c2:
-                    department = st.selectbox("Department*", sorted(df["department"].unique().tolist()) if "department" in df.columns else ["MEP-ELECTRICAL", "MEP-HVAC", "FACILITY MANAGEMENT"], key="ar_dept")
-                    description = st.text_area("Description*", height=100, key="ar_desc")
-                    status = st.selectbox("Status*", ["active", "inactive", "breakdown", "decommissioned"], key="ar_status")
-                    health_condition = st.selectbox("Health Condition", ["Excellent", "Good", "Average", "Poor"], key="ar_health")
-                    verification_freq = st.selectbox("Verification Frequency", ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="ar_vfreq")
+                    s1_dept = st.selectbox("Department*", cat_names)
+                    s1_desc = st.text_area("Description*", height=100)
+                    s1_status = st.selectbox("Status*", ["active", "inactive", "breakdown", "decommissioned"])
+                    s1_health = st.selectbox("Health Condition", ["Excellent", "Good", "Average", "Poor"])
+                    s1_vfreq = st.selectbox("Verification Frequency", ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly"])
                 
                 st.markdown("---")
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    building = st.selectbox("Building/Location*", ["CT — Office Tower", "SAT — Residential Tower", "RC — Recreation Center", "IP — Intermediate Parking"], key="ar_bldg")
+                    s1_bldg = st.selectbox("Building*", ["CT — Office Tower", "SAT — Residential Tower", "RC — Recreation Center", "IP — Intermediate Parking"])
                 with c2:
-                    sub_location = st.text_input("Sub Location", placeholder="e.g. DG Yard, Floor 13, Electrical Room", key="ar_subloc")
+                    s1_subloc = st.text_input("Sub Location", placeholder="e.g. DG Yard, Floor 13")
                 with c3:
-                    region = st.text_input("Region/City", value=info.get("city", "Abuja"), key="ar_region")
+                    s1_region = st.text_input("City", value=info.get("city", "Abuja"))
                 
                 c1, c2 = st.columns(2)
                 with c1:
-                    barcode = st.text_input("Barcode*", key="ar_barcode")
+                    s1_barcode = st.text_input("Barcode*")
                 with c2:
-                    geo_location = st.text_input("Geo Location", placeholder="e.g. 9.0486, 7.4732", key="ar_geo")
+                    s1_geo = st.text_input("Geo Location", placeholder="9.0486, 7.4732")
                 
-                if st.form_submit_button("Continue to Specifications →", use_container_width=True, type="primary"):
-                    if asset_name and asset_code and department and description and building and barcode:
-                        st.session_state.asset_step1_data = {
-                            "name": asset_name, "asset_tag": asset_code, "department": department,
-                            "category": category, "parent_asset": parent_asset, "priority": priority,
-                            "ownership": ownership, "description": description, "status": status,
-                            "health_condition": health_condition, "verification_frequency": verification_freq,
-                            "location_building": building, "location_floor": sub_location,
-                            "region": region, "barcode": barcode, "geo_location": geo_location
-                        }
+                if st.form_submit_button("Continue →", use_container_width=True, type="primary"):
+                    if s1_name and s1_code and s1_desc and s1_bldg and s1_barcode:
+                        st.session_state.s1 = {"name": s1_name, "asset_tag": s1_code, "department": s1_dept, "category_name": s1_cat, "parent_asset": s1_parent, "priority": s1_priority, "ownership": s1_ownership, "description": s1_desc, "status": s1_status, "health": s1_health, "verification_frequency": s1_vfreq, "location_building": s1_bldg, "location_floor": s1_subloc, "region": s1_region, "barcode": s1_barcode, "geo_location": s1_geo}
                         st.session_state.add_asset_step = 2
                         st.rerun()
                     else:
-                        st.error("⚠️ Please fill all required fields marked with *")
+                        st.error("⚠️ Fill all required fields (*)")
         
-        # ============================================
-        # STEP 2: SPECIFICATIONS
-        # ============================================
+        # STEP 2
         elif st.session_state.add_asset_step == 2:
-            with st.form("add_asset_step2"):
+            with st.form("add_step2"):
                 st.markdown("#### 📐 Technical Specifications")
-                
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    manufacturer = st.text_input("Manufacturer*", placeholder="e.g. Cummins, Perkins, Honeywell", key="ar_mfg")
-                    serial_number = st.text_input("Serial Number*", key="ar_serial")
-                    model = st.text_input("Model", key="ar_model")
+                    s2_mfg = st.text_input("Manufacturer*", placeholder="Cummins, Perkins")
+                    s2_serial = st.text_input("Serial Number*")
+                    s2_model = st.text_input("Model")
                 with c2:
-                    model_no = st.text_input("Model Number", key="ar_modelno")
-                    capacity = st.text_input("Capacity", placeholder="e.g. 500 KVA, 2000 CFM", key="ar_capacity")
-                    gross_weight = st.text_input("Gross Weight (kg)", key="ar_weight")
+                    s2_modelno = st.text_input("Model Number")
+                    s2_capacity = st.text_input("Capacity", placeholder="500 KVA")
+                    s2_weight = st.text_input("Gross Weight (kg)")
                 with c3:
-                    dimensions = st.text_input("Size & Dimensions", placeholder="e.g. 200x150x100 cm", key="ar_dims")
-                    standard_running_hrs = st.number_input("Standard Running Hours", min_value=0.0, value=0.0, key="ar_stdhrs")
-                    total_operational_hrs = st.number_input("Total Operational Hours", min_value=0.0, value=0.0, key="ar_tothrs")
+                    s2_dims = st.text_input("Dimensions", placeholder="200x150x100 cm")
+                    s2_stdhrs = st.number_input("Standard Running Hours", value=0.0)
+                    s2_tothrs = st.number_input("Total Operational Hours", value=0.0)
                 
-                st.markdown("---")
                 c1, c2 = st.columns(2)
                 with c1:
-                    sap_date = st.date_input("SAP Created Date", today, key="ar_sapdate")
-                    installation_date = st.date_input("Installation Date", today, key="ar_installdate")
+                    s2_sap = st.date_input("SAP Created Date", today)
+                    s2_install = st.date_input("Installation Date", today)
                 with c2:
-                    checklist_template = st.selectbox("Checklist Template", ["Standard MEP", "Standard HVAC", "Standard ELV", "Standard Civil", "Custom"], key="ar_chklist")
-                    ppm_frequency = st.selectbox("PPM Frequency", ["Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="ar_ppmfreq")
+                    s2_checklist = st.selectbox("Checklist Template", ["Standard MEP", "Standard HVAC", "Standard ELV", "Standard Civil"])
+                    s2_ppm = st.selectbox("PPM Frequency", ["Weekly", "Monthly", "Quarterly", "Yearly"])
                 
                 c1, c2 = st.columns(2)
                 with c1:
@@ -1138,54 +986,41 @@ def page_ar():
                         st.session_state.add_asset_step = 1
                         st.rerun()
                 with c2:
-                    if st.form_submit_button("Continue to Financial →", use_container_width=True, type="primary"):
-                        if manufacturer and serial_number:
-                            st.session_state.asset_step2_data = {
-                                "manufacturer": manufacturer, "serial_number": serial_number,
-                                "model": model, "model_no": model_no, "capacity": capacity,
-                                "gross_weight": gross_weight, "dimensions": dimensions,
-                                "standard_running_hrs": standard_running_hrs,
-                                "total_operational_hrs": total_operational_hrs,
-                                "sap_created_date": str(sap_date), "installation_date": str(installation_date),
-                                "checklist_template": checklist_template, "ppm_frequency": ppm_frequency
-                            }
+                    if st.form_submit_button("Continue →", use_container_width=True, type="primary"):
+                        if s2_mfg and s2_serial:
+                            st.session_state.s2 = {"manufacturer": s2_mfg, "serial_number": s2_serial, "model": s2_model, "model_no": s2_modelno, "capacity": s2_capacity, "gross_weight": s2_weight, "dimensions": s2_dims, "standard_running_hrs": s2_stdhrs, "total_operational_hrs": s2_tothrs, "sap_created_date": str(s2_sap), "installation_date": str(s2_install), "checklist_template": s2_checklist, "ppm_frequency": s2_ppm}
                             st.session_state.add_asset_step = 3
                             st.rerun()
                         else:
-                            st.error("⚠️ Manufacturer and Serial Number are required")
+                            st.error("⚠️ Manufacturer and Serial Number required")
         
-        # ============================================
-        # STEP 3: FINANCIAL DETAILS
-        # ============================================
+        # STEP 3
         elif st.session_state.add_asset_step == 3:
-            with st.form("add_asset_step3"):
-                st.markdown("#### 💰 Financial & Procurement Details")
-                
+            with st.form("add_step3"):
+                st.markdown("#### 💰 Financial Details")
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    purchase_price = st.number_input("Purchase Price (₦)*", min_value=0.0, value=0.0, step=10000.0, key="ar_price")
-                    currency = st.selectbox("Currency", ["NGN", "USD", "EUR", "GBP"], key="ar_currency")
-                    residual_value = st.number_input("Residual Value / %", min_value=0.0, value=10.0, key="ar_residual")
+                    s3_price = st.number_input("Purchase Price (₦)*", min_value=0.0, step=10000.0)
+                    s3_currency = st.selectbox("Currency", ["NGN", "USD", "EUR"])
+                    s3_residual = st.number_input("Residual Value %", value=10.0)
                 with c2:
-                    purchase_date = st.date_input("Purchase Date", today, key="ar_purchdate")
-                    depreciation_method = st.selectbox("Depreciation Method", ["Straight Line", "Reducing Balance", "Sum of Years", "Units of Production"], key="ar_depmethod")
-                    useful_life = st.number_input("Useful Life (Years)", min_value=1, value=10, key="ar_useful")
+                    s3_purchdate = st.date_input("Purchase Date", today)
+                    s3_depmethod = st.selectbox("Depreciation", ["Straight Line", "Reducing Balance"])
+                    s3_useful = st.number_input("Useful Life (Years)", value=10)
                 with c3:
-                    invoice_no = st.text_input("Invoice Number", key="ar_invoice")
-                    invoice_date = st.date_input("Invoice Date", today, key="ar_invdate")
-                    po_number = st.text_input("PO Number", key="ar_po")
-                    po_date = st.date_input("PO Date", today, key="ar_podate")
+                    s3_invoice = st.text_input("Invoice No")
+                    s3_invdate = st.date_input("Invoice Date", today)
+                    s3_po = st.text_input("PO Number")
+                    s3_podate = st.date_input("PO Date", today)
                 
-                st.markdown("---")
-                st.markdown("#### 🛡️ Warranty Information")
-                
+                st.markdown("#### 🛡️ Warranty")
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    warranty_applicable = st.selectbox("Warranty Applicable", ["Yes", "No"], key="ar_warranty")
+                    s3_warranty = st.selectbox("Warranty?", ["Yes", "No"])
                 with c2:
-                    warranty_start = st.date_input("Warranty Start Date", today, key="ar_wstart")
+                    s3_wstart = st.date_input("Warranty Start", today)
                 with c3:
-                    warranty_end = st.date_input("Warranty End Date", today + timedelta(days=365), key="ar_wend")
+                    s3_wend = st.date_input("Warranty End", today + timedelta(days=365))
                 
                 c1, c2 = st.columns(2)
                 with c1:
@@ -1193,84 +1028,51 @@ def page_ar():
                         st.session_state.add_asset_step = 2
                         st.rerun()
                 with c2:
-                    if st.form_submit_button("Continue to Assignment →", use_container_width=True, type="primary"):
-                        st.session_state.asset_step3_data = {
-                            "purchase_cost": purchase_price, "currency": currency,
-                            "residual_value": residual_value, "purchase_date": str(purchase_date),
-                            "depreciation_method": depreciation_method, "useful_life": useful_life,
-                            "invoice_no": invoice_no, "invoice_date": str(invoice_date),
-                            "po_number": po_number, "po_date": str(po_date),
-                            "warranty_applicable": warranty_applicable == "Yes",
-                            "warranty_start_date": str(warranty_start), "warranty_end_date": str(warranty_end)
-                        }
+                    if st.form_submit_button("Continue →", use_container_width=True, type="primary"):
+                        st.session_state.s3 = {"purchase_cost": s3_price, "currency": s3_currency, "residual_value": s3_residual, "purchase_date": str(s3_purchdate), "depreciation_method": s3_depmethod, "useful_life": s3_useful, "invoice_no": s3_invoice, "invoice_date": str(s3_invdate), "po_number": s3_po, "po_date": str(s3_podate), "warranty_applicable": s3_warranty == "Yes", "warranty_start": str(s3_wstart), "warranty_expiry": str(s3_wend)}
                         st.session_state.add_asset_step = 4
                         st.rerun()
         
-        # ============================================
-        # STEP 4: ASSIGNMENT
-        # ============================================
+        # STEP 4
         elif st.session_state.add_asset_step == 4:
-            with st.form("add_asset_step4"):
-                st.markdown("#### 👤 Assignment Details")
-                
+            with st.form("add_step4"):
+                st.markdown("#### 👤 Assignment")
                 users = DB.get_users()
-                user_names = [u.get("name", "") for u in users]
-                
+                user_names = [u.get("name","") for u in users]
                 c1, c2 = st.columns(2)
                 with c1:
-                    assigned_user = st.selectbox("Assigned User", ["None"] + user_names, key="ar_assigned")
-                    additional_user = st.selectbox("Additional User", ["None"] + user_names, key="ar_adduser")
+                    s4_user = st.selectbox("Assigned User", ["None"] + user_names)
+                    s4_adduser = st.selectbox("Additional User", ["None"] + user_names)
                 with c2:
-                    vendor_options = ["Clyde Engineering", "Gates and Shield", "TXB Enterprise Ltd", "Brainworks", "Metalplex", "Berger Paints", "None"]
-                    vendor = st.selectbox("Vendor/Contractor", vendor_options, key="ar_vendor")
-                    plan_year_replace = st.number_input("Plan Year to Replace", min_value=2025, value=2030, key="ar_replaceyr")
+                    s4_vendor = st.selectbox("Vendor", ["None", "Clyde Engineering", "Gates and Shield", "TXB Enterprise", "Brainworks"])
+                    s4_replaceyr = st.number_input("Replace Year", value=2030)
                 
-                st.markdown("---")
                 c1, c2 = st.columns(2)
                 with c1:
                     if st.form_submit_button("⬅️ Back", use_container_width=True):
                         st.session_state.add_asset_step = 3
                         st.rerun()
                 with c2:
-                    if st.form_submit_button("Continue to Maintenance →", use_container_width=True, type="primary"):
-                        st.session_state.asset_step4_data = {
-                            "assigned_to_name": assigned_user if assigned_user != "None" else None,
-                            "additional_user": additional_user if additional_user != "None" else None,
-                            "vendor": vendor if vendor != "None" else None,
-                            "plan_year_to_replace": plan_year_replace
-                        }
+                    if st.form_submit_button("Continue →", use_container_width=True, type="primary"):
+                        st.session_state.s4 = {"assigned_to_name": s4_user if s4_user != "None" else None, "additional_user": s4_adduser if s4_adduser != "None" else None, "vendor": s4_vendor if s4_vendor != "None" else None, "plan_year_to_replace": s4_replaceyr}
                         st.session_state.add_asset_step = 5
                         st.rerun()
         
-        # ============================================
-        # STEP 5: MAINTENANCE ACTIVITIES
-        # ============================================
+        # STEP 5
         elif st.session_state.add_asset_step == 5:
-            with st.form("add_asset_step5"):
-                st.markdown("#### 🔧 Maintenance Configuration")
-                
+            with st.form("add_step5"):
+                st.markdown("#### 🔧 Maintenance Setup")
                 c1, c2 = st.columns(2)
                 with c1:
-                    amc_applicable = st.selectbox("AMC Applicable", ["Yes", "No"], key="ar_amc")
-                    amc_provider = st.text_input("AMC Provider", key="ar_amcprov")
-                    amc_start = st.date_input("AMC Start Date", today, key="ar_amcstart")
+                    s5_amc = st.selectbox("AMC?", ["Yes", "No"])
+                    s5_amcprov = st.text_input("AMC Provider")
+                    s5_amcstart = st.date_input("AMC Start", today)
                 with c2:
-                    amc_cost = st.number_input("AMC Cost (₦/Year)", min_value=0.0, value=0.0, step=10000.0, key="ar_amccost")
-                    amc_end = st.date_input("AMC End Date", today + timedelta(days=365), key="ar_amcend")
-                    maintenance_team = st.selectbox("Maintenance Team", ["Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing", "Facility Management — Hard Services", "Contractor — External"], key="ar_mteam")
+                    s5_amccost = st.number_input("AMC Cost (₦/yr)", min_value=0.0, step=10000.0)
+                    s5_amcend = st.date_input("AMC End", today + timedelta(days=365))
+                    s5_team = st.selectbox("Maintenance Team", ["Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing", "Facility Management — Hard Services"])
                 
-                st.markdown("---")
-                st.markdown("#### 📋 PPM Schedule Configuration")
-                
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    ppm_enabled = st.selectbox("Enable PPM", ["Yes", "No"], key="ar_ppmenable")
-                    ppm_start = st.date_input("PPM Start Date", today, key="ar_ppmstart")
-                with c2:
-                    ppm_frequency_set = st.selectbox("PPM Frequency", ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="ar_ppmfreq2")
-                    ppm_due_days = st.number_input("PPM Due Days (before due)", min_value=1, value=7, key="ar_ppmdue")
-                with c3:
-                    ppm_checklist = st.text_area("PPM Checklist Items (one per line)", height=100, placeholder="Check rack for dust\nCheck earth connection\nCheck fire suppression", key="ar_ppmcheck")
+                s5_checklist = st.text_area("PPM Checklist Items (one per line)", placeholder="Check for dust\nCheck earth connection\nCheck fire suppression")
                 
                 c1, c2 = st.columns(2)
                 with c1:
@@ -1278,519 +1080,292 @@ def page_ar():
                         st.session_state.add_asset_step = 4
                         st.rerun()
                 with c2:
-                    if st.form_submit_button("Continue to Service Sheet →", use_container_width=True, type="primary"):
-                        st.session_state.asset_step5_data = {
-                            "amc_applicable": amc_applicable == "Yes",
-                            "amc_provider": amc_provider, "amc_cost": amc_cost,
-                            "amc_start_date": str(amc_start), "amc_end_date": str(amc_end),
-                            "maintenance_team": maintenance_team,
-                            "ppm_enabled": ppm_enabled == "Yes",
-                            "ppm_start_date": str(ppm_start),
-                            "ppm_frequency": ppm_frequency_set,
-                            "ppm_due_days": ppm_due_days,
-                            "ppm_checklist_items": ppm_checklist
-                        }
+                    if st.form_submit_button("Continue →", use_container_width=True, type="primary"):
+                        st.session_state.s5 = {"amc_applicable": s5_amc == "Yes", "amc_provider": s5_amcprov, "amc_cost": s5_amccost, "amc_start": str(s5_amcstart), "amc_end": str(s5_amcend), "maintenance_team": s5_team, "ppm_checklist_items": s5_checklist}
                         st.session_state.add_asset_step = 6
                         st.rerun()
         
-        # ============================================
-        # STEP 6: SERVICE SHEET & REVIEW
-        # ============================================
+        # STEP 6 — REVIEW & SUBMIT
         elif st.session_state.add_asset_step == 6:
-            st.markdown("#### 📋 Service Sheet & Final Review")
+            s1 = st.session_state.get("s1", {})
+            s2 = st.session_state.get("s2", {})
+            s3 = st.session_state.get("s3", {})
+            s4 = st.session_state.get("s4", {})
+            s5 = st.session_state.get("s5", {})
             
-            # Review all data before submission
-            s1 = st.session_state.get("asset_step1_data", {})
-            s2 = st.session_state.get("asset_step2_data", {})
-            s3 = st.session_state.get("asset_step3_data", {})
-            s4 = st.session_state.get("asset_step4_data", {})
-            s5 = st.session_state.get("asset_step5_data", {})
+            st.markdown("#### 📋 Review & Submit")
             
-            with st.form("add_asset_step6"):
-                st.markdown("##### 📝 Review Summary")
-                
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.markdown(f"""
-                    <div style="background:white;border-radius:8px;padding:0.8rem;border:1px solid #ddd;font-size:0.75rem;">
-                        <b>🏗️ Asset Info:</b><br>
-                        Name: {s1.get('name','N/A')}<br>
-                        Code: {s1.get('asset_tag','N/A')}<br>
-                        Department: {s1.get('department','N/A')}<br>
-                        Location: {s1.get('location_building','N/A')} / {s1.get('location_floor','N/A')}<br>
-                        Status: {s1.get('status','N/A')}
-                    </div>
-                    """, unsafe_allow_html=True)
-                with c2:
-                    st.markdown(f"""
-                    <div style="background:white;border-radius:8px;padding:0.8rem;border:1px solid #ddd;font-size:0.75rem;">
-                        <b>📐 Specifications:</b><br>
-                        Manufacturer: {s2.get('manufacturer','N/A')}<br>
-                        Serial No: {s2.get('serial_number','N/A')}<br>
-                        Model: {s2.get('model','N/A')}<br>
-                        Capacity: {s2.get('capacity','N/A')}
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.markdown(f"""
-                <div style="background:white;border-radius:8px;padding:0.8rem;border:1px solid #ddd;font-size:0.75rem;margin-top:0.5rem;">
-                    <b>💰 Financial:</b> Purchase: ₦{s3.get('purchase_cost',0):,.2f} | Warranty: {s3.get('warranty_start_date','N/A')} to {s3.get('warranty_end_date','N/A')}
-                </div>
-                """, unsafe_allow_html=True)
-                
-                service_notes = st.text_area("Service Sheet Notes", height=80, placeholder="Additional service notes, special instructions...", key="ar_servicenotes")
-                attachments = st.file_uploader("Attach Documents (Manual, Warranty, etc.)", type=["pdf", "doc", "docx", "xlsx"], accept_multiple_files=True, key="ar_attach")
-                
-                st.markdown("---")
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    if st.form_submit_button("⬅️ Back", use_container_width=True):
-                        st.session_state.add_asset_step = 5
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown(f"""<div style="background:white;border-radius:8px;padding:0.8rem;border:1px solid #ddd;font-size:0.75rem;"><b>🏗️ Asset:</b> {s1.get('name','N/A')}<br><b>Code:</b> {s1.get('asset_tag','N/A')}<br><b>Location:</b> {s1.get('location_building','N/A')}</div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div style="background:white;border-radius:8px;padding:0.8rem;border:1px solid #ddd;font-size:0.75rem;"><b>📐 Mfg:</b> {s2.get('manufacturer','N/A')}<br><b>Serial:</b> {s2.get('serial_number','N/A')}<br><b>Model:</b> {s2.get('model','N/A')}</div>""", unsafe_allow_html=True)
+            
+            st.markdown(f"""<div style="background:white;border-radius:8px;padding:0.8rem;border:1px solid #ddd;font-size:0.75rem;margin-top:0.5rem;"><b>💰 Price:</b> ₦{s3.get('purchase_cost',0):,.2f} | <b>Warranty:</b> {s3.get('warranty_start','N/A')} → {s3.get('warranty_expiry','N/A')}</div>""", unsafe_allow_html=True)
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                if st.button("⬅️ Back", use_container_width=True, key="s6_back"):
+                    st.session_state.add_asset_step = 5
+                    st.rerun()
+            with c2:
+                if st.button("💾 Save Draft", use_container_width=True, key="s6_draft"):
+                    st.info("Draft saving coming soon.")
+            with c3:
+                if st.button("✅ SUBMIT ASSET", use_container_width=True, type="primary", key="s6_submit"):
+                    full_data = {**s1, **s2, **s3, **s4, **s5}
+                    full_data["facility_code"] = fc
+                    full_data["created_at"] = datetime.now().isoformat()
+                    full_data["condition_rating"] = 5.0 if s1.get("health") == "Excellent" else 4.0 if s1.get("health") == "Good" else 3.0 if s1.get("health") == "Average" else 2.0
+                    
+                    # Get category_id from category_name
+                    try:
+                        cat_lookup = supabase.table("asset_categories").select("id").eq("name", s1.get("category_name", "")).execute()
+                        if cat_lookup.data:
+                            full_data["category_id"] = cat_lookup.data[0]["id"]
+                    except:
+                        pass
+                    
+                    result = DB.insert("assets", full_data)
+                    if result:
+                        st.success(f"✅ Asset '{s1.get('name','N/A')}' registered!")
+                        st.balloons()
+                        for k in ["s1","s2","s3","s4","s5","add_asset_step"]:
+                            if k in st.session_state:
+                                del st.session_state[k]
+                        st.session_state.add_asset_step = 1
+                        time.sleep(2)
                         st.rerun()
-                with c2:
-                    if st.form_submit_button("💾 Save Draft", use_container_width=True):
-                        st.warning("Draft saving coming soon.")
-                with c3:
-                    if st.form_submit_button("✅ Submit Asset", use_container_width=True, type="primary"):
-                        # Combine all data
-                        full_asset_data = {**s1, **s2, **s3, **s4, **s5}
-                        full_asset_data["facility_code"] = fc
-                        full_asset_data["service_notes"] = service_notes
-                        full_asset_data["created_at"] = datetime.now().isoformat()
-                        full_asset_data["condition_rating"] = 5.0 if s1.get("health_condition") == "Excellent" else 4.0 if s1.get("health_condition") == "Good" else 3.0 if s1.get("health_condition") == "Average" else 2.0
-                        
-                        try:
-                            result = DB.insert("assets", full_asset_data)
-                            if result:
-                                st.success(f"✅ Asset '{s1.get('name','N/A')}' registered successfully!")
-                                st.balloons()
-                                # Clear form data
-                                for key in ["asset_step1_data", "asset_step2_data", "asset_step3_data", "asset_step4_data", "asset_step5_data"]:
-                                    if key in st.session_state:
-                                        del st.session_state[key]
-                                st.session_state.add_asset_step = 1
-                                time.sleep(2)
-                                st.rerun()
-                            else:
-                                st.error("❌ Failed to register asset. Please try again.")
-                        except Exception as e:
-                            st.error(f"❌ Error: {str(e)[:200]}")
-        
-        # Step navigation reset
-        if st.button("🔄 Start New Asset Registration", use_container_width=True):
-            for key in ["asset_step1_data", "asset_step2_data", "asset_step3_data", "asset_step4_data", "asset_step5_data"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.session_state.add_asset_step = 1
-            st.rerun()
+                    else:
+                        st.error("❌ Failed. Try again.")
     
     # ============================================
     # TAB 3: BULK UPLOAD
     # ============================================
     with ar_tabs[3]:
         st.markdown("### 📦 Bulk Asset Upload")
-        st.caption("Upload multiple assets via CSV file with the standard template format")
         
-        # Download template
-        template_cols = [
-            "SNO", "Department", "Parent Asset", "Asset Name", "Category", "Status", 
-            "Health Condition", "Priority", "Ownership", "Manufacturer", "Asset Code",
-            "SAP Created Date", "Gross Weight", "Size and Dimensions", "Serial No", 
-            "Model", "Model No", "Capacity", "Description", "Region", "City", 
-            "Location", "Sub Location", "Verification Frequency", "Standard Running Hrs",
-            "Total Operational Hrs", "Invoice No", "Invoice Date", "PO Number", "PO Date",
-            "Purchase Price", "Purchase Date", "Depreciation Method", 
-            "Residual Value / Percentage", "Currency", "Useful Life", "Installation Date",
-            "Assigned User", "Additional User", "Vendor", "Plan Year to Replace",
-            "Warranty Applicable", "Warranty Start Date", "Warranty End Date",
-            "Checklist", "PPM", "Geo Location", "Barcode"
-        ]
-        
+        template_cols = ["Asset Name", "Asset Code", "Department", "Category", "Parent Asset", "Status", "Priority", "Ownership", "Manufacturer", "Serial No", "Model", "Capacity", "Description", "Location", "Sub Location", "City", "Barcode", "Purchase Price", "Purchase Date", "Warranty Start", "Warranty End", "Verification Frequency", "Checklist Template", "PPM Frequency"]
         template_df = pd.DataFrame(columns=template_cols)
-        template_csv = template_df.to_csv(index=False)
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.download_button(
-                "📥 Download CSV Template",
-                template_csv,
-                f"asset_bulk_upload_template.csv",
-                "text/csv",
-                use_container_width=True
-            )
-        with c2:
-            st.info(f"📋 Template has {len(template_cols)} columns covering all asset fields")
+        st.download_button("📥 Download CSV Template", template_df.to_csv(index=False), "asset_upload_template.csv", "text/csv", use_container_width=True)
         
         st.markdown("---")
+        uploaded = st.file_uploader("Upload filled CSV", type="csv")
         
-        uploaded_file = st.file_uploader("Upload filled CSV", type="csv", key="ar_bulk_upload")
-        
-        if uploaded_file:
-            bulk_df = pd.read_csv(uploaded_file)
+        if uploaded:
+            bulk_df = pd.read_csv(uploaded)
             st.dataframe(bulk_df.head(10), use_container_width=True)
-            st.caption(f"📋 {len(bulk_df)} assets found in CSV")
+            st.caption(f"{len(bulk_df)} assets found")
             
-            # Preview validation
-            required_cols = ["Asset Name", "Department", "Asset Code", "Location", "Barcode"]
-            missing_cols = [c for c in required_cols if c not in bulk_df.columns]
-            
-            if missing_cols:
-                st.error(f"⚠️ Missing required columns: {', '.join(missing_cols)}")
-            else:
-                if st.button(f"🚀 Upload {len(bulk_df)} Assets", use_container_width=True, type="primary"):
-                    success_count = 0
-                    failed_count = 0
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    
-                    for idx, row in bulk_df.iterrows():
-                        try:
-                            asset_data = {
-                                "facility_code": fc,
-                                "name": str(row.get("Asset Name", "")),
-                                "asset_tag": str(row.get("Asset Code", "")),
-                                "department": str(row.get("Department", "")),
-                                "category": str(row.get("Category", "")),
-                                "status": str(row.get("Status", "active")).lower(),
-                                "priority": str(row.get("Priority", "medium")).lower(),
-                                "manufacturer": str(row.get("Manufacturer", "")),
-                                "model": str(row.get("Model", "")),
-                                "serial_number": str(row.get("Serial No", "")),
-                                "location_building": str(row.get("Location", "")),
-                                "location_floor": str(row.get("Sub Location", "")),
-                                "purchase_cost": float(row.get("Purchase Price", 0)) if pd.notna(row.get("Purchase Price")) else 0,
-                                "barcode": str(row.get("Barcode", "")),
-                                "description": str(row.get("Description", "")),
-                                "condition_rating": 5.0,
-                                "created_at": datetime.now().isoformat()
-                            }
-                            
-                            DB.insert("assets", asset_data)
-                            success_count += 1
-                        except Exception as e:
-                            failed_count += 1
-                            continue
-                        
-                        progress_bar.progress((idx + 1) / len(bulk_df))
-                        status_text.text(f"Processing: {idx + 1}/{len(bulk_df)} — {success_count} succeeded, {failed_count} failed")
-                    
-                    progress_bar.empty()
-                    status_text.empty()
-                    
-                    if success_count > 0:
-                        st.success(f"✅ {success_count} assets uploaded successfully!")
-                        if failed_count > 0:
-                            st.warning(f"⚠️ {failed_count} entries failed")
-                        st.balloons()
-                    else:
-                        st.error("❌ Upload failed. Check CSV format.")
+            if st.button(f"🚀 Upload {len(bulk_df)} Assets", use_container_width=True, type="primary"):
+                success = 0
+                for _, row in bulk_df.iterrows():
+                    try:
+                        asset_data = {
+                            "facility_code": fc,
+                            "name": str(row.get("Asset Name", "")),
+                            "asset_tag": str(row.get("Asset Code", "")),
+                            "department": str(row.get("Department", "")),
+                            "status": "active",
+                            "priority": str(row.get("Priority", "medium")).lower(),
+                            "manufacturer": str(row.get("Manufacturer", "")),
+                            "model": str(row.get("Model", "")),
+                            "serial_number": str(row.get("Serial No", "")),
+                            "location_building": str(row.get("Location", "")),
+                            "location_floor": str(row.get("Sub Location", "")),
+                            "purchase_cost": float(row.get("Purchase Price", 0)) if pd.notna(row.get("Purchase Price")) else 0,
+                            "barcode": str(row.get("Barcode", "")),
+                            "description": str(row.get("Description", "")),
+                            "condition_rating": 5.0,
+                            "created_at": datetime.now().isoformat()
+                        }
+                        DB.insert("assets", asset_data)
+                        success += 1
+                    except:
+                        continue
+                st.success(f"✅ {success} assets uploaded!")
+                st.balloons()
+                st.rerun()
     
     # ============================================
-    # TAB 4: READINGS DASHBOARD
+    # TAB 4: READINGS
     # ============================================
     with ar_tabs[4]:
         st.markdown("### 📖 Asset Readings Dashboard")
         
-        # Summary cards
-        total_readings = 0
-        abnormal_readings = 0
-        corrective_wos = 0
-        
-        c1, c2, c3, c4 = st.columns(4)
-        with c1: st.metric("📊 Total Readings", total_readings)
-        with c2: st.metric("⚠️ Abnormal Readings", abnormal_readings)
-        with c3: st.metric("🔧 Corrective WOs", corrective_wos)
-        with c4: st.metric("⏱️ Total Downtime (Hrs)", "0.0")
-        
-        st.markdown("---")
-        
-        # Readings table
-        readings_data = []
-        for _, asset in df.iterrows():
-            readings_data.append({
-                "Asset ID": asset.get("asset_tag", "N/A"),
-                "Asset Name": asset.get("name", "N/A"),
-                "Parent Asset": asset.get("parent_asset", "N/A") if "parent_asset" in asset else "N/A",
-                "Department": asset.get("department", "N/A"),
-                "Manufacturer": asset.get("manufacturer", "N/A"),
-                "Model": asset.get("model", "N/A"),
-                "Serial Number": asset.get("serial_number", "N/A"),
-                "Location": f"{asset.get('location_building','')} / {asset.get('location_floor','')}",
-                "Criticality": asset.get("priority", "N/A"),
-                "Category": asset.get("department", "N/A"),
-                "Asset Age": "0 Years",
-                "Standard Running Hours": asset.get("standard_running_hrs", 0) if "standard_running_hrs" in asset else 0,
-                "Total Running Hours": asset.get("total_operational_hrs", 0) if "total_operational_hrs" in asset else 0,
-                "Current Running Hours": 0,
-                "Reading Type": "N/A",
-                "Total Readings": 0,
-                "Abnormal Readings": 0,
-                "Corrective WOs": 0,
-                "Last Reading": "N/A",
-                "Total Breakdowns": 0,
-                "Downtime (Hours)": 0,
-                "Last Breakdown": "N/A",
-                "Last PPM": "N/A"
-            })
-        
-        readings_df = pd.DataFrame(readings_data)
-        
-        search_readings = st.text_input("🔍 Search by Asset Name, ID, or Location", key="readings_search")
-        if search_readings:
-            mask = False
-            for col in ["Asset Name", "Asset ID", "Location", "Department"]:
-                if col in readings_df.columns:
-                    mask = mask | readings_df[col].astype(str).str.contains(search_readings, case=False, na=False)
-            readings_df = readings_df[mask]
-        
-        st.dataframe(readings_df, use_container_width=True, hide_index=True, height=500)
-        
-        csv_readings = readings_df.to_csv(index=False)
-        st.download_button("📥 Export Readings CSV", csv_readings, f"asset_readings_{fc}_{today}.csv", "text/csv", use_container_width=True)
+        if len(df) == 0:
+            st.info("No assets to display readings for.")
+        else:
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("📊 Total Assets", len(df))
+            with c2: st.metric("⚠️ Abnormal", 0)
+            with c3: st.metric("🔧 Corrective WOs", 0)
+            with c4: st.metric("⏱️ Downtime (Hrs)", "0.0")
+            
+            st.markdown("---")
+            
+            readings_data = []
+            for _, asset in df.iterrows():
+                readings_data.append({
+                    "Asset ID": asset.get("asset_tag", "N/A"),
+                    "Asset Name": asset.get("name", "N/A"),
+                    "Department": asset.get("department", "N/A"),
+                    "Manufacturer": asset.get("manufacturer", "N/A"),
+                    "Model": asset.get("model", "N/A"),
+                    "Serial": asset.get("serial_number", "N/A"),
+                    "Location": f"{asset.get('location_building','')} / {asset.get('location_floor','')}",
+                    "Priority": asset.get("priority", "N/A"),
+                    "Running Hours": asset.get("total_operational_hrs", 0),
+                    "Condition": asset.get("condition_rating", "N/A"),
+                    "Last PPM": "N/A",
+                    "Breakdowns": 0
+                })
+            
+            rd_df = pd.DataFrame(readings_data)
+            st.dataframe(rd_df, use_container_width=True, hide_index=True, height=500)
+            st.download_button("📥 Export", rd_df.to_csv(index=False), "readings.csv", "text/csv", use_container_width=True)
     
     # ============================================
     # TAB 5: PPM CALENDAR
     # ============================================
     with ar_tabs[5]:
-        st.markdown("### 📅 PPM Calendar — 52 Week View")
+        st.markdown("### 📅 PPM Calendar")
         
-        # Building filter
-        building_filter = st.selectbox("Select Building", ["All", "CT — Office Tower", "SAT — Residential Tower", "RC — Recreation Center", "IP — Intermediate Parking"], key="ppmcal_bldg")
-        
-        # Get PPM schedules
-        ppm_data = DB.get_all("ppm_schedules", fc, 200)
-        
-        if ppm_data:
-            ppm_df = pd.DataFrame(ppm_data)
+        if len(df) == 0:
+            st.info("No assets with PPM schedules.")
+        else:
+            building_filter = st.selectbox("Building", ["All", "CT — Office Tower", "SAT — Residential Tower", "RC — Recreation Center"], key="ppm_bldg")
             
-            # Calendar grid
-            st.markdown("#### 📆 Current Month Overview")
+            display_ppm = df
+            if building_filter != "All" and "location_building" in df.columns:
+                display_ppm = df[df["location_building"] == building_filter]
             
-            today_date = date.today()
-            month_start = today_date.replace(day=1)
-            if month_start.month == 12:
-                month_end = month_start.replace(year=month_start.year + 1, month=1, day=1) - timedelta(days=1)
-            else:
-                month_end = month_start.replace(month=month_start.month + 1, day=1) - timedelta(days=1)
-            
-            days_in_month = (month_end - month_start).days + 1
-            
-            # Status summary
-            upcoming = len(ppm_df[ppm_df["status"] == "scheduled"]) if "status" in ppm_df.columns else 0
-            pending = len(ppm_df[ppm_df["status"] == "pending"]) if "status" in ppm_df.columns else 0
-            completed = len(ppm_df[ppm_df["status"] == "completed"]) if "status" in ppm_df.columns else 0
-            closed = len(ppm_df[ppm_df["status"] == "closed"]) if "status" in ppm_df.columns else 0
-            
-            c1, c2, c3, c4 = st.columns(4)
-            with c1: st.metric("📅 Upcoming", upcoming)
-            with c2: st.metric("⏳ Pending", pending)
-            with c3: st.metric("✅ Completed", completed)
-            with c4: st.metric("🔒 Closed", closed)
-            
-            st.markdown("---")
-            
-            # PPM list with status
-            for _, row in ppm_df.head(20).iterrows():
-                status_color = {"scheduled": "#3B82F6", "pending": "#F59E0B", "completed": "#10B981", "closed": "#6B7280"}
-                sc = status_color.get(row.get("status", "scheduled"), "#3B82F6")
-                
+            for _, row in display_ppm.iterrows():
                 st.markdown(f"""
-                <div style="background:white;border-radius:8px;padding:0.6rem;margin:0.2rem 0;border-left:3px solid {sc};display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <b>{row.get('title','')}</b>
-                        <br><span style="font-size:0.7rem;color:#666;">Due: {row.get('next_due_date','')} | {row.get('frequency','')}</span>
-                    </div>
-                    <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;font-weight:600;">{row.get('status','').upper()}</span>
+                <div style="background:white;border-radius:8px;padding:0.6rem;margin:0.2rem 0;border-left:3px solid #3B82F6;display:flex;justify-content:space-between;">
+                    <div><b>{row.get('name','')}</b><br><span style="font-size:0.7rem;">{row.get('department','')} | {row.get('location_building','')}</span></div>
+                    <span style="font-size:0.7rem;color:#888;">{row.get('verification_frequency','N/A')}</span>
                 </div>
                 """, unsafe_allow_html=True)
-        else:
-            st.info("No PPM schedules found. Configure PPM schedules in the PPM dashboard.")
     
     # ============================================
-    # TAB 6: APPROVALS DASHBOARD
+    # TAB 6: APPROVALS
     # ============================================
     with ar_tabs[6]:
         st.markdown("### ✅ Approvals Dashboard")
         
-        approval_tabs = st.tabs(["📋 Pending Approvals", "🔄 Asset Movement", "🗑️ Asset Discard", "💰 Asset Sales"])
+        approval_subtabs = st.tabs(["📋 Pending", "🔄 Movement", "🗑️ Discard", "💰 Sales"])
         
-        with approval_tabs[0]:
-            st.markdown("#### 📋 Pending My Approval")
-            
-            # Get pending work permits
-            pending_permits = supabase.table("work_permits").select("*").eq("facility_code", fc).eq("status", "pending").execute()
-            
-            if pending_permits.data and len(pending_permits.data) > 0:
-                for permit in pending_permits.data:
-                    st.markdown(f"""
-                    <div style="background:#FFFBEB;border-left:3px solid #F59E0B;border-radius:8px;padding:0.8rem;margin:0.3rem 0;">
-                        <b>📋 {permit.get('permit_number','')}</b> — {permit.get('title','')}
-                        <br><span style="font-size:0.7rem;">Raised by: {permit.get('raised_by_name','')} | Type: {permit.get('permit_type','')}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    if st.button("✅ Approve", key=f"appr_{permit['id']}", use_container_width=True):
-                        DB.update("work_permits", permit["id"], {"status": "approved", "workflow_stage": "approved", "approved_at": datetime.now().isoformat(), "approved_by_name": st.session_state.get("user_name", "Approver")})
-                        st.success("✅ Approved!")
-                        st.rerun()
-            else:
-                st.success("✅ No pending approvals")
+        with approval_subtabs[0]:
+            st.info("Pending approvals will appear here when assets require review.")
         
-        with approval_tabs[1]:
-            st.markdown("#### 🔄 Asset Movement Approvals")
-            st.info("Asset movement requests — approval workflow: Submit → Team Lead → Facility Manager")
-            
-            with st.form("asset_movement_req"):
+        with approval_subtabs[1]:
+            with st.form("move_req"):
                 st.markdown("**Request Asset Movement**")
-                asset_select = st.selectbox("Select Asset", df["name"].tolist() if "name" in df.columns and len(df) > 0 else ["Select asset..."])
-                move_from = st.text_input("Move From (Location)")
-                move_to = st.text_input("Move To (Location)")
-                reason = st.text_area("Reason for Movement")
-                if st.form_submit_button("📤 Submit Movement Request", use_container_width=True):
-                    st.success("✅ Movement request submitted for approval!")
+                asset_sel = st.selectbox("Asset", df["name"].tolist() if len(df) > 0 else ["None"])
+                move_from = st.text_input("From Location")
+                move_to = st.text_input("To Location")
+                reason = st.text_area("Reason")
+                if st.form_submit_button("Submit Movement Request", use_container_width=True):
+                    st.success("✅ Movement request submitted!")
         
-        with approval_tabs[2]:
-            st.markdown("#### 🗑️ Asset Discard Approvals")
-            st.info("Asset discard requests — requires Manager + Finance approval")
-            
-            with st.form("asset_discard_req"):
-                asset_discard = st.selectbox("Select Asset to Discard", df["name"].tolist() if "name" in df.columns and len(df) > 0 else ["Select asset..."], key="discard_asset")
-                discard_reason = st.text_area("Reason for Discard")
-                discard_method = st.selectbox("Discard Method", ["Scrap", "Sell", "Donate", "Recycle"])
-                if st.form_submit_button("📤 Submit Discard Request", use_container_width=True):
-                    st.success("✅ Discard request submitted for approval!")
+        with approval_subtabs[2]:
+            with st.form("discard_req"):
+                st.markdown("**Request Asset Discard**")
+                asset_disc = st.selectbox("Asset", df["name"].tolist() if len(df) > 0 else ["None"], key="disc_asset")
+                disc_reason = st.text_area("Reason")
+                disc_method = st.selectbox("Method", ["Scrap", "Sell", "Donate", "Recycle"])
+                if st.form_submit_button("Submit Discard Request", use_container_width=True):
+                    st.success("✅ Discard request submitted!")
         
-        with approval_tabs[3]:
-            st.markdown("#### 💰 Asset Sales Approvals")
-            st.info("Asset sales — requires Manager + Finance + GMD approval")
-            
-            with st.form("asset_sale_req"):
-                asset_sale = st.selectbox("Select Asset to Sell", df["name"].tolist() if "name" in df.columns and len(df) > 0 else ["Select asset..."], key="sale_asset")
+        with approval_subtabs[3]:
+            with st.form("sale_req"):
+                st.markdown("**Request Asset Sale**")
+                asset_sale = st.selectbox("Asset", df["name"].tolist() if len(df) > 0 else ["None"], key="sale_asset")
                 sale_price = st.number_input("Sale Price (₦)", min_value=0.0, step=10000.0)
-                buyer = st.text_input("Buyer Name/Company")
-                if st.form_submit_button("📤 Submit Sale Request", use_container_width=True):
-                    st.success("✅ Sale request submitted for approval!")
+                buyer = st.text_input("Buyer")
+                if st.form_submit_button("Submit Sale Request", use_container_width=True):
+                    st.success("✅ Sale request submitted!")
     
     # ============================================
-    # TAB 7: AI-POWERED REPORTS
+    # TAB 7: REPORTS
     # ============================================
     with ar_tabs[7]:
-        st.markdown("### 📄 AI-Powered Asset Reports")
+        st.markdown("### 📄 Reports")
         
-        report_tabs = st.tabs(["📊 Asset Summary", "🔄 Movement Report", "🗑️ Discard Report", "💰 Financial Report"])
-        
-        with report_tabs[0]:
-            st.markdown("#### 📊 Asset Summary Report")
-            
+        if len(df) > 0:
             if st.button("🤖 Generate AI Asset Report", use_container_width=True, type="primary"):
-                st.success(f"✅ Report generated for {total_assets} assets")
+                st.success(f"✅ Report generated for {len(df)} assets")
                 
-                # Department summary
                 if "department" in df.columns:
-                    dept_summary = df.groupby("department").agg(
-                        Count=("name", "count"),
-                        Active=("status", lambda x: (x == "active").sum()),
-                        Breakdown=("status", lambda x: (x == "breakdown").sum())
-                    ).reset_index()
+                    dept_summary = df.groupby("department").agg(Count=("name", "count")).reset_index()
                     st.dataframe(dept_summary, use_container_width=True, hide_index=True)
                 
-                csv_report = df.to_csv(index=False)
-                st.download_button("📥 Download Full Report CSV", csv_report, f"asset_report_{today}.csv", "text/csv", use_container_width=True)
-        
-        with report_tabs[1]:
-            st.markdown("#### 🔄 Asset Movement Report")
-            st.info("Track all asset movements — real-time data from movement logs.")
-        
-        with report_tabs[2]:
-            st.markdown("#### 🗑️ Asset Discard Report")
-            st.info("Track all discarded assets with reasons and approval status.")
-        
-        with report_tabs[3]:
-            st.markdown("#### 💰 Financial Report")
+                st.download_button("📥 Download CSV", df.to_csv(index=False), f"asset_report_{today}.csv", "text/csv", use_container_width=True)
             
+            st.markdown("---")
+            st.markdown("#### 💰 Financial Summary")
             st.markdown(f"""
             <div style="background:white;border-radius:10px;padding:1rem;">
                 <table style="width:100%;font-size:0.85rem;">
-                    <tr><td>📊 Total Portfolio Value</td><td style="text-align:right;font-weight:700;">₦{total_asset_value:,.2f}</td></tr>
-                    <tr><td>📊 Active Assets Value</td><td style="text-align:right;font-weight:700;">₦{total_asset_value:,.2f}</td></tr>
-                    <tr><td>📊 Depreciated Value (Est.)</td><td style="text-align:right;font-weight:700;">₦{total_asset_value * 0.8:,.2f}</td></tr>
-                    <tr><td>📊 Net Book Value</td><td style="text-align:right;font-weight:700;">₦{total_asset_value * 0.2:,.2f}</td></tr>
+                    <tr><td>Total Portfolio Value</td><td style="text-align:right;font-weight:700;">₦{df['purchase_cost'].fillna(0).sum():,.2f}</td></tr>
+                    <tr><td>Total Assets</td><td style="text-align:right;font-weight:700;">{len(df)}</td></tr>
+                    <tr><td>Departments</td><td style="text-align:right;font-weight:700;">{df['department'].nunique() if 'department' in df.columns else 0}</td></tr>
                 </table>
             </div>
             """, unsafe_allow_html=True)
+        else:
+            st.info("No assets to report on.")
     
     # ============================================
     # TAB 8: SETTINGS
     # ============================================
     with ar_tabs[8]:
-        st.markdown("### ⚙️ Asset Settings")
+        st.markdown("### ⚙️ Settings")
         
-        settings_tabs = st.tabs(["📍 Locations", "🏢 Departments", "🏷️ Categories", "🏭 Manufacturers"])
+        sett_tabs = st.tabs(["📍 Locations", "🏢 Departments", "🏷️ Categories", "🏭 Manufacturers"])
         
-        with settings_tabs[0]:
-            st.markdown("#### 📍 Location Management")
-            
+        with sett_tabs[0]:
+            st.markdown("#### 📍 Locations")
             locs = DB.get_locations(fc)
             if locs:
-                for loc in locs:
-                    st.markdown(f"""
-                    <div style="background:white;border-radius:8px;padding:0.6rem;margin:0.2rem 0;border:1px solid #ddd;">
-                        <b>{loc.get('location_code','')}</b> — {loc.get('location_name','')}
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            with st.form("add_asset_location"):
-                new_loc_code = st.text_input("Location Code", placeholder="e.g. CT")
-                new_loc_name = st.text_input("Location Name", placeholder="e.g. CT — Office Tower")
-                if st.form_submit_button("➕ Add Location", use_container_width=True):
-                    if new_loc_code and new_loc_name:
-                        supabase.table("helpdesk_locations").insert({
-                            "facility_code": fc,
-                            "location_code": new_loc_code,
-                            "location_name": new_loc_name
-                        }).execute()
-                        st.success("✅ Location added!")
+                for l in locs:
+                    st.markdown(f"**{l.get('location_code','')}** — {l.get('location_name','')}")
+            with st.form("add_loc"):
+                lc = st.text_input("Code", placeholder="CT")
+                ln = st.text_input("Name", placeholder="CT — Office Tower")
+                if st.form_submit_button("Add Location", use_container_width=True):
+                    if lc and ln:
+                        supabase.table("helpdesk_locations").insert({"facility_code": fc, "location_code": lc, "location_name": ln}).execute()
+                        st.success("✅ Added!")
                         st.rerun()
         
-        with settings_tabs[1]:
-            st.markdown("#### 🏢 Department Management")
-            
-            if "department" in df.columns:
-                depts = df["department"].unique()
-                st.metric("Total Departments", len(depts))
-                for d in sorted(depts):
+        with sett_tabs[1]:
+            st.markdown("#### 🏢 Departments")
+            if len(df) > 0 and "department" in df.columns:
+                for d in sorted(df["department"].unique()):
                     st.markdown(f"- {d}")
+            else:
+                st.info("No departments yet.")
         
-        with settings_tabs[2]:
-            st.markdown("#### 🏷️ Category Management")
-            
-            cats = DB.get_categories()
-            if cats:
-                st.metric("Total Categories", len(cats))
-                for c in cats:
+        with sett_tabs[2]:
+            st.markdown("#### 🏷️ Categories")
+            cats_list = DB.get_categories()
+            if cats_list:
+                for c in cats_list:
                     st.markdown(f"- {c.get('name','N/A')}")
+            else:
+                st.info("No categories yet.")
         
-        with settings_tabs[3]:
-            st.markdown("#### 🏭 Manufacturer Management")
-            
-            if "manufacturer" in df.columns:
-                manufacturers = df["manufacturer"].dropna().unique()
-                st.metric("Total Manufacturers", len(manufacturers))
-                
-                search_mfg = st.text_input("🔍 Search manufacturer", key="mfg_search")
-                
-                filtered_mfg = manufacturers
-                if search_mfg:
-                    filtered_mfg = [m for m in manufacturers if search_mfg.lower() in str(m).lower()]
-                
-                for m in sorted(filtered_mfg):
+        with sett_tabs[3]:
+            st.markdown("#### 🏭 Manufacturers")
+            if len(df) > 0 and "manufacturer" in df.columns:
+                mfgs = df["manufacturer"].dropna().unique()
+                for m in sorted(mfgs):
                     st.markdown(f"- {m}")
-            
-            with st.form("add_manufacturer"):
-                new_mfg = st.text_input("Add Manufacturer", placeholder="e.g. Honeywell")
-                if st.form_submit_button("➕ Add", use_container_width=True):
-                    if new_mfg:
-                        st.success(f"✅ {new_mfg} added!")
-                        st.rerun()
+            else:
+                st.info("No manufacturers yet.")
 
 # ============================================
 # WORK PERMIT — COMPLETE FIXED MODULE
