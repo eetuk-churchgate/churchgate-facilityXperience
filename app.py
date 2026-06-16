@@ -1309,7 +1309,9 @@ def page_ar():
                         }
                         
                         # Remove None values that should be NULL in DB
-                        asset_data = {k: v for k, v in asset_data.items() if v is not None and v != "" and v != "NA" and v != "na"}
+                        # Only filter out truly empty values, keep name/asset_tag even if "NA"
+                        keep_keys = ["name", "asset_tag", "facility_code", "status", "priority", "department", "condition_rating", "created_at"]
+                        asset_data = {k: v for k, v in asset_data.items() if k in keep_keys or (v is not None and v != "" and str(v).strip() != "" and str(v).strip().lower() not in ["na", "none", "null"])}
                         
                         DB.insert("assets", asset_data)
                         success += 1
