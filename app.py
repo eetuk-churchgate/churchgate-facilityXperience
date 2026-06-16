@@ -1389,18 +1389,16 @@ def page_ar():
             st.download_button("📥 Export", rd_df.to_csv(index=False), "readings.csv", "text/csv", use_container_width=True)
     
     # ============================================
-    # TAB 5: PPM CALENDAR — INTERACTIVE COMMAND CENTER
+    # TAB 5: PPM CALENDAR — FORTUNE 500 INTERACTIVE
     # ============================================
     with ar_tabs[5]:
-        st.markdown("### 📅 PPM Calendar — Interactive Command Center")
+        st.markdown("### 📅 PPM Calendar — Financial Year Command Center")
         
         today = date.today()
         if today.month >= 4:
             fy_start_year = today.year
-            fy_end_year = today.year + 1
         else:
             fy_start_year = today.year - 1
-            fy_end_year = today.year
         
         if "cal_offset" not in st.session_state:
             st.session_state.cal_offset = 0
@@ -1411,29 +1409,34 @@ def page_ar():
         block_start_year = fy_start_year + (block_start_month - 1) // 12
         block_start_month = ((block_start_month - 1) % 12) + 1
         
-        # Navigation
-        c1, c2, c3 = st.columns([1, 3, 1])
+        months_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        
+        # Navigation row
+        c1, c2, c3 = st.columns([1, 2, 1])
         with c1:
-            if st.button("⬅️ Previous 6 Months", key="cal_prev6", use_container_width=True):
+            if st.button("◀ Previous 6 Months", key="cal_prev6", use_container_width=True):
                 st.session_state.cal_offset -= 1
                 st.rerun()
         with c2:
-            months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
             end_month_idx = ((block_start_month - 1 + 5) % 12)
-            st.markdown(f"#### 📅 FY April {fy_start_year} – March {fy_end_year} | Showing: {months_short[block_start_month-1]} – {months_short[end_month_idx]}")
+            st.markdown(f"#### FY April {fy_start_year} – March {fy_start_year+1} | {months_short[block_start_month-1]} – {months_short[end_month_idx]}")
         with c3:
-            if st.button("Next 6 Months ➡️", key="cal_next6", use_container_width=True):
+            if st.button("Next 6 Months ▶", key="cal_next6", use_container_width=True):
                 st.session_state.cal_offset += 1
                 st.rerun()
         
         # Legend
-        c1, c2, c3, c4, c5, c6 = st.columns(6)
-        with c1: st.markdown("""<div style="background:#FEF2F2;border:2px solid #EF4444;border-radius:6px;padding:0.3rem;text-align:center;font-size:0.65rem;font-weight:600;color:#EF4444;">🔴 Overdue</div>""", unsafe_allow_html=True)
-        with c2: st.markdown("""<div style="background:#FFFBEB;border:2px solid #F59E0B;border-radius:6px;padding:0.3rem;text-align:center;font-size:0.65rem;font-weight:600;color:#F59E0B;">🟡 Due Today</div>""", unsafe_allow_html=True)
-        with c3: st.markdown("""<div style="background:#EFF6FF;border:2px solid #3B82F6;border-radius:6px;padding:0.3rem;text-align:center;font-size:0.65rem;font-weight:600;color:#3B82F6;">📆 Upcoming</div>""", unsafe_allow_html=True)
-        with c4: st.markdown("""<div style="background:#ECFDF5;border:2px solid #10B981;border-radius:6px;padding:0.3rem;text-align:center;font-size:0.65rem;font-weight:600;color:#10B981;">✅ Completed</div>""", unsafe_allow_html=True)
-        with c5: st.markdown("""<div style="background:#F5F3FF;border:2px solid #8B5CF6;border-radius:6px;padding:0.3rem;text-align:center;font-size:0.65rem;font-weight:600;color:#8B5CF6;">⏳ Pending</div>""", unsafe_allow_html=True)
-        with c6: st.markdown("""<div style="background:#F0FDF4;border:2px solid #059669;border-radius:6px;padding:0.3rem;text-align:center;font-size:0.65rem;font-weight:600;color:#059669;">🟢 Approved</div>""", unsafe_allow_html=True)
+        st.markdown("""
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin:10px 0;">
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;background:#EF4444;border-radius:3px;"></div><span style="font-size:0.7rem;">Overdue</span></div>
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;background:#F59E0B;border-radius:3px;"></div><span style="font-size:0.7rem;">Due Today</span></div>
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;background:#3B82F6;border-radius:3px;"></div><span style="font-size:0.7rem;">Upcoming</span></div>
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;background:#10B981;border-radius:3px;"></div><span style="font-size:0.7rem;">Completed</span></div>
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;background:#8B5CF6;border-radius:3px;"></div><span style="font-size:0.7rem;">Pending</span></div>
+            <div style="display:flex;align-items:center;gap:4px;"><div style="width:12px;height:12px;background:#059669;border-radius:3px;"></div><span style="font-size:0.7rem;">Approved</span></div>
+        </div>
+        """, unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -1444,84 +1447,203 @@ def page_ar():
         if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
             ppm_df["due_date_dt"] = pd.to_datetime(ppm_df["next_due_date"], errors='coerce')
         
-        months_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        # Build PPM lookup dict for JavaScript
+        ppm_dates = {}
+        if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
+            for _, row in ppm_df.iterrows():
+                d = row["due_date_dt"]
+                if pd.notna(d):
+                    date_key = d.strftime("%Y-%m-%d")
+                    if date_key not in ppm_dates:
+                        ppm_dates[date_key] = {"count": 0, "has_overdue": False, "has_completed": False}
+                    ppm_dates[date_key]["count"] += 1
+                    if row.get("status") == "completed":
+                        ppm_dates[date_key]["has_completed"] = True
+                    if d.date() < today and row.get("status") != "completed":
+                        ppm_dates[date_key]["has_overdue"] = True
+        
+        import json
+        ppm_dates_json = json.dumps(ppm_dates)
+        today_str = today.strftime("%Y-%m-%d")
         
         # ============================================
-        # 6 MONTHS GRID — 2 ROWS × 3 COLUMNS
+        # BUILD 6-MONTH HTML CALENDAR
         # ============================================
+        calendar_html = f"""
+        <style>
+            .fx-cal-grid {{
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 15px;
+                font-family: 'Inter', sans-serif;
+            }}
+            .fx-cal-month {{
+                background: white;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            }}
+            .fx-cal-month-header {{
+                background: #1a1a1a;
+                color: white;
+                padding: 8px;
+                text-align: center;
+                font-weight: 600;
+                font-size: 0.85rem;
+            }}
+            .fx-cal-month-header.current {{
+                background: #CC0000;
+            }}
+            .fx-cal-table {{
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 0.7rem;
+            }}
+            .fx-cal-table th {{
+                background: #f5f5f5;
+                padding: 4px;
+                text-align: center;
+                font-weight: 600;
+                color: #888;
+                font-size: 0.6rem;
+            }}
+            .fx-cal-table td {{
+                text-align: center;
+                padding: 2px;
+                height: 30px;
+                cursor: pointer;
+                border: 1px solid #eee;
+                transition: all 0.15s;
+            }}
+            .fx-cal-table td:hover {{
+                outline: 2px solid #CC0000;
+                z-index: 10;
+            }}
+            .fx-cal-table td.today {{
+                background: #CC0000 !important;
+                color: white !important;
+                font-weight: 800;
+            }}
+            .fx-cal-table td.overdue {{
+                background: #FEF2F2;
+                color: #EF4444;
+                font-weight: 600;
+            }}
+            .fx-cal-table td.upcoming {{
+                background: #EFF6FF;
+                color: #3B82F6;
+                font-weight: 600;
+            }}
+            .fx-cal-table td.completed {{
+                background: #ECFDF5;
+                color: #10B981;
+            }}
+            .fx-cal-table td.empty {{
+                background: #fafafa;
+                cursor: default;
+            }}
+            .fx-cal-table td.empty:hover {{
+                outline: none;
+            }}
+            .fx-ppm-dot {{
+                font-size: 0.45rem;
+                display: block;
+            }}
+        </style>
+        <div class="fx-cal-grid">
+        """
+        
         for row_idx in range(2):
-            cols = st.columns(3)
             for col_idx in range(3):
                 month_offset = row_idx * 3 + col_idx
                 display_month = ((block_start_month - 1 + month_offset) % 12) + 1
                 display_year = block_start_year + ((block_start_month - 1 + month_offset) // 12)
                 
-                with cols[col_idx]:
-                    first_day = date(display_year, display_month, 1)
-                    if display_month == 12:
-                        last_day = date(display_year, 12, 31)
-                    else:
-                        last_day = date(display_year, display_month + 1, 1) - timedelta(days=1)
-                    
-                    start_weekday = first_day.weekday()
-                    is_current_month = (display_month == today.month and display_year == today.year)
-                    header_bg = "#CC0000" if is_current_month else "#1a1a1a"
-                    
-                    st.markdown(f"""<div style="background:{header_bg};color:white;padding:0.4rem;border-radius:8px 8px 0 0;text-align:center;font-weight:700;font-size:0.8rem;">{months_names[display_month-1]} {display_year}</div>""", unsafe_allow_html=True)
-                    
-                    # Calendar grid using st.columns for each week
-                    day_count = 1
-                    for week in range(6):
-                        if day_count > last_day.day:
-                            break
-                        week_cols = st.columns(7)
-                        for weekday in range(7):
-                            with week_cols[weekday]:
-                                if (week == 0 and weekday < start_weekday) or day_count > last_day.day:
-                                    st.markdown("")
-                                else:
-                                    current_date = date(display_year, display_month, day_count)
-                                    is_today_day = current_date == today
-                                    
-                                    # Check PPMs
-                                    day_ppm_count = 0
-                                    day_has_overdue = False
-                                    if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
-                                        day_ppms = ppm_df[ppm_df["due_date_dt"].dt.date == current_date]
-                                        day_ppm_count = len(day_ppms)
-                                        if day_ppm_count > 0 and "status" in day_ppms.columns:
-                                            day_has_overdue = len(day_ppms[(day_ppms["due_date_dt"] < pd.Timestamp(today)) & (day_ppms["status"] != "completed")]) > 0
-                                    
-                                    # Button label
-                                    if day_ppm_count > 0:
-                                        label = f"{day_count}●"
-                                    else:
-                                        label = str(day_count)
-                                    
-                                    # Button styling via type
-                                    if is_today_day:
-                                        btn_type = "primary"
-                                    elif day_has_overdue:
-                                        btn_type = "secondary"
-                                    else:
-                                        btn_type = "secondary" if day_ppm_count > 0 else "secondary"
-                                    
-                                    # Use a small button for each day
-                                    if st.button(label, key=f"day_{display_year}_{display_month:02d}_{day_count:02d}", use_container_width=True, type=btn_type if is_today_day else "secondary"):
-                                        st.session_state.selected_ppm_date = current_date
-                                        st.rerun()
-                                day_count += 1
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
+                first_day = date(display_year, display_month, 1)
+                if display_month == 12:
+                    last_day = date(display_year, 12, 31)
+                else:
+                    last_day = date(display_year, display_month + 1, 1) - timedelta(days=1)
+                
+                start_weekday = first_day.weekday()
+                is_current = (display_month == today.month and display_year == today.year)
+                header_class = "current" if is_current else ""
+                
+                calendar_html += f"""
+                <div class="fx-cal-month">
+                    <div class="fx-cal-month-header {header_class}">{months_names[display_month-1]} {display_year}</div>
+                    <table class="fx-cal-table">
+                        <tr><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th><th>S</th></tr>
+                """
+                
+                day_count = 1
+                for week in range(6):
+                    calendar_html += "<tr>"
+                    for weekday in range(7):
+                        if (week == 0 and weekday < start_weekday) or day_count > last_day.day:
+                            calendar_html += '<td class="empty"></td>'
+                        else:
+                            current_date = date(display_year, display_month, day_count)
+                            date_key = current_date.strftime("%Y-%m-%d")
+                            is_today = date_key == today_str
+                            
+                            ppm_info = ppm_dates.get(date_key, {"count": 0, "has_overdue": False, "has_completed": False})
+                            
+                            css_class = ""
+                            if is_today:
+                                css_class = "today"
+                            elif ppm_info["has_overdue"]:
+                                css_class = "overdue"
+                            elif ppm_info["count"] > 0 and ppm_info["has_completed"]:
+                                css_class = "completed"
+                            elif ppm_info["count"] > 0:
+                                css_class = "upcoming"
+                            
+                            ppm_dot = f'<span class="fx-ppm-dot">{"●" if ppm_info["count"] > 0 else ""}</span>'
+                            
+                            calendar_html += f'<td class="{css_class}" onclick="parent.postMessage({{type:\'ppmDayClick\',date:\'{date_key}\'}},\'*\')">{day_count}{ppm_dot}</td>'
+                            day_count += 1
+                    calendar_html += "</tr>"
+                    if day_count > last_day.day:
+                        break
+                
+                calendar_html += "</table></div>"
+        
+        calendar_html += "</div>"
+        
+        # JavaScript to handle clicks
+        calendar_html += """
+        <script>
+            window.addEventListener('message', function(e) {
+                if (e.data.type === 'ppmDayClick') {
+                    var input = parent.document.querySelector('[data-testid="stTextInput"] input');
+                    if (input) {
+                        var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                        nativeInputValueSetter.call(input, e.data.date);
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                }
+            });
+        </script>
+        """
+        
+        st.components.v1.html(calendar_html, height=450, scrolling=False)
         
         st.markdown("---")
         
-        # ============================================
-        # SELECTED DAY — SHOW PPM DETAILS
-        # ============================================
+        # Date selector to view PPM details
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            selected_date = st.date_input("Select a date to view PPM details", today, key="ppm_detail_picker")
+        with c2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔍 View PPMs", use_container_width=True, key="view_ppm_btn"):
+                st.session_state.selected_ppm_date = selected_date
+                st.rerun()
+        
         if st.session_state.selected_ppm_date:
             sel = st.session_state.selected_ppm_date
-            st.markdown(f"### 📋 PPMs for {sel.strftime('%d %B %Y')}")
+            st.markdown(f"#### 📋 PPMs for {sel.strftime('%d %B %Y')}")
             
             if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
                 day_ppms = ppm_df[ppm_df["due_date_dt"].dt.date == sel]
@@ -1532,12 +1654,12 @@ def page_ar():
                         sc = {"completed": "#10B981", "scheduled": "#3B82F6", "pending": "#F59E0B", "overdue": "#EF4444", "approved": "#059669"}.get(status, "#3B82F6")
                         
                         st.markdown(f"""
-                        <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+                        <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.7rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <b>{row.get('title','N/A')}</b>
-                                <span style="background:{sc};color:white;padding:3px 12px;border-radius:12px;font-size:0.65rem;font-weight:600;">{status.upper()}</span>
+                                <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;font-weight:600;">{status.upper()}</span>
                             </div>
-                            <div style="font-size:0.75rem;color:#666;margin-top:0.3rem;">
+                            <div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">
                                 👤 {row.get('assigned_team','N/A')} | 📅 {str(row.get('next_due_date',''))[:10]} | 🔄 {row.get('frequency','N/A')}
                             </div>
                         </div>
@@ -1545,11 +1667,9 @@ def page_ar():
                 else:
                     st.info(f"No PPMs scheduled for {sel.strftime('%d %B %Y')}")
             
-            if st.button("❌ Clear Selection", key="clear_ppm_date"):
+            if st.button("❌ Clear", key="clear_ppm"):
                 st.session_state.selected_ppm_date = None
                 st.rerun()
-        else:
-            st.info("👆 Click any day with a ● dot to view scheduled PPMs for that day.")
     
     # ============================================
     # TAB 6: APPROVALS
