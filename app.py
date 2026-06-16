@@ -2595,7 +2595,7 @@ def page_visitor():
                 id_number = st.text_input("ID Number")
             with c2:
                 vehicle = st.text_input("Vehicle Plate Number")
-                gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+                gender = st.selectbox("Gender*", ["Male", "Female", "Other"])
             
             st.markdown("---")
             st.markdown("**🏢 Visit Details**")
@@ -2604,18 +2604,29 @@ def page_visitor():
                 host_name = st.text_input("Host Name*")
                 arrival_time = st.time_input("Expected Arrival", time(9, 0))
             with c2:
-                host_email = st.text_input("Host Email")
+                host_email = st.text_input("Host Email*")
                 departure_time = st.time_input("Expected Departure", time(17, 0))
             with c3:
                 host_phone = st.text_input("Host Phone")
                 purpose = st.text_area("Purpose of Visit", height=60)
             
-            belongings = st.text_area("Belongings/Equipment", placeholder="Laptop, tools, etc...")
+            belongings_label = "Belongings/Equipment*" if visitor_type == "Contractor" else "Belongings/Equipment"
+            belongings = st.text_area(belongings_label, placeholder="Laptop, tools, etc...")
             
             st.markdown("---")
             
             if st.button("🛂 Register Visitor", use_container_width=True, type="primary"):
-                if first_name and last_name and host_name:
+                errors = []
+                if not first_name: errors.append("First Name")
+                if not last_name: errors.append("Last Name")
+                if not gender: errors.append("Gender")
+                if not host_name: errors.append("Host Name")
+                if not host_email: errors.append("Host Email")
+                if visitor_type == "Contractor" and not belongings: errors.append("Belongings/Equipment (required for Contractors)")
+                
+                if errors:
+                    st.error(f"⚠️ Please fill all required fields: {', '.join(errors)}")
+                else:
                     import random, string
                     pass_id = f"VIS-{fc}-{datetime.now().strftime('%Y%m%d')}-{''.join(random.choices(string.digits, k=4))}"
                     access_code_in = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -2679,8 +2690,6 @@ def page_visitor():
                     
                     st.balloons()
                     st.rerun()
-                else:
-                    st.error("⚠️ First Name, Last Name, and Host Name are required")
         
         elif reg_mode == "Bulk Registration (CSV)":
             st.markdown("#### 📋 Bulk Visitor Registration via CSV")
