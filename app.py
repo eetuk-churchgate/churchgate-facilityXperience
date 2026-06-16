@@ -1487,13 +1487,6 @@ def page_ar():
         # ============================================
         # 6 MONTHS — 2 ROWS × 3 COLUMNS WITH FULL DAY GRID
         # ============================================
-        months_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-        months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        days_header = ["M", "T", "W", "T", "F", "S", "S"]
-        
-        if "selected_day" not in st.session_state:
-            st.session_state.selected_day = None
-        
         for row_idx in range(2):
             cols = st.columns(3)
             for col_idx in range(3):
@@ -1511,33 +1504,38 @@ def page_ar():
                     start_weekday = first_day.weekday()
                     is_current_month = (display_month == today.month and display_year == today.year)
                     
-                    # Month header
+                    # Build entire month as ONE HTML string
                     header_bg = "#CC0000" if is_current_month else "#1a1a1a"
-                    st.markdown(f"""
-                    <div style="background:{header_bg};color:white;padding:0.4rem;border-radius:8px 8px 0 0;text-align:center;font-weight:700;font-size:0.85rem;">
-                        {months_short[display_month-1]} {display_year}
-                    </div>
-                    """, unsafe_allow_html=True)
                     
-                    # Day headers
-                    day_header_html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#f5f5f5;padding:2px;">'
-                    for dh in days_header:
-                        day_header_html += f'<div style="text-align:center;font-size:0.55rem;font-weight:700;color:#888;padding:2px;">{dh}</div>'
-                    day_header_html += '</div>'
-                    st.markdown(day_header_html, unsafe_allow_html=True)
+                    month_html = f'''
+                    <div style="background:white;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:1rem;">
+                        <div style="background:{header_bg};color:white;padding:0.5rem;text-align:center;font-weight:700;font-size:0.85rem;">
+                            {months_names[display_month-1]} {display_year}
+                        </div>
+                        <div style="padding:4px;">
+                            <table style="width:100%;border-collapse:collapse;font-size:0.55rem;">
+                                <tr style="background:#f5f5f5;">
+                                    <th style="padding:3px;text-align:center;color:#888;">M</th>
+                                    <th style="padding:3px;text-align:center;color:#888;">T</th>
+                                    <th style="padding:3px;text-align:center;color:#888;">W</th>
+                                    <th style="padding:3px;text-align:center;color:#888;">T</th>
+                                    <th style="padding:3px;text-align:center;color:#888;">F</th>
+                                    <th style="padding:3px;text-align:center;color:#888;">S</th>
+                                    <th style="padding:3px;text-align:center;color:#888;">S</th>
+                                </tr>
+                    '''
                     
-                    # Day grid
                     day_count = 1
                     for week in range(6):
-                        day_html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#e5e5e5;">'
+                        month_html += '<tr>'
                         for weekday in range(7):
                             if (week == 0 and weekday < start_weekday) or day_count > last_day.day:
-                                day_html += '<div style="background:#fafafa;min-height:28px;"></div>'
+                                month_html += '<td style="background:#fafafa;padding:2px;text-align:center;min-width:28px;height:28px;"></td>'
                             else:
                                 current_date = date(display_year, display_month, day_count)
                                 is_today_day = current_date == today
                                 
-                                # Check PPMs for this day
+                                # Check PPMs
                                 day_ppm_count = 0
                                 day_has_overdue = False
                                 if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
@@ -1546,7 +1544,7 @@ def page_ar():
                                     if day_ppm_count > 0 and "status" in day_ppms.columns:
                                         day_has_overdue = len(day_ppms[(day_ppms["due_date_dt"] < pd.Timestamp(today)) & (day_ppms["status"] != "completed")]) > 0
                                 
-                                # Color coding
+                                # Colors
                                 if is_today_day:
                                     bg = "#CC0000"
                                     tc = "white"
@@ -1564,24 +1562,16 @@ def page_ar():
                                     tc = "#1a1a1a"
                                     fw = "400"
                                 
-                                # Make clickable
-                                day_key = f"{display_year}-{display_month:02d}-{day_count:02d}"
-                                day_html += f'''
-                                <div onclick="this.style.outline='2px solid #CC0000'" style="background:{bg};color:{tc};font-weight:{fw};min-height:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:0.65rem;cursor:pointer;">
-                                    {day_count}
-                                    {f'<span style="font-size:0.45rem;">{day_ppm_count}</span>' if day_ppm_count > 0 else ''}
-                                </div>
-                                '''
+                                ppm_dot = f'<div style="font-size:0.4rem;color:{tc};">{"●" if day_ppm_count > 0 else ""}</div>' if day_ppm_count > 0 else ''
+                                
+                                month_html += f'<td style="background:{bg};padding:2px;text-align:center;height:28px;cursor:pointer;border:1px solid #eee;"><div style="font-weight:{fw};font-size:0.65rem;color:{tc};">{day_count}</div>{ppm_dot}</td>'
                                 day_count += 1
-                        day_html += '</div>'
-                        if day_count > last_day.day and weekday == 6:
-                            st.markdown(day_html, unsafe_allow_html=True)
-                            break
-                        st.markdown(day_html, unsafe_allow_html=True)
+                        month_html += '</tr>'
                         if day_count > last_day.day:
                             break
                     
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    month_html += '</table></div></div>'
+                    st.markdown(month_html, unsafe_allow_html=True)
         
         st.markdown("---")
         
