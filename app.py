@@ -1388,8 +1388,8 @@ def page_ar():
             st.dataframe(rd_df, use_container_width=True, hide_index=True, height=500)
             st.download_button("📥 Export", rd_df.to_csv(index=False), "readings.csv", "text/csv", use_container_width=True)
     
-     # ============================================
-    # TAB 5: PPM CALENDAR — PROPER HTML RENDERING
+    # ============================================
+    # TAB 5: PPM CALENDAR — CLICK WITHOUT RELOAD
     # ============================================
     with ar_tabs[5]:
         st.markdown("### 📅 PPM Calendar — Financial Year Command Center")
@@ -1404,6 +1404,8 @@ def page_ar():
             st.session_state.cal_offset = 0
         if "selected_ppm_date" not in st.session_state:
             st.session_state.selected_ppm_date = None
+        if "ppm_click_date" not in st.session_state:
+            st.session_state.ppm_click_date = None
         
         block_start_month = 4 + (st.session_state.cal_offset * 6)
         block_start_year = fy_start_year + (block_start_month - 1) // 12
@@ -1446,7 +1448,6 @@ def page_ar():
         if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
             ppm_df["due_date_dt"] = pd.to_datetime(ppm_df["next_due_date"], errors='coerce')
         
-        # Build PPM lookup
         ppm_dates = {}
         if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
             for _, row in ppm_df.iterrows():
@@ -1458,7 +1459,7 @@ def page_ar():
                     ppm_dates[dk].append(row.to_dict())
         
         # ============================================
-        # BUILD HTML CALENDAR
+        # BUILD HTML WITH JAVASCRIPT CLICK HANDLER
         # ============================================
         cal_html = """<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
             body { font-family: 'Inter', Arial, sans-serif; margin: 0; padding: 10px; background: #e8e8e8; }
@@ -1469,25 +1470,28 @@ def page_ar():
             .cal-hdr.norm { background: #1a1a1a; }
             .cal-tbl { width: 100%; border-collapse: collapse; }
             .cal-tbl th { background: #f5f5f5; padding: 3px; text-align: center; font-size: 10px; color: #888; font-weight: 700; }
-            .cal-tbl td { text-align: center; padding: 0; height: 28px; cursor: pointer; }
-            .cal-tbl td a { display: flex; align-items: center; justify-content: center; height: 100%; text-decoration: none; font-size: 11px; font-weight: 500; }
+            .cal-tbl td { text-align: center; padding: 0; height: 28px; cursor: pointer; border: 1px solid #eee; }
+            .cal-tbl td span { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 11px; font-weight: 500; }
             .cal-tbl td:hover { outline: 2px solid #CC0000; outline-offset: -2px; }
-            .cal-tbl td.emp { background: #fafafa; cursor: default; }
+            .cal-tbl td.emp { background: #fafafa; cursor: default; border: none; }
             .cal-tbl td.emp:hover { outline: none; }
             .cal-tbl td.tdy { background: #CC0000; }
-            .cal-tbl td.tdy a { color: white; font-weight: 800; }
+            .cal-tbl td.tdy span { color: white; font-weight: 800; }
             .cal-tbl td.ovd { background: #FEF2F2; }
-            .cal-tbl td.ovd a { color: #DC2626; font-weight: 700; }
+            .cal-tbl td.ovd span { color: #DC2626; font-weight: 700; }
             .cal-tbl td.upc { background: #EFF6FF; }
-            .cal-tbl td.upc a { color: #2563EB; font-weight: 700; }
+            .cal-tbl td.upc span { color: #2563EB; font-weight: 700; }
             .cal-tbl td.don { background: #ECFDF5; }
-            .cal-tbl td.don a { color: #059669; font-weight: 600; }
+            .cal-tbl td.don span { color: #059669; font-weight: 600; }
             .cal-tbl td.pnd { background: #F5F3FF; }
-            .cal-tbl td.pnd a { color: #7C3AED; font-weight: 700; }
+            .cal-tbl td.pnd span { color: #7C3AED; font-weight: 700; }
             .cal-tbl td.non { background: #fdfdfd; }
-            .cal-tbl td.non a { color: #bbb; font-weight: 400; }
+            .cal-tbl td.non span { color: #bbb; font-weight: 400; }
             .dot { font-size: 8px; display: block; }
-        </style></head><body><div class="cal-grid">"""
+            .hidden-input { display: none; }
+        </style></head><body>
+        <input type="text" id="dateInput" class="hidden-input">
+        <div class="cal-grid">"""
         
         for row_idx in range(2):
             for col_idx in range(3):
@@ -1530,27 +1534,34 @@ def page_ar():
                                 else: cls = "upc"
                             
                             dot_html = '<span class="dot">&#9679;</span>' if pc > 0 else ''
-                            cal_html += f'<td class="{cls}"><a href="?ppm_date={dk}">{dc}{dot_html}</a></td>'
+                            cal_html += f'<td class="{cls}" onclick="document.getElementById(\'dateInput\').value=\'{dk}\'; document.getElementById(\'dateInput\').dispatchEvent(new Event(\'input\',{{bubbles:true}}));"><span>{dc}{dot_html}</span></td>'
                             dc += 1
                     cal_html += "</tr>"
                     if dc > ld.day: break
                 cal_html += "</table></div>"
         
-        cal_html += "</div></body></html>"
+        cal_html += """</div>
+        <script>
+            var input = document.getElementById('dateInput');
+            input.addEventListener('input', function() {
+                if (input.value) {
+                    window.parent.postMessage({type: 'streamlit:setComponentValue', value: input.value}, '*');
+                }
+            });
+        </script>
+        </body></html>"""
         
-        st.components.v1.html(cal_html, height=480, scrolling=False)
+        # Use a callback to capture the click
+        def handle_cal_click():
+            if st.session_state.ppm_click_date:
+                st.session_state.selected_ppm_date = datetime.strptime(st.session_state.ppm_click_date, "%Y-%m-%d").date()
+                st.session_state.ppm_click_date = None
         
-        # ============================================
-        # HANDLE CLICK
-        # ============================================
-        params = st.query_params
-        if "ppm_date" in params:
-            try:
-                st.session_state.selected_ppm_date = datetime.strptime(params["ppm_date"], "%Y-%m-%d").date()
-                st.query_params.clear()
-                st.rerun()
-            except:
-                pass
+        clicked_date = st.components.v1.html(cal_html, height=480, scrolling=False)
+        
+        if clicked_date:
+            st.session_state.selected_ppm_date = datetime.strptime(clicked_date, "%Y-%m-%d").date()
+            st.rerun()
         
         st.markdown("---")
         
