@@ -247,9 +247,14 @@ class DB:
     @staticmethod
     def get_assets(fc, limit=50000):
         try:
-            res=supabase.table("assets").select("*, asset_categories(name,code)").eq("facility_code",fc).limit(limit).execute()
-            return res.data if res.data else []
-        except: return []
+            # Fetch assets without the join that might fail
+            res = supabase.table("assets").select("*").eq("facility_code", fc).limit(limit).execute()
+            if res.data:
+                return res.data
+            return []
+        except Exception as e:
+            st.error(f"Asset fetch error: {str(e)[:100]}")
+            return []
 
     @staticmethod
     def get_categories():
