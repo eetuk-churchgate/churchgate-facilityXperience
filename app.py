@@ -1484,6 +1484,8 @@ def page_ar():
         
         st.markdown("---")
         
+        months_names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+        
         # ============================================
         # 6 MONTHS — 2 ROWS × 3 COLUMNS WITH FULL DAY GRID
         # ============================================
