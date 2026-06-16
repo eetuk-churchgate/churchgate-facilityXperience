@@ -1299,7 +1299,7 @@ def page_ar():
                             "total_operational_hrs": float(str(row.get("Total Operational Hrs", "0")).strip()) if pd.notna(row.get("Total Operational Hrs")) else 0,
                             "gross_weight": str(row.get("Gross Weight", "")).strip(),
                             "dimensions": str(row.get("Size and Dimensions", "")).strip(),
-                            "sap_created_date": fix_date(row.get("SAP Created Date")),Date", "")).strip() != "" else None,
+                            "sap_created_date": fix_date(row.get("SAP Created Date")),
 
                             "plan_year_to_replace": int(float(str(row.get("Plan Year to replace", "2030")).strip())) if pd.notna(row.get("Plan Year to replace")) else 2030,
                             "condition_rating": 5,
