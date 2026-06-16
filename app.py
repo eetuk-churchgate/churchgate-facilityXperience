@@ -704,20 +704,7 @@ def page_ar():
     if all_assets:
         df = pd.DataFrame(all_assets)
         # Get category names
-        try:
-            cat_res = supabase.table("asset_categories").select("*").execute()
-            cat_dict = {c["id"]: c.get("name", "N/A") for c in cat_res.data} if cat_res.data else {}
-        except:
-            cat_dict = {}
-        
-        # Use department column directly if it exists, otherwise fall back to category
-        if "department" in df.columns and df["department"].notna().any():
-            df["department"] = df["department"].fillna("N/A")
-        elif "category_id" in df.columns:
-            df["department"] = df["category_id"].apply(lambda x: cat_dict.get(x, "N/A"))
         else:
-            df["department"] = "N/A"
-    else:
         df = pd.DataFrame()
     
     today = date.today()
