@@ -705,7 +705,10 @@ def page_ar():
         except:
             cat_dict = {}
         
-        if "category_id" in df.columns:
+        # Use department column directly if it exists, otherwise fall back to category
+        if "department" in df.columns and df["department"].notna().any():
+            df["department"] = df["department"].fillna("N/A")
+        elif "category_id" in df.columns:
             df["department"] = df["category_id"].apply(lambda x: cat_dict.get(x, "N/A"))
         else:
             df["department"] = "N/A"
