@@ -1570,24 +1570,6 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
     else:
         st.info("No tickets raised yet")
 
-# ============================================
-# HELPDESK — WORLD CLASS TICKET SYSTEM v2.0
-# ============================================
-def page_helpdesk_queue():
-    fc = st.session_state.get("facility", "WTC")
-    info = FACILITY_INFO.get(fc, {})
-    user_role = st.session_state.get("user_role", "staff")
-    is_admin = user_role in ["admin", "approver"]
-    
-    st.markdown(f'## 💬 Helpdesk — {info.get("full_name", fc)}')
-    
-    categories = DB.get_helpdesk_categories()
-    
-    nav_tabs = ["🏠 Home", "📊 AI Analytic# ============================================
-# HELPDESK — WORLD CLASS TICKET SYSTEM v3.0
-# FORTUNE 500 GRADE — COMPLETE RESTORATION
-# ============================================
-
 def page_helpdesk_queue():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
