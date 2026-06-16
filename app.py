@@ -3827,14 +3827,43 @@ def page_ic():
                     DB.insert("incidents",{"facility_code":fc,"incident_number":f"INC-{fc}-{datetime.now().year}-{str(cnt+1).zfill(4)}","title":title,"department":dept,"type":itype,"severity":sev,"priority":pri,"category":cat,"location_building":loc_b,"location_floor":loc_f,"location_zone":loc_z,"incident_date":str(idate),"incident_time":str(itime),"description":desc,"immediate_actions":actions,"root_cause":root,"status":"reported","reported_at":datetime.now().isoformat(),"reported_by_name":st.session_state.get("user_name","Staff")})
                     st.success("Incident reported!");st.rerun()
 
+
+# ============================================
+# WORK ORDERS (STUB)
+# ============================================
+def page_wo():
+    fc=st.session_state.get("facility","WTC")
+    info=FACILITY_INFO.get(fc,{})
+    st.markdown(f'## 📋 Work Orders — {info.get("full_name",fc)}')
+    st.info("🚧 Work Orders module — full deployment in progress.")
+
+# ============================================
+# HOTO CHECK (STUB)
+# ============================================
+def page_hot():
+    fc=st.session_state.get("facility","WTC")
+    info=FACILITY_INFO.get(fc,{})
+    st.markdown(f'## 🔄 HOTO Check — {info.get("full_name",fc)}')
+    st.info("🚧 HOTO (Handover-Takeover) module — full deployment in progress.")
+
+# ============================================
+# MONTHLY MIS (STUB)
+# ============================================
+def page_mis():
+    fc=st.session_state.get("facility","WTC")
+    info=FACILITY_INFO.get(fc,{})
+    st.markdown(f'## 📊 Monthly MIS — {info.get("full_name",fc)}')
+    st.info("🚧 Monthly MIS Reports module — full deployment in progress.")
+
+
 # ============================================
 # ROUTER
 # ============================================
 ROUTER={
     "cc":page_cc,"ar":page_ar,"cal":page_cal,"cs":page_cs,"ppm":page_ppm,
-    "wo":page_generic,"wp":page_wp,"fo":page_fo,"oa":page_oa,
+    "wo":page_wo,"wp":page_wp,"fo":page_fo,"oa":page_oa,
     "vm": page_visitor,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb": page_feedback,
-    "ac":page_ac,"ic":page_ic,"hot":page_generic,"uc":page_uc,"mis":page_generic,
+    "ac":page_ac,"ic":page_ic,"hot":page_hot,"uc":page_uc,"mis":page_mis,
 }
 
 # ============================================
