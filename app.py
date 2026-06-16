@@ -253,11 +253,21 @@ class DB:
     @staticmethod
     def get_assets(fc, limit=50000):
         try:
-            # Fetch assets without the join that might fail
-            res = supabase.table("assets").select("*").eq("facility_code", fc).limit(limit).execute()
-            if res.data:
-                return res.data
-            return []
+            all_data = []
+            page_size = 1000
+            offset = 0
+            
+            while offset < limit:
+                res = supabase.table("assets").select("*").eq("facility_code", fc).range(offset, offset + page_size - 1).execute()
+                if res.data and len(res.data) > 0:
+                    all_data.extend(res.data)
+                    offset += page_size
+                    if len(res.data) < page_size:
+                        break
+                else:
+                    break
+            
+            return all_data if all_data else []
         except Exception as e:
             st.error(f"Asset fetch error: {str(e)[:100]}")
             return []
@@ -709,11 +719,7 @@ def page_ar():
     # Build dataframe
     if all_assets:
         df = pd.DataFrame(all_assets)
-        st.write("DEBUG - Columns:", list(df.columns))
-        st.write("DEBUG - Row count:", len(df))
-        st.write("DEBUG - Department unique values:", df["department"].unique() if "department" in df.columns else "NO DEPARTMENT COLUMN")
-        st.write("DEBUG - First row:", df.iloc[0].to_dict() if len(df) > 0 else "EMPTY")
-        
+        # Get category names
         # Department is already in the assets table from SQL upload
         if "department" in df.columns:
             df["department"] = df["department"].fillna("N/A")
