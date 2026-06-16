@@ -3792,23 +3792,370 @@ def page_uc():
                 st.success("Reading recorded!");st.rerun()
 
 # ============================================
-# PPM DASHBOARD (FULL)
+# PPM COMMAND CENTER — FORTUNE 500 GRADE
+# WORLD-CLASS PLANNED PREVENTIVE MAINTENANCE
 # ============================================
 def page_ppm():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 📊 PPM Dashboard — {info.get("full_name",fc)}')
-    ppm=DB.get_all("ppm_schedules",fc,50)
-    if ppm:
-        df=pd.DataFrame(ppm)
-        c1,c2,c3=st.columns(3)
-        with c1:st.metric("Total Schedules",len(df))
-        with c2:st.metric("Due This Week",len(df[pd.to_datetime(df["next_due_date"]).dt.date<=date.today()+timedelta(days=7)]) if "next_due_date" in df.columns else 0)
-        with c3:st.metric("Critical",len(df[df["is_critical"]==True]) if "is_critical" in df.columns else 0)
-        for i,row in df.iterrows():
-            with st.expander(f"{row.get('title','')} — Due: {row.get('next_due_date','')} — {row.get('frequency','')}"):
-                st.write(f"**Team:** {row.get('assigned_team','')} | **Priority:** {row.get('priority','')}")
-                if st.button("✅ Mark Complete",key=f"ppm_{row['id']}"):DB.update("ppm_schedules",row["id"],{"status":"completed","last_completed_date":str(date.today())});st.rerun()
-    else:st.info("No PPM schedules")
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    
+    st.markdown(f'## 📊 PPM Command Center — {info.get("full_name", fc)}')
+    
+    # Fetch ALL PPM data
+    ppm_all = DB.get_all("ppm_schedules", fc, 500)
+    
+    if not ppm_all:
+        st.warning("No PPM schedules configured for this facility. Please set up PPM schedules in the database.")
+        return
+    
+    df = pd.DataFrame(ppm_all)
+    
+    # ============================================
+    # DATA PREPARATION
+    # ============================================
+    today = date.today()
+    now = datetime.now()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+    month_start = today.replace(day=1)
+    
+    # Parse dates
+    if "next_due_date" in df.columns:
+        df["due_date_parsed"] = pd.to_datetime(df["next_due_date"], errors='coerce')
+    if "last_completed_date" in df.columns:
+        df["completed_date_parsed"] = pd.to_datetime(df["last_completed_date"], errors='coerce')
+    
+    # Status classifications
+    overdue_mask = (df["due_date_parsed"] < pd.Timestamp(today)) & (df["status"] != "completed")
+    due_today_mask = (df["due_date_parsed"] == pd.Timestamp(today)) & (df["status"] != "completed")
+    due_this_week_mask = (df["due_date_parsed"] >= pd.Timestamp(today)) & (df["due_date_parsed"] <= pd.Timestamp(week_end)) & (df["status"] != "completed")
+    due_this_month_mask = (df["due_date_parsed"] >= pd.Timestamp(today)) & (df["due_date_parsed"] <= pd.Timestamp(today + timedelta(days=30))) & (df["status"] != "completed")
+    completed_mask = df["status"] == "completed"
+    critical_mask = df.get("is_critical", pd.Series([False] * len(df))) == True
+    
+    # Counts
+    total_schedules = len(df)
+    overdue_count = overdue_mask.sum()
+    due_today_count = due_today_mask.sum()
+    due_week_count = due_this_week_mask.sum()
+    due_month_count = due_this_month_mask.sum()
+    completed_count = completed_mask.sum()
+    critical_count = critical_mask.sum()
+    critical_overdue = (overdue_mask & critical_mask).sum()
+    
+    # Compliance rate
+    compliance_rate = round((completed_count / total_schedules * 100), 1) if total_schedules > 0 else 0
+    
+    # ============================================
+    # EXECUTIVE KPI ROW
+    # ============================================
+    st.markdown("---")
+    st.markdown("### 🎯 Executive KPIs")
+    
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        color = "#EF4444" if overdue_count > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-left:4px solid {color};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.65rem;color:#888;text-transform:uppercase;letter-spacing:1px;">🔴 Overdue</div><div style="font-size:2rem;font-weight:800;color:{color};">{overdue_count}</div></div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-left:4px solid #F59E0B;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.65rem;color:#888;text-transform:uppercase;letter-spacing:1px;">📅 Due Today</div><div style="font-size:2rem;font-weight:800;color:#F59E0B;">{due_today_count}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-left:4px solid #3B82F6;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.65rem;color:#888;text-transform:uppercase;letter-spacing:1px;">📆 This Week</div><div style="font-size:2rem;font-weight:800;color:#3B82F6;">{due_week_count}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-left:4px solid #8B5CF6;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.65rem;color:#888;text-transform:uppercase;letter-spacing:1px;">✅ Completed</div><div style="font-size:2rem;font-weight:800;color:#8B5CF6;">{completed_count}</div></div>""", unsafe_allow_html=True)
+    with c5:
+        compliance_color = "#10B981" if compliance_rate >= 90 else "#F59E0B" if compliance_rate >= 70 else "#EF4444"
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-left:4px solid {compliance_color};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.65rem;color:#888;text-transform:uppercase;letter-spacing:1px;">📈 Compliance</div><div style="font-size:2rem;font-weight:800;color:{compliance_color};">{compliance_rate}%</div></div>""", unsafe_allow_html=True)
+    with c6:
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-left:4px solid #1a1a1a;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.65rem;color:#888;text-transform:uppercase;letter-spacing:1px;">🏗️ Total</div><div style="font-size:2rem;font-weight:800;color:#1a1a1a;">{total_schedules}</div></div>""", unsafe_allow_html=True)
+    
+    # ============================================
+    # ALERT BANNERS
+    # ============================================
+    if critical_overdue > 0:
+        st.error(f"🚨 **CRITICAL ALERT:** {critical_overdue} critical PPM tasks are OVERDUE! Immediate action required.")
+    elif overdue_count > 0:
+        st.warning(f"⚠️ **ATTENTION:** {overdue_count} PPM tasks are past due. Review and reschedule.")
+    
+    if compliance_rate < 70:
+        st.error(f"📉 **COMPLIANCE RISK:** PPM compliance at {compliance_rate}% — below 70% threshold. Escalation recommended.")
+    
+    # ============================================
+    # COMPLIANCE GAUGE + CHARTS
+    # ============================================
+    st.markdown("---")
+    c1, c2 = st.columns([1, 2])
+    
+    with c1:
+        st.markdown("### 📊 Compliance Gauge")
+        
+        # Gauge chart
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number+delta",
+            value=compliance_rate,
+            title={'text': "PPM Compliance Rate", 'font': {'size': 14}},
+            delta={'reference': 90, 'increasing': {'color': "#10B981"}},
+            gauge={
+                'axis': {'range': [0, 100], 'tickwidth': 1},
+                'bar': {'color': "#CC0000" if compliance_rate < 70 else "#F59E0B" if compliance_rate < 90 else "#10B981"},
+                'bgcolor': "white",
+                'steps': [
+                    {'range': [0, 70], 'color': '#FEE2E2'},
+                    {'range': [70, 90], 'color': '#FFFBEB'},
+                    {'range': [90, 100], 'color': '#ECFDF5'}
+                ],
+                'threshold': {
+                    'line': {'color': "#CC0000", 'width': 3},
+                    'thickness': 0.75,
+                    'value': 90
+                }
+            }
+        ))
+        fig_gauge.update_layout(height=300)
+        st.plotly_chart(fig_gauge, use_container_width=True)
+    
+    with c2:
+        st.markdown("### 📅 PPM by Frequency")
+        
+        if "frequency" in df.columns:
+            freq_counts = df["frequency"].value_counts()
+            fig_freq = px.pie(
+                values=freq_counts.values, 
+                names=freq_counts.index,
+                color_discrete_sequence=["#CC0000", "#F59E0B", "#3B82F6", "#10B981", "#8B5CF6", "#EC4899"],
+                hole=0.4
+            )
+            fig_freq.update_layout(height=300, showlegend=True)
+            fig_freq.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig_freq, use_container_width=True)
+    
+    # ============================================
+    # STATUS DISTRIBUTION CHART
+    # ============================================
+    st.markdown("---")
+    st.markdown("### 📊 Workload Distribution")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        # By assigned team
+        if "assigned_team" in df.columns:
+            team_counts = df["assigned_team"].value_counts().head(8)
+            fig_team = px.bar(
+                x=team_counts.values, 
+                y=team_counts.index, 
+                orientation='h',
+                title="PPM Tasks by Team",
+                color=team_counts.values,
+                color_continuous_scale="Reds",
+                labels={"x": "Tasks", "y": ""}
+            )
+            fig_team.update_layout(height=350)
+            st.plotly_chart(fig_team, use_container_width=True)
+    
+    with c2:
+        # By priority
+        if "priority" in df.columns:
+            priority_counts = df["priority"].value_counts()
+            colors_priority = {"critical": "#EF4444", "high": "#F59E0B", "medium": "#3B82F6", "low": "#10B981"}
+            pie_colors = [colors_priority.get(p, "#999") for p in priority_counts.index]
+            fig_priority = px.pie(
+                values=priority_counts.values,
+                names=priority_counts.index,
+                title="Tasks by Priority",
+                color_discrete_sequence=pie_colors
+            )
+            fig_priority.update_layout(height=350)
+            st.plotly_chart(fig_priority, use_container_width=True)
+    
+    # ============================================
+    # CRITICAL OVERDUE — IMMEDIATE ATTENTION
+    # ============================================
+    if critical_overdue > 0:
+        st.markdown("---")
+        st.markdown("### 🚨 Critical Overdue — Immediate Action Required")
+        
+        critical_overdue_df = df[overdue_mask & critical_mask].sort_values("due_date_parsed")
+        
+        for _, row in critical_overdue_df.iterrows():
+            days_overdue = (today - row["due_date_parsed"].date()).days if pd.notna(row.get("due_date_parsed")) else 0
+            st.markdown(f"""
+            <div style="background:#FEF2F2;border-left:4px solid #EF4444;border-radius:8px;padding:0.8rem;margin:0.3rem 0;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <b>🔴 {row.get('title','')}</b>
+                        <br><span style="font-size:0.75rem;color:#991B1B;">{row.get('asset_name','') or row.get('equipment','')} | Due: {row.get('next_due_date','')} | {days_overdue} days overdue</span>
+                    </div>
+                    <span style="background:#EF4444;color:white;padding:3px 12px;border-radius:20px;font-size:0.7rem;font-weight:600;">CRITICAL</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # ============================================
+    # TASK VIEW TABS
+    # ============================================
+    st.markdown("---")
+    st.markdown("### 📋 PPM Task Views")
+    
+    task_tabs = st.tabs(["🔴 Overdue", "📅 Due Today", "📆 This Week", "📆 This Month", "✅ Completed", "📋 All Tasks"])
+    
+    # --- OVERDUE TAB ---
+    with task_tabs[0]:
+        overdue_df = df[overdue_mask].sort_values("due_date_parsed")
+        if len(overdue_df) > 0:
+            st.caption(f"🔴 {len(overdue_df)} overdue tasks")
+            for _, row in overdue_df.iterrows():
+                days_overdue = (today - row["due_date_parsed"].date()).days if pd.notna(row.get("due_date_parsed")) else 0
+                is_critical = row.get("is_critical", False)
+                border_color = "#EF4444" if is_critical else "#F59E0B"
+                bg_color = "#FEF2F2" if is_critical else "#FFFBEB"
+                
+                with st.expander(f"{'🔴' if is_critical else '🟡'} {row.get('title','')} — {days_overdue}d overdue | Due: {row.get('next_due_date','')}"):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.write(f"**Asset:** {row.get('asset_name','N/A')}")
+                        st.write(f"**Frequency:** {row.get('frequency','N/A')}")
+                    with c2:
+                        st.write(f"**Team:** {row.get('assigned_team','N/A')}")
+                        st.write(f"**Priority:** {row.get('priority','N/A').upper()}")
+                    with c3:
+                        st.write(f"**Status:** {row.get('status','N/A').upper()}")
+                        st.write(f"**Last Done:** {row.get('last_completed_date','Never')}")
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("✅ Mark Complete", key=f"ppm_overdue_{row['id']}", use_container_width=True):
+                            DB.update("ppm_schedules", row["id"], {"status": "completed", "last_completed_date": str(today)})
+                            st.success("✅ Completed!")
+                            st.rerun()
+                    with c2:
+                        new_due = st.date_input("Reschedule to", today + timedelta(days=7), key=f"reschedule_{row['id']}")
+                        if st.button("📅 Reschedule", key=f"ppm_reschedule_{row['id']}", use_container_width=True):
+                            DB.update("ppm_schedules", row["id"], {"next_due_date": str(new_due)})
+                            st.success("📅 Rescheduled!")
+                            st.rerun()
+        else:
+            st.success("🎉 No overdue tasks! All PPMs on track.")
+    
+    # --- DUE TODAY TAB ---
+    with task_tabs[1]:
+        today_df = df[due_today_mask].sort_values("due_date_parsed")
+        if len(today_df) > 0:
+            st.caption(f"📅 {len(today_df)} tasks due today")
+            for _, row in today_df.iterrows():
+                is_critical = row.get("is_critical", False)
+                icon = "🔴" if is_critical else "📅"
+                
+                with st.expander(f"{icon} {row.get('title','')} — {row.get('frequency','')} | {row.get('assigned_team','N/A')}"):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.write(f"**Asset:** {row.get('asset_name','N/A')}")
+                        st.write(f"**Location:** {row.get('location','N/A')}")
+                    with c2:
+                        st.write(f"**Team:** {row.get('assigned_team','N/A')}")
+                        st.write(f"**Priority:** {row.get('priority','N/A').upper()}")
+                    with c3:
+                        st.write(f"**Last Done:** {row.get('last_completed_date','Never')}")
+                    
+                    if st.button("✅ Mark Complete", key=f"ppm_today_{row['id']}", use_container_width=True):
+                        DB.update("ppm_schedules", row["id"], {"status": "completed", "last_completed_date": str(today)})
+                        st.success("✅ Completed!")
+                        st.rerun()
+        else:
+            st.success("✅ No tasks due today.")
+    
+    # --- THIS WEEK TAB ---
+    with task_tabs[2]:
+        week_df = df[due_this_week_mask].sort_values("due_date_parsed")
+        if len(week_df) > 0:
+            st.caption(f"📆 {len(week_df)} tasks due this week ({week_start.strftime('%d %b')} - {week_end.strftime('%d %b')})")
+            for _, row in week_df.iterrows():
+                days_left = (row["due_date_parsed"].date() - today).days if pd.notna(row.get("due_date_parsed")) else 0
+                days_label = f"{days_left}d left" if days_left >= 0 else f"{-days_left}d overdue"
+                
+                st.markdown(f"""
+                <div style="background:white;border-radius:8px;padding:0.7rem;margin:0.2rem 0;border-left:3px solid #3B82F6;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <b>{row.get('title','')}</b>
+                        <br><span style="font-size:0.7rem;color:#666;">{row.get('assigned_team','')} | Due: {row.get('next_due_date','')}</span>
+                    </div>
+                    <span style="font-size:0.7rem;color:#3B82F6;font-weight:600;">{days_label}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.success("✅ No tasks due this week.")
+    
+    # --- THIS MONTH TAB ---
+    with task_tabs[3]:
+        month_df = df[due_this_month_mask].sort_values("due_date_parsed")
+        if len(month_df) > 0:
+            st.caption(f"📆 {len(month_df)} tasks due in the next 30 days")
+            st.dataframe(
+                month_df[[c for c in ["title", "assigned_team", "frequency", "priority", "next_due_date", "status"] if c in month_df.columns]],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.success("✅ No tasks due this month.")
+    
+    # --- COMPLETED TAB ---
+    with task_tabs[4]:
+        completed_df = df[completed_mask].sort_values("completed_date_parsed", ascending=False) if "completed_date_parsed" in df.columns else df[completed_mask]
+        if len(completed_df) > 0:
+            st.caption(f"✅ {len(completed_df)} completed tasks")
+            st.dataframe(
+                completed_df[[c for c in ["title", "assigned_team", "frequency", "last_completed_date", "next_due_date"] if c in completed_df.columns]].head(20),
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("No completed tasks recorded.")
+    
+    # --- ALL TASKS TAB ---
+    with task_tabs[5]:
+        st.caption(f"📋 All {total_schedules} PPM schedules")
+        
+        # Search/filter
+        search_ppm = st.text_input("🔍 Search PPM tasks", key="ppm_search_all")
+        
+        display_df = df
+        if search_ppm:
+            display_df = df[df["title"].str.contains(search_ppm, case=False, na=False)]
+        
+        st.dataframe(
+            display_df[[c for c in ["title", "assigned_team", "frequency", "priority", "next_due_date", "last_completed_date", "status"] if c in display_df.columns]],
+            use_container_width=True,
+            hide_index=True,
+            height=400
+        )
+    
+    # ============================================
+    # MANAGEMENT INSIGHTS
+    # ============================================
+    st.markdown("---")
+    st.markdown("### 🤖 Management Insights")
+    
+    c1, c2, c3 = st.columns(3)
+    
+    with c1:
+        if compliance_rate >= 90:
+            st.success(f"✅ **Excellent:** {compliance_rate}% PPM compliance — on track for audit readiness.")
+        elif compliance_rate >= 70:
+            st.warning(f"⚠️ **Attention Needed:** {compliance_rate}% compliance — below 90% target. Focus on overdue tasks.")
+        else:
+            st.error(f"🚨 **Critical:** {compliance_rate}% compliance — immediate management intervention required.")
+    
+    with c2:
+        if overdue_count == 0:
+            st.success("✅ **Zero Overdue:** All PPM tasks are on schedule.")
+        elif overdue_count <= 5:
+            st.warning(f"⚠️ **Minor Backlog:** {overdue_count} tasks overdue. Address within 48 hours.")
+        else:
+            st.error(f"🚨 **Significant Backlog:** {overdue_count} overdue tasks. Resource allocation review needed.")
+    
+    with c3:
+        if critical_count > 0 and critical_overdue == 0:
+            st.success(f"✅ **Critical Tasks Protected:** All {critical_count} critical PPMs are on schedule.")
+        elif critical_overdue > 0:
+            st.error(f"🚨 **Risk Exposure:** {critical_overdue} critical tasks overdue. Potential equipment failure risk.")
 
 # ============================================
 # 52-WEEK CALENDAR (FULL)
