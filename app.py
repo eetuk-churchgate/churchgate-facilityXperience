@@ -1114,6 +1114,31 @@ def page_ar():
             with c3:
                 if st.button("✅ SUBMIT ASSET", use_container_width=True, type="primary", key="s6_submit"):
                     full_data = {**s1, **s2, **s3, **s4, **s5}
+                    # Map department
+                    raw_dept = full_data.get("department", "")
+                    dept_mapping = {
+                        "Engineering — Electrical": ("Engineering", "Electrical"),
+                        "Engineering — Fire Fighting": ("Engineering", "Fire Fighting"),
+                        "Engineering — HVAC": ("Engineering", "HVAC"),
+                        "Engineering — Plumbing": ("Engineering", "Plumbing"),
+                        "Engineering — Vertical Transportation": ("Engineering", "Vertical Transportation (Lifts)"),
+                        "Facility Management — FM Operations": ("Facility Management", "FM Operations"),
+                        "Facility Management — Fitout Works": ("Facility Management", "Fitout Works"),
+                        "Facility Management — Front of House": ("Facility Management", "Front of House"),
+                        "Facility Management — Hard Services": ("Facility Management", "Hard Services"),
+                        "Facility Management — Soft Services": ("Facility Management", "Soft Services"),
+                        "Security": ("Security", "Security"),
+                        "Technology Group — Access Control": ("Technology Group", "Access Control"),
+                        "Technology Group — Automation": ("Technology Group", "Automation"),
+                        "Technology Group — BMS": ("Technology Group", "BMS"),
+                        "Technology Group — CCTV": ("Technology Group", "CCTV"),
+                        "Technology Group — Fire Alarm & Voice Evac": ("Technology Group", "Fire Alarm & Voice Evac"),
+                        "Technology Group — Networks & Connectivity": ("Technology Group", "Networks & Connectivity"),
+                        "Technology Group — MDTH (DSTV)": ("Technology Group", "MDTH (DSTV)"),
+                    }
+                    mapped_dept, mapped_sub = dept_mapping.get(raw_dept, (raw_dept, raw_dept))
+                    full_data["department"] = mapped_dept
+                    full_data["sub_division"] = mapped_sub
                     full_data["facility_code"] = fc
                     full_data["created_at"] = datetime.now().isoformat()
                     full_data["condition_rating"] = 5.0 if s1.get("health") == "Excellent" else 4.0 if s1.get("health") == "Good" else 3.0 if s1.get("health") == "Average" else 2.0
@@ -1162,27 +1187,56 @@ def page_ar():
                 success = 0
                 for _, row in bulk_df.iterrows():
                     try:
+                        raw_dept = str(row.get("Department", "")).strip()
+                        
+                        # Department mapping
+                        dept_mapping = {
+                            "Engineering — Electrical": ("Engineering", "Electrical"),
+                            "Engineering — Fire Fighting": ("Engineering", "Fire Fighting"),
+                            "Engineering — HVAC": ("Engineering", "HVAC"),
+                            "Engineering — Plumbing": ("Engineering", "Plumbing"),
+                            "Engineering — Vertical Transportation": ("Engineering", "Vertical Transportation (Lifts)"),
+                            "Engineering — Vertical Transportation (Lifts)": ("Engineering", "Vertical Transportation (Lifts)"),
+                            "Facility Management — FM Operations": ("Facility Management", "FM Operations"),
+                            "Facility Management — Fitout Works": ("Facility Management", "Fitout Works"),
+                            "Facility Management — Front of House": ("Facility Management", "Front of House"),
+                            "Facility Management — Hard Services": ("Facility Management", "Hard Services"),
+                            "Facility Management — Soft Services": ("Facility Management", "Soft Services"),
+                            "Security": ("Security", "Security"),
+                            "Technology Group — Access Control": ("Technology Group", "Access Control"),
+                            "Technology Group — Automation": ("Technology Group", "Automation"),
+                            "Technology Group — BMS": ("Technology Group", "BMS"),
+                            "Technology Group — CCTV": ("Technology Group", "CCTV"),
+                            "Technology Group — Fire Alarm & Voice Evac": ("Technology Group", "Fire Alarm & Voice Evac"),
+                            "Technology Group — Networks & Connectivity": ("Technology Group", "Networks & Connectivity"),
+                            "Technology Group — MDTH (DSTV)": ("Technology Group", "MDTH (DSTV)"),
+                        }
+                        
+                        mapped_dept, mapped_sub = dept_mapping.get(raw_dept, (raw_dept, raw_dept))
+                        
                         asset_data = {
                             "facility_code": fc,
-                            "name": str(row.get("Asset Name", "")),
-                            "asset_tag": str(row.get("Asset Code", "")),
-                            "department": str(row.get("Department", "")),
+                            "name": str(row.get("Asset Name", "")).strip(),
+                            "asset_tag": str(row.get("Asset Code", "")).strip(),
+                            "department": mapped_dept,
+                            "sub_division": mapped_sub,
                             "status": "active",
-                            "priority": str(row.get("Priority", "medium")).lower(),
-                            "manufacturer": str(row.get("Manufacturer", "")),
-                            "model": str(row.get("Model", "")),
-                            "serial_number": str(row.get("Serial No", "")),
-                            "location_building": str(row.get("Location", "")),
-                            "location_floor": str(row.get("Sub Location", "")),
+                            "priority": str(row.get("Priority", "medium")).strip().lower(),
+                            "manufacturer": str(row.get("Manufacturer", "")).strip(),
+                            "model": str(row.get("Model", "")).strip(),
+                            "serial_number": str(row.get("Serial No", "")).strip(),
+                            "location_building": str(row.get("Location", "")).strip(),
+                            "location_floor": str(row.get("Sub Location", "")).strip(),
                             "purchase_cost": float(row.get("Purchase Price", 0)) if pd.notna(row.get("Purchase Price")) else 0,
-                            "barcode": str(row.get("Barcode", "")),
-                            "description": str(row.get("Description", "")),
+                            "barcode": str(row.get("Barcode", "")).strip(),
+                            "description": str(row.get("Description", "")).strip(),
                             "condition_rating": 5.0,
                             "created_at": datetime.now().isoformat()
                         }
+                        
                         DB.insert("assets", asset_data)
                         success += 1
-                    except:
+                    except Exception as e:
                         continue
                 st.success(f"✅ {success} assets uploaded!")
                 st.balloons()
