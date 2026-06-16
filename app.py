@@ -704,7 +704,12 @@ def page_ar():
     if all_assets:
         df = pd.DataFrame(all_assets)
         # Get category names
+        # Department is already in the assets table from SQL upload
+        if "department" in df.columns:
+            df["department"] = df["department"].fillna("N/A")
         else:
+            df["department"] = "N/A"
+    else:
         df = pd.DataFrame()
     
     today = date.today()
