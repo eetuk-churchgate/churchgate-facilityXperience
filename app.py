@@ -3068,19 +3068,65 @@ def page_visitor():
                         st.markdown(f"🚩 {v.get('full_name','')} — {v.get('company','')} | Status: {v.get('status','').upper()}")
             
             with gate_tabs[3]:
-                st.markdown("#### 📊 Live Activity Feed")
+                st.markdown("#### 📊 Activity Log")
+                st.caption("Today's gate activity — check-ins and check-outs")
                 
-                recent_logs = supabase.table("visitor_gate_log").select("*, visitors(full_name, company)").order("event_time", desc=True).limit(30).execute()
+                today_str = str(date.today())
                 
-                if recent_logs.data:
-                    for log in recent_logs.data:
+                # Get TODAY'S activity only
+                today_logs = supabase.table("visitor_gate_log").select("*, visitors(full_name, company)").gte("event_time", f"{today_str}T00:00:00").order("event_time", desc=True).execute()
+                
+                if today_logs.data:
+                    # Show summary stats
+                    checkins_today = len([l for l in today_logs.data if l.get("event_type") == "check_in"])
+                    checkouts_today = len([l for l in today_logs.data if l.get("event_type") == "check_out"])
+                    
+                    c1, c2, c3 = st.columns(3)
+                    with c1: st.metric("📋 Total Events", len(today_logs.data))
+                    with c2: st.metric("✅ Check-ins", checkins_today)
+                    with c3: st.metric("🚪 Check-outs", checkouts_today)
+                    
+                    st.markdown("---")
+                    
+                    # Currently on-site (checked in but not checked out today)
+                    active_visitors = supabase.table("visitors").select("*").eq("facility_code", fc).eq("visit_date", today_str).eq("status", "checked_in").execute()
+                    
+                    if active_visitors.data:
+                        st.markdown(f"### 🟢 Currently On-Site ({len(active_visitors.data)} people)")
+                        for v in active_visitors.data:
+                            checkin_time = ""
+                            checkin_log = [l for l in today_logs.data if l.get("visitor_id") == v.get("id") and l.get("event_type") == "check_in"]
+                            if checkin_log:
+                                try:
+                                    checkin_time = pd.to_datetime(checkin_log[0].get("event_time")).strftime("%I:%M %p")
+                                except: pass
+                            
+                            st.markdown(f"""
+                            <div style="background:#ECFDF5;border-left:4px solid #10B981;border-radius:8px;padding:0.6rem;margin:0.3rem 0;">
+                                <b>{v.get('full_name','')}</b> — {v.get('company','') or 'N/A'}
+                                <br><span style="font-size:0.7rem;color:#666;">🕐 In since: {checkin_time or 'N/A'} | 👤 Host: {v.get('host_name','')}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.info("No visitors currently on-site")
+                    
+                    st.markdown("---")
+                    st.markdown("### 📋 Recent Activity")
+                    
+                    for log in today_logs.data[:20]:
                         icon = "✅" if log.get("event_type") == "check_in" else "🚪" if log.get("event_type") == "check_out" else "🚩"
                         v_info = log.get("visitors", {})
                         name = v_info.get("full_name","Unknown") if v_info else "Unknown"
                         company = v_info.get("company","") if v_info else ""
-                        st.markdown(f"{icon} **{name}** ({company}) — {log.get('event_type','').upper()} at {log.get('event_time','')} by {log.get('scanned_by','')}")
+                        
+                        try:
+                            event_time = pd.to_datetime(log.get("event_time")).strftime("%I:%M %p")
+                        except:
+                            event_time = str(log.get("event_time",""))
+                        
+                        st.markdown(f"{icon} **{name}** ({company}) — {log.get('event_type','').upper()} at {event_time} by {log.get('scanned_by','')}")
                 else:
-                    st.info("No activity yet")
+                    st.info("No gate activity recorded today")
     
     # ============================================
     # TAB 3: ANALYTICS
