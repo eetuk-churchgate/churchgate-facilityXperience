@@ -245,7 +245,7 @@ class DB:
         except: return []
 
     @staticmethod
-    def get_assets(fc, limit=500):
+    def get_assets(fc, limit=10000):
         try:
             res=supabase.table("assets").select("*, asset_categories(name,code)").eq("facility_code",fc).limit(limit).execute()
             return res.data if res.data else []
@@ -672,7 +672,7 @@ def page_ar():
     st.markdown(f'## 🏗️ Asset Command Center — {info.get("full_name", fc)}')
     
     # Fetch all assets
-    all_assets = DB.get_assets(fc, 1000)
+    all_assets = DB.get_assets(fc, 10000)
     
     # Build dataframe
     if all_assets:
