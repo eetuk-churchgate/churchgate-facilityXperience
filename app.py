@@ -39,6 +39,12 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 def init_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# Clear cache on startup
+if "cache_cleared" not in st.session_state:
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    st.session_state.cache_cleared = True
+
 supabase = init_supabase()
 
 # ============================================
