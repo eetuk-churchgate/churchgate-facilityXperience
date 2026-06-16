@@ -1388,8 +1388,8 @@ def page_ar():
             st.dataframe(rd_df, use_container_width=True, hide_index=True, height=500)
             st.download_button("📥 Export", rd_df.to_csv(index=False), "readings.csv", "text/csv", use_container_width=True)
     
-     # ============================================
-    # TAB 5: PPM CALENDAR — VIBRANT INTERACTIVE
+    # ============================================
+    # TAB 5: PPM CALENDAR — FULLY INTERACTIVE, VIBRANT
     # ============================================
     with ar_tabs[5]:
         st.markdown("### 📅 PPM Calendar — Financial Year Command Center")
@@ -1416,14 +1416,14 @@ def page_ar():
         # BOLD VIBRANT LEGEND
         # ============================================
         st.markdown("""
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;font-weight:600;">
-            <div style="background:#EF4444;color:white;padding:5px 12px;border-radius:6px;font-size:0.7rem;">🔴 Overdue</div>
-            <div style="background:#F59E0B;color:white;padding:5px 12px;border-radius:6px;font-size:0.7rem;">🟡 Due Today</div>
-            <div style="background:#3B82F6;color:white;padding:5px 12px;border-radius:6px;font-size:0.7rem;">📆 Upcoming</div>
-            <div style="background:#10B981;color:white;padding:5px 12px;border-radius:6px;font-size:0.7rem;">✅ Completed</div>
-            <div style="background:#8B5CF6;color:white;padding:5px 12px;border-radius:6px;font-size:0.7rem;">⏳ Pending</div>
-            <div style="background:#059669;color:white;padding:5px 12px;border-radius:6px;font-size:0.7rem;">🟢 Approved</div>
-            <div style="background:#f0f0f0;color:#999;padding:5px 12px;border-radius:6px;font-size:0.7rem;">⬜ No PPM</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0;">
+            <div style="background:#EF4444;color:white;padding:6px 14px;border-radius:20px;font-size:0.7rem;font-weight:700;">🔴 Overdue</div>
+            <div style="background:#F59E0B;color:white;padding:6px 14px;border-radius:20px;font-size:0.7rem;font-weight:700;">🟡 Due Today</div>
+            <div style="background:#3B82F6;color:white;padding:6px 14px;border-radius:20px;font-size:0.7rem;font-weight:700;">📆 Upcoming</div>
+            <div style="background:#10B981;color:white;padding:6px 14px;border-radius:20px;font-size:0.7rem;font-weight:700;">✅ Completed</div>
+            <div style="background:#8B5CF6;color:white;padding:6px 14px;border-radius:20px;font-size:0.7rem;font-weight:700;">⏳ Pending</div>
+            <div style="background:#059669;color:white;padding:6px 14px;border-radius:20px;font-size:0.7rem;font-weight:700;">🟢 Approved</div>
+            <div style="background:#e8e8e8;color:#888;padding:6px 14px;border-radius:20px;font-size:0.7rem;font-weight:700;">⬜ No PPM</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -1462,32 +1462,11 @@ def page_ar():
                 if pd.notna(d):
                     dk = d.strftime("%Y-%m-%d")
                     if dk not in ppm_dates:
-                        ppm_dates[dk] = {"count": 0, "statuses": []}
-                    ppm_dates[dk]["count"] += 1
-                    ppm_dates[dk]["statuses"].append(row.get("status", "scheduled"))
+                        ppm_dates[dk] = []
+                    ppm_dates[dk].append(row.to_dict())
         
         # ============================================
-        # HELPER: Determine day color
-        # ============================================
-        def get_day_color(dk, is_today):
-            if is_today:
-                return "#CC0000", "white", "TODAY"
-            if dk not in ppm_dates:
-                return "#f5f5f5", "#bbb", ""
-            statuses = ppm_dates[dk]["statuses"]
-            if "overdue" in statuses or any(s not in ["completed", "approved"] for s in statuses):
-                # Check if any are past due
-                return "#FEF2F2", "#EF4444", str(ppm_dates[dk]["count"])
-            if all(s == "completed" for s in statuses):
-                return "#ECFDF5", "#10B981", str(ppm_dates[dk]["count"])
-            if all(s == "approved" for s in statuses):
-                return "#F0FDF4", "#059669", str(ppm_dates[dk]["count"])
-            if "pending" in statuses:
-                return "#F5F3FF", "#8B5CF6", str(ppm_dates[dk]["count"])
-            return "#EFF6FF", "#3B82F6", str(ppm_dates[dk]["count"])
-        
-        # ============================================
-        # 6 MONTH GRID
+        # 6 MONTH GRID — 2 ROWS × 3 COLS
         # ============================================
         for row_idx in range(2):
             month_cols = st.columns(3)
@@ -1508,13 +1487,13 @@ def page_ar():
                     
                     # Month header
                     hdr_bg = "#CC0000" if is_current else "#1a1a1a"
-                    st.markdown(f"""<div style="background:{hdr_bg};color:white;padding:8px 0;border-radius:8px 8px 0 0;text-align:center;font-weight:700;font-size:0.85rem;">{months_short[display_month-1]} {display_year}</div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:{hdr_bg};color:white;padding:8px 0;border-radius:10px 10px 0 0;text-align:center;font-weight:700;font-size:0.9rem;">{months_short[display_month-1]} {display_year}</div>""", unsafe_allow_html=True)
                     
                     # Day name headers
                     dcols = st.columns(7)
                     for i, dh in enumerate(["M","T","W","T","F","S","S"]):
                         with dcols[i]:
-                            st.markdown(f"""<div style="text-align:center;font-size:0.6rem;color:#888;font-weight:700;padding:3px 0;background:#f9f9f9;">{dh}</div>""", unsafe_allow_html=True)
+                            st.markdown(f"""<div style="text-align:center;font-size:0.65rem;color:#666;font-weight:700;padding:4px 0;background:#f0f0f0;border:1px solid #ddd;">{dh}</div>""", unsafe_allow_html=True)
                     
                     # Day grid
                     day_count = 1
@@ -1531,64 +1510,94 @@ def page_ar():
                                     dk = current_date.strftime("%Y-%m-%d")
                                     is_today = dk == today.strftime("%Y-%m-%d")
                                     
-                                    bg, tc, label = get_day_color(dk, is_today)
-                                    count = ppm_dates.get(dk, {}).get("count", 0)
+                                    ppms_today = ppm_dates.get(dk, [])
+                                    ppm_count = len(ppms_today)
                                     
-                                    if count > 0 or is_today:
-                                        # Clickable button for days with PPMs or today
-                                        if st.button(f"{day_count}", key=f"calday_{dk}", help=f"{count} PPMs" if count > 0 else "Today", use_container_width=True, type="primary" if is_today else "secondary"):
-                                            st.session_state.selected_ppm_date = current_date
-                                            st.rerun()
+                                    # Determine status for coloring
+                                    has_overdue = any(p.get("status") not in ["completed", "approved"] and pd.to_datetime(p.get("next_due_date"), errors='coerce').date() < today for p in ppms_today if pd.notna(pd.to_datetime(p.get("next_due_date"), errors='coerce')))
+                                    all_completed = ppm_count > 0 and all(p.get("status") == "completed" for p in ppms_today)
+                                    all_approved = ppm_count > 0 and all(p.get("status") == "approved" for p in ppms_today)
+                                    has_pending = any(p.get("status") == "pending" for p in ppms_today)
+                                    
+                                    # Color scheme
+                                    if is_today:
+                                        bg_color = "#CC0000"
+                                        text_color = "white"
+                                        badge = "TODAY"
+                                    elif has_overdue:
+                                        bg_color = "#FEF2F2"
+                                        text_color = "#EF4444"
+                                        badge = str(ppm_count)
+                                    elif all_completed:
+                                        bg_color = "#ECFDF5"
+                                        text_color = "#10B981"
+                                        badge = str(ppm_count)
+                                    elif all_approved:
+                                        bg_color = "#F0FDF4"
+                                        text_color = "#059669"
+                                        badge = str(ppm_count)
+                                    elif has_pending:
+                                        bg_color = "#F5F3FF"
+                                        text_color = "#8B5CF6"
+                                        badge = str(ppm_count)
+                                    elif ppm_count > 0:
+                                        bg_color = "#EFF6FF"
+                                        text_color = "#3B82F6"
+                                        badge = str(ppm_count)
                                     else:
-                                        # Plain div for empty days
-                                        st.markdown(f"""<div style="background:{bg};color:{tc};text-align:center;padding:4px 0;border-radius:3px;font-size:0.65rem;font-weight:400;min-height:24px;border:1px solid #e5e5e5;">{day_count}</div>""", unsafe_allow_html=True)
-                                day_count += 1
+                                        bg_color = "#f8f8f8"
+                                        text_color = "#bbb"
+                                        badge = ""
+                                    
+                                    # ALL DAYS CLICKABLE
+                                    label = f"{day_count}" if badge == "" else f"{day_count} ({badge})"
+                                    if st.button(label, key=f"caldaybtn_{dk}", help=f"{ppm_count} PPMs" if ppm_count > 0 else "No PPMs — Click to view", use_container_width=True):
+                                        st.session_state.selected_ppm_date = current_date
+                                        st.rerun()
+                                    
+                                    day_count += 1
                     
                     st.markdown("<br>", unsafe_allow_html=True)
         
         st.markdown("---")
         
         # ============================================
-        # SELECTED DAY DETAILS
+        # SHOW DETAILS FOR SELECTED DAY
         # ============================================
         if st.session_state.selected_ppm_date:
             sel = st.session_state.selected_ppm_date
-            st.markdown(f"### 📋 PPM Details — {sel.strftime('%d %B %Y')}")
+            dk_sel = sel.strftime("%Y-%m-%d")
+            ppms_sel = ppm_dates.get(dk_sel, [])
             
-            if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
-                day_ppms = ppm_df[ppm_df["due_date_dt"].dt.date == sel]
+            if len(ppms_sel) > 0:
+                st.markdown(f"### 📋 {len(ppms_sel)} PPMs Scheduled — {sel.strftime('%d %B %Y')}")
                 
-                if len(day_ppms) > 0:
-                    for _, row in day_ppms.iterrows():
-                        status = row.get('status', 'scheduled')
-                        sc = {"completed": "#10B981", "scheduled": "#3B82F6", "pending": "#F59E0B", "overdue": "#EF4444", "approved": "#059669"}.get(status, "#3B82F6")
-                        icon = {"completed": "✅", "scheduled": "📆", "pending": "⏳", "overdue": "🔴", "approved": "🟢"}.get(status, "📋")
-                        
-                        st.markdown(f"""
-                        <div style="background:white;border-left:5px solid {sc};border-radius:8px;padding:0.8rem;margin:0.4rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-                            <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div>
-                                    <b style="font-size:0.9rem;">{icon} {row.get('title','N/A')}</b>
-                                    <br><span style="font-size:0.7rem;color:#666;">👤 {row.get('assigned_team','N/A')} | 📅 Due: {str(row.get('next_due_date',''))[:10]} | 🔄 {row.get('frequency','N/A')}</span>
-                                </div>
-                                <span style="background:{sc};color:white;padding:4px 14px;border-radius:15px;font-size:0.7rem;font-weight:700;">{status.upper()}</span>
+                for ppm in ppms_sel:
+                    status = ppm.get('status', 'scheduled')
+                    sc = {"completed": "#10B981", "scheduled": "#3B82F6", "pending": "#F59E0B", "overdue": "#EF4444", "approved": "#059669"}.get(status, "#3B82F6")
+                    icon = {"completed": "✅", "scheduled": "📆", "pending": "⏳", "overdue": "🔴", "approved": "🟢"}.get(status, "📋")
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.4rem 0;box-shadow:0 2px 6px rgba(0,0,0,0.06);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <b style="font-size:0.9rem;">{icon} {ppm.get('title','N/A')}</b>
+                                <br><span style="font-size:0.75rem;color:#666;">👤 {ppm.get('assigned_team','N/A')} | 📅 Due: {str(ppm.get('next_due_date',''))[:10]} | 🔄 {ppm.get('frequency','N/A')}</span>
                             </div>
+                            <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">{status.upper()}</span>
                         </div>
-                        """, unsafe_allow_html=True)
-                else:
-                    st.info(f"No PPMs scheduled for {sel.strftime('%d %B %Y')}")
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled yet for this day. Click 'Schedule PPM' to add one.")
             
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("❌ CLEAR SELECTION", key="clear_ppm_date", use_container_width=True):
+                if st.button("❌ CLEAR", key="clearppm", use_container_width=True):
                     st.session_state.selected_ppm_date = None
                     st.rerun()
-            with c2:
-                if st.button("🔄 SCHEDULE NEW PPM", key="schedule_new_ppm", use_container_width=True, type="primary"):
-                    st.session_state.page = "ppm"
-                    st.rerun()
         else:
-            st.info("👆 **Click any day** to view scheduled PPMs. Days with PPMs are clickable buttons. Empty days are grey.")
+            st.info("👆 **Click any day** on the calendar above to view PPM details.")
     
     # ============================================
     # TAB 6: APPROVALS
