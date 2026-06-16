@@ -1189,7 +1189,7 @@ def page_ar():
                     try:
                         raw_dept = str(row.get("Department", "")).strip()
                         
-                        # Department mapping
+                        # Department mapping based on your CSV "Department" column
                         dept_mapping = {
                             "Engineering — Electrical": ("Engineering", "Electrical"),
                             "Engineering — Fire Fighting": ("Engineering", "Fire Fighting"),
@@ -1214,22 +1214,60 @@ def page_ar():
                         
                         mapped_dept, mapped_sub = dept_mapping.get(raw_dept, (raw_dept, raw_dept))
                         
+                        # Parse purchase price safely
+                        purchase_price = 0
+                        try:
+                            pp = row.get("Purchase Price", 0)
+                            if pd.notna(pp) and str(pp).strip() != "":
+                                purchase_price = float(str(pp).replace(",", "").replace("₦", "").strip())
+                        except:
+                            pass
+                        
                         asset_data = {
                             "facility_code": fc,
-                            "name": str(row.get("Asset Name", "")).strip(),
+                            "name": str(row.get("Assetname", row.get("Asset Name", ""))).strip(),
                             "asset_tag": str(row.get("Asset Code", "")).strip(),
                             "department": mapped_dept,
                             "sub_division": mapped_sub,
-                            "status": "active",
-                            "priority": str(row.get("Priority", "medium")).strip().lower(),
+                            "category_name": str(row.get("Category", "")).strip(),
+                            "parent_asset": str(row.get("Parent Asset", "")).strip(),
+                            "status": str(row.get("Status", "active")).strip().lower() or "active",
+                            "priority": str(row.get("Priority", "medium")).strip().lower() or "medium",
+                            "ownership": str(row.get("Ownership", "")).strip(),
                             "manufacturer": str(row.get("Manufacturer", "")).strip(),
                             "model": str(row.get("Model", "")).strip(),
-                            "serial_number": str(row.get("Serial No", "")).strip(),
+                            "model_no": str(row.get("Model NO", "")).strip(),
+                            "serial_number": str(row.get("Serial NO", row.get("Serial No", ""))).strip(),
+                            "capacity": str(row.get("Capacity", "")).strip(),
+                            "description": str(row.get("Description", "")).strip(),
                             "location_building": str(row.get("Location", "")).strip(),
                             "location_floor": str(row.get("Sub Location", "")).strip(),
-                            "purchase_cost": float(row.get("Purchase Price", 0)) if pd.notna(row.get("Purchase Price")) else 0,
                             "barcode": str(row.get("Barcode", "")).strip(),
-                            "description": str(row.get("Description", "")).strip(),
+                            "geo_location": str(row.get("Geo Location", "")).strip(),
+                            "purchase_cost": purchase_price,
+                            "purchase_date": str(row.get("Purchase Date", "")) if pd.notna(row.get("Purchase Date")) else None,
+                            "currency": str(row.get("Currency", "NGN")).strip(),
+                            "useful_life": int(float(str(row.get("Useful Life", "10")).strip())) if pd.notna(row.get("Useful Life")) else 10,
+                            "installation_date": str(row.get("Installation Date", "")) if pd.notna(row.get("Installation Date")) else None,
+                            "warranty_start": str(row.get("Warrenty Start Date", row.get("Warranty Start Date", ""))) if pd.notna(row.get("Warrenty Start Date", row.get("Warranty Start Date", ""))) else None,
+                            "warranty_expiry": str(row.get("Warrenty End Date", row.get("Warranty End Date", ""))) if pd.notna(row.get("Warrenty End Date", row.get("Warranty End Date", ""))) else None,
+                            "depreciation_method": str(row.get("Depreciation Method", "")).strip(),
+                            "residual_value": float(str(row.get("Residual Value / Percentage", "10")).replace("%", "").strip()) if pd.notna(row.get("Residual Value / Percentage")) else 10,
+                            "invoice_no": str(row.get("Invioce NO", row.get("Invoice NO", ""))).strip(),
+                            "po_number": str(row.get("PO Number", "")).strip(),
+                            "vendor": str(row.get("Vendor", "")).strip(),
+                            "assigned_to_name": str(row.get("Assigned User", "")).strip(),
+                            "additional_user": str(row.get("Additional User", "")).strip(),
+                            "maintenance_team": str(row.get("Department", "")).strip(),
+                            "checklist_template": str(row.get("Checklist", "")).strip(),
+                            "ppm_frequency": str(row.get("PPM", "")).strip(),
+                            "verification_frequency": str(row.get("Verification Frequency", "")).strip(),
+                            "standard_running_hrs": float(str(row.get("Standard Running Hrs", "0")).strip()) if pd.notna(row.get("Standard Running Hrs")) else 0,
+                            "total_operational_hrs": float(str(row.get("Total Operational Hrs", "0")).strip()) if pd.notna(row.get("Total Operational Hrs")) else 0,
+                            "gross_weight": str(row.get("Gross Weight", "")).strip(),
+                            "dimensions": str(row.get("Size and Dimensions", "")).strip(),
+                            "sap_created_date": str(row.get("SAP Created Date", "")) if pd.notna(row.get("SAP Created Date")) else None,
+                            "plan_year_to_replace": int(float(str(row.get("Plan Year to replace", "2030")).strip())) if pd.notna(row.get("Plan Year to replace")) else 2030,
                             "condition_rating": 5,
                             "created_at": datetime.now().isoformat()
                         }
