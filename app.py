@@ -2490,7 +2490,7 @@ def page_helpdesk_queue():
                 st.info("Custom status management — contact system administrator for modifications.")
 
 # ============================================
-# VISITOR MANAGEMENT — WORLD CLASS SYSTEM
+# VISITOR MANAGEMENT — WORLD CLASS SYSTEM (FULL)
 # ============================================
 def page_visitor():
     fc = st.session_state.get("facility", "WTC")
@@ -2502,6 +2502,9 @@ def page_visitor():
     
     tabs = st.tabs(["📋 Dashboard", "➕ Register Visitor", "🛂 Gate Check", "📈 Analytics", "📄 Reports"])
     
+    # ============================================
+    # TAB 0: DASHBOARD
+    # ============================================
     with tabs[0]:
         today = date.today()
         
@@ -2535,7 +2538,7 @@ def page_visitor():
                             supabase.table("visitors").update({"status": "checked_in", "actual_arrival": datetime.now().isoformat()}).eq("id", v["id"]).execute()
                             if v.get("host_email"):
                                 send_email_notification(v["host_email"], f"✅ Guest Arrived: {v.get('full_name','')}",
-                                    f"""<div style="font-family:Arial;max-width:400px;border:1px solid #10B981;border-radius:8px;overflow:hidden;"><div style="background:#10B981;padding:15px;color:white;"><h3>✅ Guest Has Arrived</h3></div><div style="padding:15px;"><p>Dear {v.get('host_name','')},</p><p><b>{v.get('full_name','')}</b> from <b>{v.get('company','')}</b> has arrived.</p></div></div>""")
+                                    f"""<div style="font-family:Arial;max-width:400px;border:1px solid #10B981;border-radius:8px;overflow:hidden;"><div style="background:#10B981;padding:15px;color:white;"><h3>✅ Guest Has Arrived</h3><p style="margin:3px 0 0 0;font-size:11px;">{info.get('full_name',fc)}</p></div><div style="padding:15px;"><p>Dear {v.get('host_name','')},</p><p><b>{v.get('full_name','')}</b> from <b>{v.get('company','')}</b> has arrived and is waiting for you.</p><table style="width:100%;font-size:12px;"><tr><td style="padding:3px;"><b>🕐 Check-in:</b></td><td>{datetime.now().strftime('%I:%M %p')}</td></tr><tr><td style="padding:3px;"><b>📍 Location:</b></td><td>{v.get('gate_location','Main Gate')}</td></tr><tr><td style="padding:3px;"><b>🎯 Purpose:</b></td><td>{v.get('purpose_of_visit','')}</td></tr></table></div></div>""")
                             st.rerun()
                 with c2:
                     if status == "checked_in":
@@ -2549,9 +2552,16 @@ def page_visitor():
                             st.write(f"**Access Code:** {v.get('access_code','N/A')}")
                             if v.get("qr_code_url"):
                                 st.image(v["qr_code_url"], width=120)
+                            st.write(f"**ID Type:** {v.get('identification_type','')} | **ID No:** {v.get('identification_number','')}")
+                            st.write(f"**Access Level:** {v.get('access_level','')}")
+                            if v.get("belongings"):
+                                st.write(f"**Belongings:** {v.get('belongings','')}")
         else:
             st.info("No visitors today")
     
+    # ============================================
+    # TAB 1: REGISTER VISITOR
+    # ============================================
     with tabs[1]:
         st.markdown("### ➕ Register Visitor")
         
@@ -2661,11 +2671,11 @@ def page_visitor():
                     
                     if email:
                         send_email_notification(email, f"🛂 Your Access Pass - {info.get('full_name',fc)}",
-                            f"""<div style="font-family:Arial;max-width:450px;margin:0 auto;border:2px solid #CC0000;border-radius:12px;overflow:hidden;"><div style="background:#CC0000;padding:15px;color:white;text-align:center;"><h2>VISITOR ACCESS PASS</h2></div><div style="padding:20px;text-align:center;"><h3>{first_name} {last_name}</h3><p>{company}</p><img src="{qr_url}" width="180"><p><b>Date:</b> {visit_date} | <b>Time:</b> {arrival_time} - {departure_time}</p><p><b>Entry Code:</b> {access_code_in}</p></div></div>""")
+                            f"""<div style="font-family:Arial;max-width:450px;margin:0 auto;border:2px solid #CC0000;border-radius:12px;overflow:hidden;"><div style="background:#CC0000;padding:15px;color:white;text-align:center;"><h2 style="margin:0;">VISITOR ACCESS PASS</h2><p style="margin:3px 0 0 0;font-size:11px;">{info.get('full_name',fc)}</p></div><div style="padding:20px;text-align:center;"><h3 style="margin:0 0 5px 0;">{first_name} {last_name}</h3><p style="color:#666;margin:0 0 10px 0;">{company}</p><img src="{qr_url}" width="180" style="border:1px solid #ddd;padding:5px;border-radius:8px;"><div style="display:flex;justify-content:center;gap:30px;margin:15px 0;"><div style="text-align:center;"><div style="font-size:10px;color:#888;">🟢 ENTRY CODE</div><div style="font-size:1.3rem;font-weight:bold;font-family:monospace;color:#10B981;">{access_code_in}</div></div><div style="text-align:center;"><div style="font-size:10px;color:#888;">🔴 EXIT CODE</div><div style="font-size:1.3rem;font-weight:bold;font-family:monospace;color:#EF4444;">{access_code_out}</div></div></div><table style="width:100%;font-size:11px;text-align:left;margin-top:10px;"><tr><td style="padding:4px;font-weight:bold;">📅 Date:</td><td>{visit_date}</td></tr><tr><td style="padding:4px;font-weight:bold;">⏰ Time:</td><td>{arrival_time} - {departure_time}</td></tr><tr><td style="padding:4px;font-weight:bold;">👤 Host:</td><td>{host_name}</td></tr><tr><td style="padding:4px;font-weight:bold;">🆔 Pass ID:</td><td>{pass_id}</td></tr></table><div style="margin-top:15px;padding:10px;background:#FFF3CD;border-radius:8px;font-size:10px;color:#92400E;">⚠️ Please present this QR code at the gate. Overstaying beyond your scheduled time will flag security.</div></div></div>""")
                     
                     if host_email:
                         send_email_notification(host_email, f"🛂 Visitor Expected: {first_name} {last_name}",
-                            f"""<div style="font-family:Arial;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;"><div style="background:#CC0000;padding:15px;color:white;"><h3>📋 Visitor Pre-Registered</h3></div><div style="padding:15px;"><p>Dear {host_name},</p><p><b>{first_name} {last_name}</b> from <b>{company}</b> is scheduled to visit.</p><p><b>Date:</b> {visit_date} | <b>Time:</b> {arrival_time} - {departure_time}</p></div></div>""")
+                            f"""<div style="font-family:Arial;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;"><div style="background:#CC0000;padding:15px;color:white;"><h3 style="margin:0;">📋 Visitor Pre-Registered</h3><p style="margin:3px 0 0 0;font-size:11px;">{info.get('full_name',fc)}</p></div><div style="padding:15px;"><p>Dear {host_name},</p><p><b>{first_name} {last_name}</b> from <b>{company}</b> is scheduled to visit you.</p><table style="width:100%;font-size:12px;border-collapse:collapse;"><tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">📅 Date</td><td style="padding:5px;border-bottom:1px solid #eee;">{visit_date}</td></tr><tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">⏰ Time</td><td style="padding:5px;border-bottom:1px solid #eee;">{arrival_time} - {departure_time}</td></tr><tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">🎯 Purpose</td><td style="padding:5px;border-bottom:1px solid #eee;">{purpose}</td></tr><tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">🆔 Pass ID</td><td style="padding:5px;border-bottom:1px solid #eee;">{pass_id}</td></tr><tr><td style="padding:5px;border-bottom:1px solid #eee;font-weight:bold;">🟢 Entry Code</td><td style="padding:5px;border-bottom:1px solid #eee;font-family:monospace;color:#10B981;">{access_code_in}</td></tr><tr><td style="padding:5px;font-weight:bold;">🚗 Vehicle</td><td style="padding:5px;">{vehicle or 'N/A'}</td></tr></table><div style="margin-top:12px;padding:10px;background:#f0f8ff;border-radius:6px;font-size:11px;">💡 <b>Forward this email</b> to your guest — it contains their access codes and QR pass for entry.</div></div></div>""")
                     
                     st.balloons()
                     st.rerun()
@@ -2777,7 +2787,7 @@ def page_visitor():
                                 send_email_notification(
                                     bulk_host_email,
                                     f"🛂 {success_count} Visitors Pre-Registered - {info.get('full_name', fc)}",
-                                    f"""<div style="font-family:Arial;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;"><div style="background:#CC0000;padding:15px;color:white;"><h3>📋 Batch Visitor Registration</h3></div><div style="padding:15px;"><p>Dear {bulk_host},</p><p><b>{success_count} visitors</b> have been pre-registered for <b>{bulk_date}</b>.</p><p><b>Purpose:</b> {bulk_purpose}</p></div></div>"""
+                                    f"""<div style="font-family:Arial;max-width:500px;border:1px solid #ddd;border-radius:8px;overflow:hidden;"><div style="background:#CC0000;padding:15px;color:white;"><h3 style="margin:0;">📋 Batch Visitor Registration</h3><p style="margin:3px 0 0 0;font-size:11px;">{info.get('full_name', fc)}</p></div><div style="padding:15px;"><p>Dear {bulk_host},</p><p><b>{success_count} visitors</b> have been pre-registered for <b>{bulk_date}</b>.</p><p><b>Purpose:</b> {bulk_purpose}</p><p><b>Time:</b> {bulk_arrival} - {bulk_departure}</p><p>Please ensure your guests have their access codes ready at the gate.</p></div></div>"""
                                 )
                         else:
                             st.error(f"❌ Failed to register any visitors. Check CSV format (needs: First Name, Last Name columns)")
@@ -2866,23 +2876,267 @@ def page_visitor():
                 else:
                     st.error("⚠️ Host Name, Purpose, and Visitor Names are required")
     
+    # ============================================
+    # TAB 2: GATE CHECK CONSOLE (ADMIN/SECURITY ONLY)
+    # ============================================
     with tabs[2]:
         if not is_admin:
             st.error("⛔ Access restricted to Security & Admin personnel only")
         else:
             st.markdown("### 🛂 Gate Check Console")
-            st.info("Gate check functionality available for security personnel.")
+            
+            gate_tabs = st.tabs(["🔍 Verify Entry", "📋 Today's Log", "🚨 Alerts", "📊 Live Feed"])
+            
+            with gate_tabs[0]:
+                st.markdown("#### 🔍 Verify Visitor Access")
+                
+                verify_mode = st.radio("Verification Mode", ["🔢 Enter Code", "📷 Scan QR"], horizontal=True)
+                
+                if verify_mode == "🔢 Enter Code":
+                    access_code = st.text_input("Enter Access Code", placeholder="Type IN or OUT code...", key="gate_manual_code")
+                    
+                    if access_code and len(access_code) >= 8:
+                        visitor = supabase.table("visitors").select("*").eq("facility_code", fc).or_(f"access_code_in.eq.{access_code},access_code_out.eq.{access_code}").execute()
+                        
+                        if visitor.data and len(visitor.data) > 0:
+                            v = visitor.data[0]
+                            is_in_code = v.get("access_code_in") == access_code
+                            status = v.get("status", "expected")
+                            
+                            if is_in_code and status in ["expected", "pre_registered"]:
+                                action = "CHECK IN"
+                                action_color = "#10B981"
+                            elif not is_in_code and status == "checked_in":
+                                action = "CHECK OUT"
+                                action_color = "#EF4444"
+                            elif is_in_code and status == "checked_in":
+                                action = "ALREADY IN"
+                                action_color = "#F59E0B"
+                            elif not is_in_code and status in ["expected", "pre_registered"]:
+                                action = "NOT CHECKED IN"
+                                action_color = "#F59E0B"
+                            else:
+                                action = "COMPLETED"
+                                action_color = "#6B7280"
+                            
+                            st.markdown(f"""
+                            <div style="background:white;border-radius:12px;padding:1.5rem;border-left:5px solid {action_color};box-shadow:0 2px 8px rgba(0,0,0,0.1);margin:1rem 0;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <div>
+                                        <h3 style="margin:0;">{v.get('full_name','')}</h3>
+                                        <p style="color:#666;margin:3px 0;">{v.get('company','')} | {v.get('visitor_type','').upper()}</p>
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <div style="font-size:1.5rem;font-weight:800;color:{action_color};">{action}</div>
+                                        <div style="font-size:0.7rem;color:#888;">{status.upper()}</div>
+                                    </div>
+                                </div>
+                                <hr>
+                                <table style="width:100%;font-size:0.8rem;">
+                                    <tr><td><b>Pass ID:</b></td><td>{v.get('pass_id','')}</td><td><b>Host:</b></td><td>{v.get('host_name','')}</td></tr>
+                                    <tr><td><b>🟢 IN:</b></td><td style="font-family:monospace;">{v.get('access_code_in','')}</td><td><b>🔴 OUT:</b></td><td style="font-family:monospace;">{v.get('access_code_out','')}</td></tr>
+                                    <tr><td><b>📅 Date:</b></td><td>{v.get('visit_date','')}</td><td><b>⏰ Time:</b></td><td>{v.get('expected_arrival','')} - {v.get('expected_departure','')}</td></tr>
+                                    <tr><td><b>🎯 Purpose:</b></td><td colspan="3">{v.get('purpose_of_visit','')}</td></tr>
+                                    <tr><td><b>🚗 Vehicle:</b></td><td>{v.get('vehicle_plate','N/A')}</td><td><b>📦 Items:</b></td><td>{v.get('belongings','None')[:30]}</td></tr>
+                                </table>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            c1, c2, c3, c4 = st.columns(4)
+                            with c1:
+                                if action == "CHECK IN":
+                                    if st.button("✅ Confirm Check In", use_container_width=True, type="primary"):
+                                        supabase.table("visitors").update({"status":"checked_in","actual_arrival":datetime.now().isoformat()}).eq("id",v["id"]).execute()
+                                        supabase.table("visitor_gate_log").insert({"visitor_id":v["id"],"event_type":"check_in","gate_location":"Main Gate","scanned_by":st.session_state.get("user_name","Security"),"event_time":datetime.now().isoformat()}).execute()
+                                        if v.get("host_email"):
+                                            send_email_notification(v["host_email"], f"✅ Guest Arrived: {v.get('full_name','')}",
+                                                f"""<div style="font-family:Arial;max-width:400px;border:1px solid #10B981;border-radius:8px;overflow:hidden;"><div style="background:#10B981;padding:15px;color:white;"><h3>✅ Guest Has Arrived</h3></div><div style="padding:15px;"><p>Dear {v.get('host_name','')},</p><p><b>{v.get('full_name','')}</b> from <b>{v.get('company','')}</b> has arrived.</p></div></div>""")
+                                        st.success("✅ Checked In!")
+                                        st.rerun()
+                            with c2:
+                                if action == "CHECK OUT":
+                                    if st.button("🚪 Confirm Check Out", use_container_width=True):
+                                        supabase.table("visitors").update({"status":"checked_out","actual_departure":datetime.now().isoformat()}).eq("id",v["id"]).execute()
+                                        supabase.table("visitor_gate_log").insert({"visitor_id":v["id"],"event_type":"check_out","gate_location":"Main Gate","scanned_by":st.session_state.get("user_name","Security"),"event_time":datetime.now().isoformat()}).execute()
+                                        st.success("🚪 Checked Out!")
+                                        st.rerun()
+                            with c3:
+                                if st.button("📋 More Info", use_container_width=True):
+                                    with st.expander("Full Details", expanded=True):
+                                        st.json({
+                                            "Name": v.get("full_name"),
+                                            "Pass ID": v.get("pass_id"),
+                                            "Access Level": v.get("access_level"),
+                                            "ID Type": v.get("identification_type"),
+                                            "ID Number": v.get("identification_number"),
+                                        })
+                            with c4:
+                                if st.button("🚩 Flag/Deny", use_container_width=True):
+                                    supabase.table("visitors").update({"status":"cancelled","security_flag":True}).eq("id",v["id"]).execute()
+                                    st.error("🚩 Entry Denied & Flagged")
+                                    st.rerun()
+                            
+                            if status == "checked_in" and v.get("expected_departure"):
+                                try:
+                                    dep_time = datetime.strptime(str(v.get("visit_date")) + " " + str(v.get("expected_departure")), "%Y-%m-%d %H:%M:%S")
+                                    if datetime.now() > dep_time:
+                                        st.error(f"🚨 OVERSTAY ALERT: Guest was expected to leave by {v.get('expected_departure')}")
+                                except: pass
+                        else:
+                            st.error("❌ Invalid access code")
+                
+                elif verify_mode == "📷 Scan QR":
+                    st.info("📷 QR Scanner — Use a QR code scanner and paste the data below:")
+                    qr_data = st.text_input("QR Data", placeholder="Paste scanned QR code data here...")
+                    if qr_data:
+                        if "IN:" in qr_data and "OUT:" in qr_data:
+                            parts = qr_data.replace("IN:","").replace("OUT:","").split("|")
+                            if len(parts) >= 2:
+                                st.success(f"✅ QR Scanned: IN Code = {parts[0].strip()}")
+            
+            with gate_tabs[1]:
+                st.markdown("#### 📋 Today's Visitor Log")
+                
+                today_str = str(date.today())
+                today_visitors = supabase.table("visitors").select("*").eq("facility_code", fc).eq("visit_date", today_str).order("expected_arrival").execute()
+                
+                if today_visitors.data:
+                    tv = today_visitors.data
+                    c1, c2, c3, c4, c5 = st.columns(5)
+                    with c1: st.metric("📋 Total", len(tv))
+                    with c2: st.metric("✅ Checked In", len([v for v in tv if v.get("status")=="checked_in"]))
+                    with c3: st.metric("⏳ Expected", len([v for v in tv if v.get("status") in ["expected","pre_registered"]]))
+                    with c4: st.metric("🚪 Checked Out", len([v for v in tv if v.get("status")=="checked_out"]))
+                    with c5: st.metric("🚩 Flagged", len([v for v in tv if v.get("security_flag")]))
+                    
+                    st.markdown("---")
+                    
+                    vtype_filter = st.selectbox("Filter by Type", ["All", "Visitor", "Vendor", "Interview", "Contractor", "Delivery"], key="gate_type_filter")
+                    filtered = tv if vtype_filter == "All" else [v for v in tv if v.get("visitor_type") == vtype_filter.lower()]
+                    
+                    if filtered:
+                        for v in filtered:
+                            status = v.get("status","expected")
+                            colors = {"checked_in":"#10B981","checked_out":"#6B7280","expected":"#F59E0B","cancelled":"#EF4444"}
+                            sc = colors.get(status,"#4a4a4a")
+                            
+                            overstay = False
+                            if status == "checked_in" and v.get("expected_departure"):
+                                try:
+                                    dep = datetime.strptime(f"{v.get('visit_date')} {v.get('expected_departure')}", "%Y-%m-%d %H:%M:%S")
+                                    if datetime.now() > dep:
+                                        overstay = True
+                                except: pass
+                            
+                            st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;margin:0.3rem 0;border-left:4px solid {sc};box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{v.get('full_name','')}</b><span style="font-size:0.65rem;color:#888;margin-left:0.5rem;">{v.get('visitor_type','').upper()}</span></div><div><span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.65rem;">{status.upper()}</span>{f' <span style="background:#EF4444;color:white;padding:2px 8px;border-radius:12px;font-size:0.6rem;">⚠️ OVERSTAY</span>' if overstay else ''}</div></div><div style="font-size:0.7rem;color:#666;margin-top:0.2rem;">{v.get('company','') or 'N/A'} | 🎯 {v.get('purpose_of_visit','') or 'N/A'} | 👤 {v.get('host_name','')}</div></div>""", unsafe_allow_html=True)
+                    else:
+                        st.info(f"No {vtype_filter} visitors today")
+            
+            with gate_tabs[2]:
+                st.markdown("#### 🚨 Security Alerts")
+                
+                all_active = supabase.table("visitors").select("*").eq("facility_code", fc).eq("status", "checked_in").execute()
+                
+                overstays = []
+                if all_active.data:
+                    for v in all_active.data:
+                        if v.get("expected_departure"):
+                            try:
+                                dep = datetime.strptime(f"{v.get('visit_date')} {v.get('expected_departure')}", "%Y-%m-%d %H:%M:%S")
+                                if datetime.now() > dep:
+                                    overstays.append(v)
+                            except: pass
+                
+                if overstays:
+                    st.error(f"🚨 {len(overstays)} OVERSTAY ALERTS")
+                    for v in overstays:
+                        st.markdown(f"""
+                        <div style="background:#FEF2F2;border:1px solid #EF4444;border-radius:8px;padding:1rem;margin:0.5rem 0;">
+                            <b>⚠️ {v.get('full_name','')}</b> — {v.get('company','')}
+                            <br>Expected departure: {v.get('expected_departure','')}
+                            <br>Host: {v.get('host_name','')} | Pass: {v.get('pass_id','')}
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.success("✅ No overstay alerts")
+                
+                flagged = supabase.table("visitors").select("*").eq("facility_code", fc).eq("security_flag", True).order("created_at", desc=True).limit(20).execute()
+                if flagged.data:
+                    st.markdown("---")
+                    st.markdown("#### 🚩 Flagged Visitors")
+                    for v in flagged.data:
+                        st.markdown(f"🚩 {v.get('full_name','')} — {v.get('company','')} | Status: {v.get('status','').upper()}")
+            
+            with gate_tabs[3]:
+                st.markdown("#### 📊 Live Activity Feed")
+                
+                recent_logs = supabase.table("visitor_gate_log").select("*, visitors(full_name, company)").order("event_time", desc=True).limit(30).execute()
+                
+                if recent_logs.data:
+                    for log in recent_logs.data:
+                        icon = "✅" if log.get("event_type") == "check_in" else "🚪" if log.get("event_type") == "check_out" else "🚩"
+                        v_info = log.get("visitors", {})
+                        name = v_info.get("full_name","Unknown") if v_info else "Unknown"
+                        company = v_info.get("company","") if v_info else ""
+                        st.markdown(f"{icon} **{name}** ({company}) — {log.get('event_type','').upper()} at {log.get('event_time','')} by {log.get('scanned_by','')}")
+                else:
+                    st.info("No activity yet")
     
+    # ============================================
+    # TAB 3: ANALYTICS
+    # ============================================
     with tabs[3]:
         st.markdown("### 📈 Visitor Analytics")
-        st.info("Visitor analytics dashboard.")
+        
+        all_visitors = supabase.table("visitors").select("*").eq("facility_code", fc).order("visit_date", desc=True).limit(500).execute()
+        
+        if all_visitors.data:
+            df = pd.DataFrame(all_visitors.data)
+            
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("Total Records", len(df))
+            with c2: st.metric("This Month", len(df[pd.to_datetime(df["visit_date"]).dt.month == today.month]) if "visit_date" in df.columns else 0)
+            with c3: st.metric("Avg Daily", round(len(df)/max((datetime.now() - pd.to_datetime(df["visit_date"].min())).days if "visit_date" in df.columns else 1, 1)))
+            with c4: st.metric("Checked In Rate", f"{round(len(df[df['status']=='checked_in'])/len(df)*100) if len(df)>0 else 0}%")
+            
+            st.markdown("---")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                if "visitor_type" in df.columns:
+                    type_counts = df["visitor_type"].value_counts()
+                    fig = px.pie(values=type_counts.values, names=type_counts.index, title="By Visitor Type")
+                    st.plotly_chart(fig, use_container_width=True)
+            with c2:
+                if "visit_date" in df.columns:
+                    df["month"] = pd.to_datetime(df["visit_date"]).dt.month
+                    monthly = df.groupby("month").size().reset_index(name="count")
+                    fig2 = px.bar(monthly, x="month", y="count", title="Monthly Volume")
+                    st.plotly_chart(fig2, use_container_width=True)
     
+    # ============================================
+    # TAB 4: REPORTS
+    # ============================================
     with tabs[4]:
         st.markdown("### 📄 Visitor Reports")
-        st.info("Visitor report generation.")
+        
+        rpt_month = st.selectbox("Month", ["January","February","March","April","May","June","July","August","September","October","November","December"], key="vis_rpt_m")
+        rpt_year = st.selectbox("Year", [2024,2025,2026,2027], key="vis_rpt_y")
+        
+        if st.button("📊 Generate Report", use_container_width=True):
+            visitors = supabase.table("visitors").select("*").eq("facility_code", fc).order("visit_date", desc=True).limit(500).execute()
+            if visitors.data:
+                df = pd.DataFrame(visitors.data)
+                st.success(f"✅ Report for {rpt_month} {rpt_year} — {len(df)} records")
+                
+                display_cols = [c for c in ["full_name","company","visitor_type","host_name","purpose_of_visit","visit_date","expected_arrival","status","vehicle_plate"] if c in df.columns]
+                st.dataframe(df[display_cols], use_container_width=True, hide_index=True)
+                
+                csv = df.to_csv(index=False)
+                st.download_button("📥 CSV", csv, f"visitors_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
 
 # ============================================
-# USER MANAGEMENT — FULL ADMIN MODULE
+# USER MANAGEMENT — FULL ADMIN MODULE (FULL)
 # ============================================
 def page_users():
     st.markdown("## 👥 User Management")
@@ -2918,18 +3172,31 @@ def page_users():
                     with c1:
                         st.write(f"**Employee ID:** {row.get('employee_id','N/A')}")
                         st.write(f"**Designation:** {row.get('designation','N/A')}")
+                        st.write(f"**Level:** {row.get('level_hierarchy','N/A')} | **Reports to:** {row.get('reporting_to','N/A')}")
+                        st.write(f"**Mobile:** {row.get('mobile','N/A')}")
                         depts = safe_parse_permissions(row.get("department_permissions", []))
                         st.write(f"**Departments:** {', '.join(depts) if depts else 'All'}")
+                        perms = safe_parse_permissions(row.get("extra_permissions", []))
+                        st.write(f"**Module Permissions:** {', '.join(perms) if perms else 'None'}")
                     with c2:
                         if st.button("✏️ Edit", key=f"edit_usr_{row['id']}", use_container_width=True):
                             st.session_state.edit_user_id = row["id"]
                             st.rerun()
+                        if st.button("🔄 Reset PW", key=f"reset_pw_{row['id']}", use_container_width=True):
+                            st.session_state.reset_user_id = row["id"]
+                            st.rerun()
+                        if role != "admin":
+                            if st.button("🗑️ Deactivate", key=f"deact_{row['id']}", use_container_width=True):
+                                DB.update("app_users", row["id"], {"is_active": False})
+                                st.warning("User deactivated")
+                                st.rerun()
         else:
             st.info("No users found")
     
     with tabs[1]:
         with st.form("add_user_form"):
             st.markdown("### ➕ Add New User")
+            st.markdown("**👤 Personal Details**")
             c1, c2, c3 = st.columns(3)
             with c1:
                 new_name = st.text_input("Full Name*", key="add_name")
@@ -2943,6 +3210,7 @@ def page_users():
             new_reporting = st.text_input("Reporting To", key="add_report")
             
             st.markdown("---")
+            st.markdown("**🔐 Role & Permissions**")
             c1, c2 = st.columns(2)
             with c1:
                 new_role = st.selectbox("Role*", ["staff","authorizer","confirmer","approver","admin","tenant","contractor","vendor"],
@@ -2954,14 +3222,18 @@ def page_users():
             
             st.markdown("---")
             st.markdown("**🏢 Department Permissions**")
-            all_depts = [
+            all_depts_add = [
                 "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
+                "Engineering — Vertical Transportation (Lifts)", "Engineering — Fire Fighting",
                 "Facility Management — Hard Services", "Facility Management — Soft Services (Housekeeping)",
-                "Facility Management — FM Operations & Helpdesk",
+                "Facility Management — FM Operations & Helpdesk", "Facility Management — Fitout Works",
+                "Facility Management — HSSE Safety & Compliance",
                 "Technology Group — Network & Connectivity", "Technology Group — Building Technology",
+                "Technology Group — IT Service Desk", "Technology Group — Cybersecurity",
                 "Security — Man Guarding Operations",
+                "Contractor — Clyde Engineering", "Contractor — Gates and Shield"
             ]
-            new_depts = st.multiselect("Select Departments (leave empty for All)", all_depts, key="add_depts")
+            new_depts = st.multiselect("Select Departments (leave empty for All)", all_depts_add, key="add_depts")
             
             submitted = st.form_submit_button("➕ Create User", use_container_width=True, type="primary")
             if submitted:
@@ -2988,7 +3260,32 @@ def page_users():
     
     with tabs[2]:
         user_id = st.session_state.get("edit_user_id")
-        if user_id:
+        reset_id = st.session_state.get("reset_user_id")
+        
+        if reset_id:
+            st.markdown("### 🔄 Reset Password")
+            with st.form("reset_pw_form"):
+                new_pw = st.text_input("New Password*", type="password")
+                confirm_pw = st.text_input("Confirm Password*", type="password")
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.form_submit_button("✅ Reset", use_container_width=True, type="primary"):
+                        if new_pw and new_pw == confirm_pw:
+                            pw_valid, pw_msg = validate_password_strength(new_pw)
+                            if not pw_valid:
+                                st.error(f"⚠️ {pw_msg}")
+                            else:
+                                pw_hash = hash_password(new_pw)
+                                DB.update("app_users", reset_id, {"password_hash": pw_hash})
+                                st.success("Password reset!")
+                                st.session_state.reset_user_id = None
+                                st.rerun()
+                with c2:
+                    if st.form_submit_button("❌ Cancel", use_container_width=True):
+                        st.session_state.reset_user_id = None
+                        st.rerun()
+        
+        elif user_id:
             users = DB.get_users()
             user = next((u for u in users if u["id"] == user_id), None)
             
@@ -3072,14 +3369,7 @@ def page_users():
             st.info("👆 Click ✏️ Edit on a user in the Directory tab to edit them here")
 
 # ============================================
-# GENERIC PAGES
-# ============================================
-def page_generic(title,icon=""):
-    st.markdown(f'## {icon} {title}')
-    st.info("🚧 Module structure ready. Full deployment in progress.")
-
-# ============================================
-# FACILITY OPERATIONS DASHBOARD
+# FACILITY OPERATIONS DASHBOARD (FULL)
 # ============================================
 def page_fo():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
@@ -3090,71 +3380,452 @@ def page_fo():
     with c2:st.metric("PPM Due",k["ppm_due"])
     with c3:st.metric("Open Incidents",k["open_inc"])
     with c4:st.metric("Open Tickets",k["open_tix"])
+    st.markdown("---")
+    st.markdown("### 🔧 MEP Checks")
+    mep=DB.get_all("mep_checks",fc,10)
+    if mep:st.dataframe(pd.DataFrame(mep),use_container_width=True,hide_index=True)
+    else:st.info("No MEP checks recorded")
+    with st.form("mep_f"):
+        c1,c2=st.columns(2)
+        with c1:
+            ct=st.selectbox("Check Type",["Mechanical","Electrical","Plumbing","Housekeeping","Fire Safety"])
+            zone=st.text_input("Zone");floor=st.text_input("Floor")
+        with c2:
+            score=st.slider("Score",0.0,100.0,95.0);inspector=st.text_input("Inspector")
+        findings=st.text_area("Findings")
+        if st.form_submit_button("✅ Submit MEP Check"):
+            DB.insert("mep_checks",{"facility_code":fc,"check_type":ct,"zone":zone,"floor":floor,"overall_score":score,"findings":[findings],"check_date":str(date.today()),"status":"completed"})
+            st.success("Submitted!");st.rerun()
 
 # ============================================
-# OBSERVATIONS & ALERTS
+# OBSERVATIONS & ALERTS (FULL)
 # ============================================
 def page_oa():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
     st.markdown(f'## ✅ Observations & Alerts — {info.get("full_name",fc)}')
-    st.info("Observations and alerts dashboard.")
+    inc=DB.get_all("incidents",fc,30)
+    if inc:
+        for i in inc:
+            sev=i.get("severity","low")
+            badge="badge-critical" if sev in ["critical","high"] else "badge-warning" if sev=="medium" else "badge-info"
+            with st.expander(f"{i.get('incident_number','')} — {i.get('title','')} — {sev.upper()}"):
+                st.write(f"**Type:** {i.get('type','')} | **Status:** {i.get('status','')}")
+                st.write(f"**Description:** {i.get('description','')}")
+                if i.get("immediate_actions"):st.write(f"**Actions:** {i['immediate_actions']}")
+    else:st.success("✅ No open alerts")
 
 # ============================================
-# AUDIT CHECKLIST
+# AUDIT CHECKLIST (FULL)
 # ============================================
 def page_ac():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
     st.markdown(f'## ✅ Audit Framework — {info.get("full_name",fc)}')
-    st.info("Audit checklist module.")
+    tab1,tab2=st.tabs(["📋 View Audits","➕ Start Audit"])
+    with tab1:
+        audits=DB.get_all("audits",fc,20)
+        if audits:st.dataframe(pd.DataFrame(audits),use_container_width=True,hide_index=True)
+        else:st.info("No audits")
+    with tab2:
+        with st.form("audit_f"):
+            title=st.text_input("Audit Title*");atype=st.selectbox("Type",["Internal","External","Safety","Quality","ISO"])
+            items=["Fire extinguishers accessible","Emergency exits clear","Electrical panels labeled","PPE available","Housekeeping standards met","First aid kits stocked","Safety signage visible","Waste management compliant"]
+            results={}
+            st.markdown("**Checklist Items:**")
+            for item in items:results[item]=st.selectbox(item,["Pass","Fail","N/A"],key=f"aud_{item[:15]}")
+            if st.form_submit_button("✅ Submit Audit",use_container_width=True):
+                if title:
+                    passed=sum(1 for v in results.values() if v=="Pass")
+                    total=sum(1 for v in results.values() if v!="N/A")
+                    score=round((passed/total)*100,1) if total>0 else 100
+                    cnt=len(DB.get_all("audits",fc,1000))
+                    DB.insert("audits",{"facility_code":fc,"audit_number":f"AUD-{fc}-{datetime.now().year}-{str(cnt+1).zfill(4)}","title":title,"type":atype,"overall_score":score,"status":"completed","findings":results,"audit_date":str(date.today()),"created_at":datetime.now().isoformat()})
+                    st.success(f"Score: {score}%");st.rerun()
 
 # ============================================
-# FEEDBACK SYSTEM
+# VOICE OF CUSTOMER — FEEDBACK SYSTEM (FULL)
 # ============================================
 def page_feedback():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    is_admin = user_role in ["admin", "approver"]
+    
     st.markdown(f'## ⭐ Voice of Customer — {info.get("full_name", fc)}')
-    st.info("Feedback and survey system.")
+    
+    tabs = st.tabs(["📝 Take Survey", "📊 Feedback Dashboard", "📈 AI Analytics", "⚙️ Survey Admin"])
+    
+    with tabs[0]:
+        survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).eq("is_active", True).execute()
+        
+        if not survey.data or len(survey.data) == 0:
+            st.info("📝 No active survey at this time. Check back during survey period.")
+        else:
+            s = survey.data[0]
+            st.markdown(f"### 📝 {s.get('title','')}")
+            st.caption(s.get('description',''))
+            
+            questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
+            
+            if questions.data:
+                with st.form("feedback_form"):
+                    st.markdown("---")
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        resp_name = st.text_input("Your Name", value=st.session_state.get("user_name",""))
+                        resp_company = st.text_input("Company")
+                    with c2:
+                        resp_email = st.text_input("Your Email", value=st.session_state.get("user",{}).get("email",""))
+                        anon = st.checkbox("Submit anonymously")
+                    
+                    st.markdown("---")
+                    st.markdown("### Rate Your Experience")
+                    st.caption("4 = Excellent | 3 = Good | 2 = Average | 1 = Below Average")
+                    
+                    scores = {}
+                    for q in questions.data:
+                        qnum = q.get("question_number")
+                        qtype = q.get("question_type","rating")
+                        
+                        if qtype == "rating":
+                            st.markdown(f"**{qnum}. {q.get('question_text','')}**")
+                            st.caption(f"Category: {q.get('category','')}")
+                            score = st.select_slider(
+                                f"Rating for Q{qnum}",
+                                options=[1, 2, 3, 4],
+                                value=3,
+                                format_func=lambda x: f"{'⭐'*x} {['','Below Average','Average','Good','Excellent'][x]}",
+                                key=f"q_{q['id']}"
+                            )
+                            scores[q["id"]] = {"score": score}
+                        else:
+                            st.markdown(f"**{qnum}. {q.get('question_text','')}**")
+                            text_answer = st.text_area(f"Your answer for Q{qnum}", key=f"q_{q['id']}", height=80)
+                            scores[q["id"]] = {"text": text_answer}
+                        
+                        st.markdown("---")
+                    
+                    submitted = st.form_submit_button("📩 Submit Feedback", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        if resp_email or anon:
+                            res = supabase.table("feedback_responses").insert({
+                                "survey_id": s["id"],
+                                "respondent_email": resp_email if not anon else None,
+                                "respondent_name": resp_name if not anon else "Anonymous",
+                                "company": resp_company,
+                                "facility_code": fc,
+                                "is_anonymous": anon,
+                                "submitted_at": datetime.now().isoformat()
+                            }).execute()
+                            
+                            if res.data:
+                                resp_id = res.data[0]["id"]
+                                for qid, data in scores.items():
+                                    supabase.table("feedback_scores").insert({
+                                        "response_id": resp_id,
+                                        "question_id": qid,
+                                        "score": data.get("score"),
+                                        "text_answer": data.get("text")
+                                    }).execute()
+                                
+                                st.success("✅ Thank you for your feedback! Your response has been recorded.")
+                                st.balloons()
+                                st.rerun()
+                        else:
+                            st.error("Please enter your email or submit anonymously")
+    
+    with tabs[1]:
+        st.markdown("### 📊 Feedback Dashboard")
+        
+        survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(1).execute()
+        
+        if survey.data:
+            s = survey.data[0]
+            responses = supabase.table("feedback_responses").select("id", count="exact").eq("survey_id", s["id"]).execute()
+            questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
+            
+            total_responses = responses.count or 0
+            
+            st.markdown(f"**Survey:** {s.get('title','')}")
+            st.metric("Total Responses", total_responses)
+            
+            if total_responses > 0 and questions.data:
+                st.markdown("---")
+                st.markdown("### 📈 Category Scores")
+                
+                for q in questions.data:
+                    if q.get("question_type") == "rating":
+                        scores_data = supabase.table("feedback_scores").select("score").eq("question_id", q["id"]).execute()
+                        if scores_data.data:
+                            avg_score = sum(sc["score"] for sc in scores_data.data) / len(scores_data.data)
+                            stars = "⭐" * round(avg_score)
+                            st.markdown(f"**{q.get('question_number')}. {q.get('category','')}**")
+                            st.markdown(f"{stars} **{avg_score:.1f}/4**")
+                            st.progress(avg_score / 4)
+        else:
+            st.info("No survey data yet")
+    
+    with tabs[2]:
+        st.markdown("### 🤖 AI-Powered Feedback Analytics")
+        
+        survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(1).execute()
+        
+        if survey.data:
+            s = survey.data[0]
+            questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
+            
+            if questions.data:
+                categories_list = []
+                avg_scores = []
+                
+                for q in questions.data:
+                    if q.get("question_type") == "rating":
+                        scores_data = supabase.table("feedback_scores").select("score").eq("question_id", q["id"]).execute()
+                        if scores_data.data:
+                            avg = sum(sc["score"] for sc in scores_data.data) / len(scores_data.data)
+                            categories_list.append(q.get("category",""))
+                            avg_scores.append(round(avg, 1))
+                
+                if categories_list:
+                    fig = px.bar(x=categories_list, y=avg_scores, title="Satisfaction by Category", 
+                                labels={"x":"","y":"Score"}, color=avg_scores, 
+                                color_continuous_scale=["#EF4444","#F59E0B","#3B82F6","#10B981"],
+                                range_color=[1,4])
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    st.markdown("### 🤖 AI Recommendations")
+                    best = categories_list[avg_scores.index(max(avg_scores))]
+                    worst = categories_list[avg_scores.index(min(avg_scores))]
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.success(f"🌟 **Strength:** {best} ({max(avg_scores)}/4)")
+                        st.caption("Continue investing in this area")
+                    with col2:
+                        st.error(f"⚠️ **Needs Attention:** {worst} ({min(avg_scores)}/4)")
+                        st.caption("Priority improvement area")
+                    
+                    if min(avg_scores) < 2.5:
+                        st.warning(f"🚨 **Retention Risk:** Low satisfaction in {worst} may impact tenant retention.")
+                    
+                    if max(avg_scores) >= 3.5:
+                        st.info(f"💡 **Marketing Opportunity:** High satisfaction in {best} can be leveraged.")
+        else:
+            st.info("No data for analytics")
+    
+    with tabs[3]:
+        if not is_admin:
+            st.error("⛔ Admin access only")
+        else:
+            st.markdown("### ⚙️ Survey Administration")
+            
+            surveys = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).order("created_at", desc=True).execute()
+            
+            if surveys.data:
+                st.markdown("**Existing Surveys:**")
+                for s in surveys.data:
+                    status_badge = "🟢 Active" if s.get("is_active") else "⚪ Inactive"
+                    st.markdown(f"- **{s.get('title','')}** — {status_badge} | {s.get('start_date','')} to {s.get('end_date','')}")
+            
+            st.markdown("---")
+            
+            with st.form("survey_admin"):
+                st.markdown("**Manage Survey**")
+                
+                survey_options = {s.get("title",""): s["id"] for s in surveys.data} if surveys.data else {}
+                selected_survey = st.selectbox("Select Survey", list(survey_options.keys())) if survey_options else None
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.form_submit_button("🟢 Activate Survey", use_container_width=True):
+                        if selected_survey:
+                            supabase.table("feedback_surveys").update({"is_active": False}).eq("facility_code", fc).execute()
+                            supabase.table("feedback_surveys").update({"is_active": True}).eq("id", survey_options[selected_survey]).execute()
+                            st.success(f"✅ {selected_survey} activated!")
+                            st.rerun()
+                with c2:
+                    if st.form_submit_button("⚪ Deactivate All", use_container_width=True):
+                        supabase.table("feedback_surveys").update({"is_active": False}).eq("facility_code", fc).execute()
+                        st.success("All surveys deactivated")
+                        st.rerun()
+            
+            st.markdown("---")
+            st.markdown("### 📧 Broadcast Survey to Tenants")
+            
+            tenants = supabase.table("organizations").select("*").eq("is_active", True).execute()
+            
+            if tenants.data:
+                tenant_options = {}
+                for t in tenants.data:
+                    tenant_options[f"{t.get('name','')} ({t.get('primary_contact_email','')})"] = t
+                
+                selected_tenants = st.multiselect(
+                    "Choose tenants",
+                    list(tenant_options.keys()),
+                    default=list(tenant_options.keys()),
+                    key="broadcast_tenants"
+                )
+                
+                st.caption(f"📋 {len(selected_tenants)} of {len(tenant_options)} tenants selected")
+                
+                if st.button("📧 Send Survey to Selected Tenants", use_container_width=True):
+                    if selected_survey and survey_options:
+                        survey_link = f"https://facilityxperience.streamlit.app/?survey={survey_options[selected_survey]}"
+                        sent_count = 0
+                        
+                        for name in selected_tenants:
+                            t = tenant_options[name]
+                            if t.get("primary_contact_email"):
+                                send_email_notification(
+                                    t["primary_contact_email"],
+                                    f"📝 Tenant Satisfaction Survey — {info.get('full_name',fc)}",
+                                    f"""
+                                    <div style="font-family:Arial;max-width:600px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
+                                        <div style="background:#CC0000;padding:20px;color:white;">
+                                            <h2 style="margin:0;">We Value Your Feedback</h2>
+                                            <p style="margin:5px 0 0 0;font-size:12px;">{info.get('full_name',fc)} — Tenant Satisfaction Survey</p>
+                                        </div>
+                                        <div style="padding:20px;">
+                                            <p>Dear {t.get('name','Valued Tenant')},</p>
+                                            <p>We invite you to participate in our tenant satisfaction survey. Your feedback helps us improve our services.</p>
+                                            <p><b>Time to complete:</b> Less than 5 minutes</p>
+                                            <div style="text-align:center;margin:25px 0;">
+                                                <a href="{survey_link}" style="background:#CC0000;color:white;padding:12px 30px;text-decoration:none;border-radius:6px;font-weight:bold;">Take Survey Now</a>
+                                            </div>
+                                            <p style="font-size:11px;color:#888;">Your responses are confidential.</p>
+                                        </div>
+                                    </div>
+                                    """
+                                )
+                                sent_count += 1
+                        
+                        st.success(f"✅ Survey sent to {sent_count} tenants!")
+                        st.balloons()
+                    else:
+                        st.error("Please select a survey first")
+            else:
+                st.info("No tenants found in the database")
 
 # ============================================
-# UTILITY DASHBOARD
+# UTILITY DASHBOARD (FULL)
 # ============================================
 def page_uc():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
     st.markdown(f'## ⚡ Utility Dashboard — {info.get("full_name",fc)}')
-    st.info("Utility monitoring dashboard.")
+    tab1,tab2=st.tabs(["📊 Dashboard","➕ Record Reading"])
+    with tab1:
+        readings=DB.get_all("utility_readings",fc,20)
+        if readings:
+            df=pd.DataFrame(readings)
+            st.metric("Total Readings",len(df))
+            st.dataframe(df,use_container_width=True,hide_index=True)
+        else:st.info("No utility readings")
+    with tab2:
+        with st.form("util_f"):
+            c1,c2=st.columns(2)
+            with c1:
+                mtype=st.selectbox("Utility Type",["Electricity","Water","Diesel","Gas"])
+                mname=st.text_input("Meter Name*");mvalue=st.number_input("Reading Value*",min_value=0.0,step=0.1)
+            with c2:
+                rdate=st.date_input("Reading Date",date.today());rtime=st.time_input("Reading Time",datetime.now().time())
+                rtype=st.selectbox("Reading Type",["Manual","Automated"])
+            notes=st.text_area("Notes")
+            if st.form_submit_button("📝 Record Reading",use_container_width=True):
+                DB.insert("utility_readings",{"facility_code":fc,"utility_type":mtype,"meter_id":None,"meter_name":mname,"reading_date":str(rdate),"reading_time":str(rtime),"reading_value":mvalue,"reading_type":rtype.lower(),"notes":notes,"created_at":datetime.now().isoformat()})
+                st.success("Reading recorded!");st.rerun()
 
 # ============================================
-# PPM DASHBOARD
+# PPM DASHBOARD (FULL)
 # ============================================
 def page_ppm():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
     st.markdown(f'## 📊 PPM Dashboard — {info.get("full_name",fc)}')
-    st.info("PPM dashboard.")
+    ppm=DB.get_all("ppm_schedules",fc,50)
+    if ppm:
+        df=pd.DataFrame(ppm)
+        c1,c2,c3=st.columns(3)
+        with c1:st.metric("Total Schedules",len(df))
+        with c2:st.metric("Due This Week",len(df[pd.to_datetime(df["next_due_date"]).dt.date<=date.today()+timedelta(days=7)]) if "next_due_date" in df.columns else 0)
+        with c3:st.metric("Critical",len(df[df["is_critical"]==True]) if "is_critical" in df.columns else 0)
+        for i,row in df.iterrows():
+            with st.expander(f"{row.get('title','')} — Due: {row.get('next_due_date','')} — {row.get('frequency','')}"):
+                st.write(f"**Team:** {row.get('assigned_team','')} | **Priority:** {row.get('priority','')}")
+                if st.button("✅ Mark Complete",key=f"ppm_{row['id']}"):DB.update("ppm_schedules",row["id"],{"status":"completed","last_completed_date":str(date.today())});st.rerun()
+    else:st.info("No PPM schedules")
 
 # ============================================
-# 52-WEEK CALENDAR
+# 52-WEEK CALENDAR (FULL)
 # ============================================
 def page_cal():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
     st.markdown(f'## 📅 52-Week Calendar — {info.get("full_name",fc)}')
-    st.info("52-week PPM calendar.")
+    today=date.today()
+    weeks=[]
+    for w in range(1,53):
+        week_start=today+timedelta(weeks=w-today.isocalendar()[1])
+        weeks.append({"Week":w,"Start":week_start.strftime("%d %b"),"Status":"Upcoming" if w>today.isocalendar()[1] else "Current" if w==today.isocalendar()[1] else "Past"})
+    df=pd.DataFrame(weeks)
+    st.dataframe(df,use_container_width=True,hide_index=True,height=400)
+    st.caption(f"📅 Current Week: {today.isocalendar()[1]} | {today.strftime('%d %B %Y')}")
 
 # ============================================
-# CHECKLIST STATUS
+# CHECKLIST STATUS (FULL)
 # ============================================
 def page_cs():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
     st.markdown(f'## ✅ Checklist Status — {info.get("full_name",fc)}')
-    st.info("Checklist status view.")
+    cats=DB.get_categories()
+    cat_names=sorted(list(set(c.get("name","") for c in cats)))
+    dept=st.selectbox("Select Department",cat_names)
+    assets=DB.get_assets(fc,200)
+    if assets:
+        df=pd.DataFrame(assets)
+        df["department"]=df["asset_categories"].apply(lambda x: x.get("name","") if isinstance(x,dict) else "")
+        df=df[df["department"]==dept] if dept else df
+        st.dataframe(df[[c for c in ["asset_tag","name","status","condition_rating","location_building","location_floor"] if c in df.columns]],use_container_width=True,hide_index=True)
 
 # ============================================
-# INCIDENT CHECK
+# INCIDENT CHECK (FULL)
 # ============================================
 def page_ic():
     fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
     st.markdown(f'## 🚨 Incident Intelligence — {info.get("full_name",fc)}')
-    st.info("Incident management module.")
+    tab1,tab2=st.tabs(["📋 View Incidents","➕ Report Incident"])
+    with tab1:
+        inc=DB.get_all("incidents",fc,50)
+        if inc:st.dataframe(pd.DataFrame(inc),use_container_width=True,hide_index=True)
+        else:st.success("✅ No incidents reported")
+    with tab2:
+        with st.form("inc_form"):
+            st.markdown("### Report New Incident")
+            c1,c2=st.columns(2)
+            with c1:
+                title=st.text_input("Title*");dept=st.selectbox("Department*",[
+    "Engineering — Civil & Structural","Engineering — Electrical","Engineering — HVAC",
+    "Engineering — Plumbing","Engineering — Vertical Transportation (Lifts)",
+    "Engineering — Fire Fighting","Engineering — Utilities & Energy",
+    "Facility Management — Hard Services","Facility Management — Soft Services (Housekeeping)",
+    "Facility Management — FM Operations & Helpdesk","Facility Management — HSSE Safety & Compliance",
+    "Technology Group — Network & Connectivity","Technology Group — Building Technology",
+    "Security — Man Guarding Operations",
+    "Contractor — Clyde Engineering","Contractor — Gates and Shield"
+])
+                itype=st.selectbox("Incident Type",["Safety","Security","Environmental","Equipment Failure","Fire","Water Leak","Power Outage","Other"])
+                sev=st.selectbox("Severity",["low","medium","high","critical"])
+                pri=st.selectbox("Priority",["low","medium","high","critical"])
+            with c2:
+                loc_b=st.text_input("Building");loc_f=st.text_input("Floor");loc_z=st.text_input("Zone")
+                idate=st.date_input("Incident Date",date.today());itime=st.time_input("Incident Time",datetime.now().time())
+                cat=st.selectbox("Category",["Property Damage","Injury","Near Miss","Environmental","Equipment","Other"])
+            desc=st.text_area("Description*");actions=st.text_area("Immediate Actions Taken")
+            root=st.text_area("Root Cause Analysis (if known)")
+            if st.form_submit_button("🚨 Report Incident",use_container_width=True):
+                if title and desc:
+                    cnt=len(DB.get_all("incidents",fc,1000))
+                    DB.insert("incidents",{"facility_code":fc,"incident_number":f"INC-{fc}-{datetime.now().year}-{str(cnt+1).zfill(4)}","title":title,"department":dept,"type":itype,"severity":sev,"priority":pri,"category":cat,"location_building":loc_b,"location_floor":loc_f,"location_zone":loc_z,"incident_date":str(idate),"incident_time":str(itime),"description":desc,"immediate_actions":actions,"root_cause":root,"status":"reported","reported_at":datetime.now().isoformat(),"reported_by_name":st.session_state.get("user_name","Staff")})
+                    st.success("Incident reported!");st.rerun()
 
 # ============================================
 # ROUTER
