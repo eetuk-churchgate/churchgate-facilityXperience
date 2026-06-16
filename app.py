@@ -709,7 +709,11 @@ def page_ar():
     # Build dataframe
     if all_assets:
         df = pd.DataFrame(all_assets)
-        # Get category names
+        st.write("DEBUG - Columns:", list(df.columns))
+        st.write("DEBUG - Row count:", len(df))
+        st.write("DEBUG - Department unique values:", df["department"].unique() if "department" in df.columns else "NO DEPARTMENT COLUMN")
+        st.write("DEBUG - First row:", df.iloc[0].to_dict() if len(df) > 0 else "EMPTY")
+        
         # Department is already in the assets table from SQL upload
         if "department" in df.columns:
             df["department"] = df["department"].fillna("N/A")
