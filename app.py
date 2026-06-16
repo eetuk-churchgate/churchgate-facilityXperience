@@ -1141,7 +1141,7 @@ def page_ar():
                     full_data["sub_division"] = mapped_sub
                     full_data["facility_code"] = fc
                     full_data["created_at"] = datetime.now().isoformat()
-                    full_data["condition_rating"] = 5.0 if s1.get("health") == "Excellent" else 4.0 if s1.get("health") == "Good" else 3.0 if s1.get("health") == "Average" else 2.0
+                    full_data["condition_rating"] = 5 if s1.get("health") == "Excellent" else 4 if s1.get("health") == "Good" else 3 if s1.get("health") == "Average" else 2
                     
                     # Get category_id from category_name
                     try:
@@ -1230,7 +1230,7 @@ def page_ar():
                             "purchase_cost": float(row.get("Purchase Price", 0)) if pd.notna(row.get("Purchase Price")) else 0,
                             "barcode": str(row.get("Barcode", "")).strip(),
                             "description": str(row.get("Description", "")).strip(),
-                            "condition_rating": 5.0,
+                            "condition_rating": 5,
                             "created_at": datetime.now().isoformat()
                         }
                         
