@@ -6710,51 +6710,36 @@ def page_ppm_activities():
                             st.session_state.manual_selected_dates = []
                             st.rerun()
                     
-                    # Show selected dates as clickable chips
+                    # Show selected dates
                     if st.session_state.manual_selected_dates:
                         st.markdown("**Selected Dates:**")
                         
-                        # Display as colored chips in a grid
-                        chips_html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">'
-                        for i, d in enumerate(st.session_state.manual_selected_dates):
-                            chips_html += f'''
-                            <div style="background:#EFF6FF;border:1px solid #3B82F6;border-radius:20px;padding:4px 10px;font-size:0.7rem;display:flex;align-items:center;gap:4px;cursor:pointer;" title="Click to remove">
-                                📅 {d}
-                            </div>
-                            '''
-                        chips_html += '</div>'
-                        st.markdown(chips_html, unsafe_allow_html=True)
+                        # Display as a simple list with remove buttons
+                        cols_per_row = 4
+                        for i in range(0, len(st.session_state.manual_selected_dates), cols_per_row):
+                            row_dates = st.session_state.manual_selected_dates[i:i+cols_per_row]
+                            dcols = st.columns(cols_per_row)
+                            for j, d in enumerate(row_dates):
+                                with dcols[j]:
+                                    st.markdown(f"""
+                                    <div style="background:#EFF6FF;border:2px solid #3B82F6;border-radius:8px;padding:0.4rem;text-align:center;font-size:0.7rem;font-weight:600;color:#2563EB;">
+                                        📅 {d}
+                                    </div>
+                                    """, unsafe_allow_html=True)
                         
-                        # Allow removing individual dates
-                        remove_date = st.selectbox("Remove a date", ["Select..."] + st.session_state.manual_selected_dates, key="tpl_remove_date")
-                        if remove_date != "Select...":
-                            if st.button(f"🗑️ Remove {remove_date}", key="btn_remove_date", use_container_width=True):
-                                st.session_state.manual_selected_dates.remove(remove_date)
-                                st.rerun()
+                        # Remove date
+                        c1, c2 = st.columns([2, 1])
+                        with c1:
+                            remove_date = st.selectbox("Remove a date", ["Select..."] + st.session_state.manual_selected_dates, key="tpl_remove_date")
+                        with c2:
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            if remove_date != "Select...":
+                                if st.button(f"🗑️ Remove", key="btn_remove_date", use_container_width=True):
+                                    st.session_state.manual_selected_dates.remove(remove_date)
+                                    st.rerun()
                         
                         dates_string = ",".join(st.session_state.manual_selected_dates)
                         st.caption(f"📅 {len(st.session_state.manual_selected_dates)} dates selected")
-                        
-                        # Show calendar preview
-                        if st.button("📅 Preview Calendar", key="btn_preview_cal"):
-                            cal_preview = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:0.6rem;text-align:center;">'
-                            cal_preview += '<div style="font-weight:700;">M</div><div style="font-weight:700;">T</div><div style="font-weight:700;">W</div><div style="font-weight:700;">T</div><div style="font-weight:700;">F</div><div style="font-weight:700;">S</div><div style="font-weight:700;">S</div>'
-                            # Simple calendar for current month
-                            first = date.today().replace(day=1)
-                            last = (first.replace(month=first.month+1) if first.month < 12 else first.replace(year=first.year+1, month=1)) - timedelta(days=1)
-                            for i in range(first.weekday()):
-                                cal_preview += '<div></div>'
-                            for d in range(1, last.day+1):
-                                cd = date(first.year, first.month, d)
-                                dk = cd.strftime("%d-%m-%Y")
-                                bg = "#ECFDF5" if dk in st.session_state.manual_selected_dates else "#fff"
-                                color = "#059669" if dk in st.session_state.manual_selected_dates else "#bbb"
-                                cal_preview += f'<div style="background:{bg};color:{color};padding:2px;border-radius:2px;">{d}</div>'
-                            cal_preview += '</div>'
-                            st.markdown(cal_preview, unsafe_allow_html=True)
-                    else:
-                        dates_string = ""
-                        st.caption("No dates selected yet. Use the date picker above to add dates.")
                 
                 else:
                     if "generated_dates" not in st.session_state:
