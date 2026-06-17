@@ -5658,14 +5658,17 @@ def page_cs():
     
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        departments = ["All"] + sorted(df["department"].dropna().unique().tolist())
+        # Create department — sub_division labels
+        df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
+        departments = ["All"] + sorted(df["dept_full"].dropna().unique().tolist())
+
         sel_dept = st.selectbox("Select Department", departments, key="cs_dept")
     with c2:
         # Filter assets by department
         if sel_dept != "All":
-            dept_assets = df[df["department"] == sel_dept]
-        else:
-            dept_assets = df
+        dept_assets = df[df["dept_full"] == sel_dept]
+    else:
+        dept_assets = df
         asset_list = ["All"] + sorted(dept_assets["name"].dropna().unique().tolist())
         sel_asset = st.selectbox("Select Asset", asset_list, key="cs_asset")
     with c3:
@@ -5873,21 +5876,58 @@ def page_cs():
         # Bulk enrollment
         st.markdown("---")
         st.markdown("### 📦 Bulk Enrollment")
+        st.caption("Enroll all currently filtered assets, or narrow by department/building below.")
+        
         with st.form("cs_bulk_enroll"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                bulk_dept = st.selectbox("Target Department", ["All"] + sorted(df["dept_full"].dropna().unique().tolist()), key="cs_bulk_dept")
+            with c2:
+                bulk_bldg = st.selectbox("Target Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cs_bulk_bldg")
+            with c3:
+                bulk_template = st.selectbox("Checklist Template", template_names, key="cs_bulk_tpl")
+            
             c1, c2 = st.columns(2)
             with c1:
-                bulk_template = st.selectbox("Template", template_names, key="cs_bulk_tpl")
+                bulk_freq = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="cs_bulk_freq")
             with c2:
-                bulk_freq = st.selectbox("Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="cs_bulk_freq")
+                overwrite_existing = st.checkbox("Overwrite existing enrollments", value=True, key="cs_bulk_overwrite")
             
-            if st.form_submit_button("🚀 Enroll All Filtered Assets", use_container_width=True, type="primary"):
-                count = 0
-                for _, asset in filtered.iterrows():
-                    DB.update("assets", asset["id"], {"checklist": bulk_template, "ppm_frequency": bulk_freq, "checklist_template": bulk_template})
-                    count += 1
-                st.success(f"✅ {count} assets enrolled!")
-                st.balloons()
-                st.rerun()
+            # Show preview count
+            preview_df = filtered.copy()
+            if bulk_dept != "All": preview_df = preview_df[preview_df["dept_full"] == bulk_dept]
+            if bulk_bldg != "All": preview_df = preview_df[preview_df["location_building"] == bulk_bldg]
+            
+            st.caption(f"📋 {len(preview_df)} assets will be enrolled with **{bulk_template}** at **{bulk_freq}** frequency")
+            
+            if st.form_submit_button("🚀 ENROLL ASSETS", use_container_width=True, type="primary"):
+                if bulk_template:
+                    enroll_df = filtered.copy()
+                    if bulk_dept != "All": enroll_df = enroll_df[enroll_df["dept_full"] == bulk_dept]
+                    if bulk_bldg != "All": enroll_df = enroll_df[enroll_df["location_building"] == bulk_bldg]
+                    
+                    count = 0
+                    skipped = 0
+                    for _, asset in enroll_df.iterrows():
+                        is_enrolled = pd.notna(asset.get("checklist")) and str(asset.get("checklist","")).strip() not in ["","NA","na"]
+                        if is_enrolled and not overwrite_existing:
+                            skipped += 1
+                            continue
+                        DB.update("assets", asset["id"], {
+                            "checklist": bulk_template,
+                            "ppm_frequency": bulk_freq,
+                            "checklist_template": bulk_template
+                        })
+                        count += 1
+                    
+                    msg = f"✅ {count} assets enrolled with {bulk_template}!"
+                    if skipped > 0:
+                        msg += f" ({skipped} skipped — already enrolled)"
+                    st.success(msg)
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("⚠️ Please select a template")
 
 # ============================================
 # INCIDENT CHECK (FULL)
