@@ -1551,22 +1551,25 @@ def page_ar():
                         pdf.image(str(logo_path), x=14, y=8, h=8)
                     pdf.set_font('Helvetica','B',14)
                     pdf.set_text_color(204,0,0)
-                    pdf.cell(260,8,f'Asset Readings Report - {info.get("full_name",fc)}',0,1)
+                    pdf.cell(260,8,safe_text(f'Asset Readings Report - {info.get("full_name",fc)}'),0,1)
                     pdf.set_font('Helvetica','',8)
                     pdf.set_text_color(0,0,0)
-                    pdf.cell(260,5,f'Generated: {today.strftime("%d %B %Y")} | Total Assets: {len(rd_df)}',0,1)
+                    pdf.cell(260,5,safe_text(f'Generated: {today.strftime("%d %B %Y")} | Total Assets: {len(rd_df)}'),0,1)
                     pdf.ln(3)
                     pdf.set_font('Helvetica','B',6)
                     pdf.set_fill_color(204,0,0)
                     pdf.set_text_color(255,255,255)
-                    for h,w in zip(['Asset ID','Name','Department','Location','Priority','Condition','Age'],[25,45,35,40,20,20,20]):
-                        pdf.cell(w,5,h,1,0,'C',True)
+                    headers = ['Asset ID','Name','Department','Location','Priority','Condition','Age']
+                    widths = [25,45,35,40,20,20,20]
+                    for h,w in zip(headers,widths):
+                        pdf.cell(w,5,safe_text(h),1,0,'C',True)
                     pdf.ln()
                     pdf.set_font('Helvetica','',6)
                     pdf.set_text_color(26,26,26)
                     for _,r in rd_df.head(50).iterrows():
-                        for v,w in zip([r['Asset ID'],r['Asset Name'],r['Department'],r['Location'],r['Priority'],str(r['Condition']),r['Asset Age']],[25,45,35,40,20,20,20]):
-                            pdf.cell(w,4,str(v)[:int(w/2)],1,0)
+                        vals = [safe_text(str(r['Asset ID'])), safe_text(str(r['Asset Name'])), safe_text(str(r['Department'])), safe_text(str(r['Location'])), safe_text(str(r['Priority'])), safe_text(str(r['Condition'])), safe_text(str(r['Asset Age']))]
+                        for v,w in zip(vals,widths):
+                            pdf.cell(w,4,v[:int(w/2)],1,0)
                         pdf.ln()
                     pdf_file = f"/tmp/readings_report_{today}.pdf"
                     pdf.output(pdf_file)
