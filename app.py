@@ -6394,6 +6394,14 @@ def page_ppm_activities():
                                         "status": "pending",
                                         "created_at": datetime.now().isoformat()
                                     }).execute()
+                                    supabase.table("ppm_approvals").insert({
+                                        "execution_id": execution_id,
+                                        "approval_level": "manager",
+                                        "status": "pending",
+                                        "created_at": datetime.now().isoformat()
+                                    }).execute()
+
+
                                     
                                     st.success("✅ PPM Execution submitted!")
                                     st.balloons()
@@ -6493,23 +6501,29 @@ def page_ppm_activities():
             st.info("No PPM submissions yet.")
     
     # ============================================
-    # TAB 4: PENDING APPROVAL
+    # TAB 4: PENDING APPROVAL — TWO LEVELS
     # ============================================
     with tabs[4]:
-        st.markdown("### ⏳ Pending Approvals")
+        st.markdown("### ⏳ Approval Center")
         
         if user_role not in ["admin", "approver", "authorizer", "confirmer"]:
             st.info("This section is for Team Leads and Managers.")
         else:
-            pending = supabase.table("ppm_executions").select("*").eq("facility_code", fc).in_("status", ["submitted","confirmed"]).order("created_at", desc=True).execute()
+            approval_tabs = st.tabs(["🔐 Team Lead Confirmation", "🟢 Manager Approval"])
             
-            if pending.data and len(pending.data) > 0:
-                for ex in pending.data:
-                    status = ex.get("status", "submitted")
-                    sc = {"submitted": "#3B82F6", "confirmed": "#F59E0B"}.get(status, "#3B82F6")
-                    ppm_type = ex.get("ppm_type", "Scheduled PPM")
-                    
-                    with st.container():
+            # ============================================
+            # TEAM LEAD CONFIRMATION
+            # ============================================
+            with approval_tabs[0]:
+                st.markdown("#### 🔐 Pending Team Lead Confirmation")
+                
+                pending = supabase.table("ppm_executions").select("*").eq("facility_code", fc).eq("status", "submitted").order("created_at", desc=True).execute()
+                
+                if pending.data and len(pending.data) > 0:
+                    for ex in pending.data:
+                        sc = "#3B82F6"
+                        ppm_type = ex.get("ppm_type", "Scheduled PPM")
+                        
                         st.markdown(f"""
                         <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -6517,12 +6531,11 @@ def page_ppm_activities():
                                     <div style="font-size:1rem;font-weight:700;">📋 {ex.get('execution_date','')} — {ppm_type}</div>
                                     <div style="font-size:0.75rem;color:#666;">👤 {ex.get('executed_by_name','')} | 🏢 {ex.get('building','N/A')}</div>
                                 </div>
-                                <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">{status.upper()}</span>
+                                <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">SUBMITTED</span>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        # Comments and notes
                         if ex.get("general_comments"):
                             st.caption(f"📝 {ex.get('general_comments','')}")
                         if ex.get("is_early_execution"):
@@ -6530,7 +6543,6 @@ def page_ppm_activities():
                         if ex.get("mitigation_plan"):
                             st.error(f"🚨 Mitigation: {ex.get('mitigation_plan','')}")
                         
-                        # Checklist items
                         items = supabase.table("ppm_execution_items").select("*").eq("execution_id", ex["id"]).order("item_number").execute()
                         if items.data:
                             with st.expander("📋 View Checklist Results"):
@@ -6547,23 +6559,93 @@ def page_ppm_activities():
                         st.markdown("---")
                         c1, c2 = st.columns(2)
                         with c1:
-                            confirm_comment = st.text_area("Confirmation Comment*", key=f"confirm_{ex['id']}", height=60)
-                            if st.button("✅ CONFIRM", key=f"btn_confirm_{ex['id']}", use_container_width=True, type="primary"):
+                            confirm_comment = st.text_area("Confirmation Comment*", key=f"tl_confirm_{ex['id']}", height=60)
+                            if st.button("✅ CONFIRM & SEND TO MANAGER", key=f"tl_btn_confirm_{ex['id']}", use_container_width=True, type="primary"):
                                 if confirm_comment:
                                     supabase.table("ppm_executions").update({"status":"confirmed"}).eq("id", ex["id"]).execute()
                                     supabase.table("ppm_approvals").update({"status":"approved","comments":confirm_comment,"approver_name":user_name,"action_date":datetime.now().isoformat()}).eq("execution_id", ex["id"]).eq("approval_level","team_lead").execute()
-                                    st.success("✅ Confirmed!"); st.rerun()
+                                    st.success("✅ Confirmed! Sent to Manager for final approval."); st.rerun()
                                 else: st.error("⚠️ Comment required")
                         with c2:
-                            reject_comment = st.text_area("Rejection Reason*", key=f"reject_{ex['id']}", height=60)
-                            if st.button("❌ REJECT", key=f"btn_reject_{ex['id']}", use_container_width=True):
+                            reject_comment = st.text_area("Rejection Reason*", key=f"tl_reject_{ex['id']}", height=60)
+                            if st.button("❌ REJECT", key=f"tl_btn_reject_{ex['id']}", use_container_width=True):
                                 if reject_comment:
                                     supabase.table("ppm_executions").update({"status":"rejected"}).eq("id", ex["id"]).execute()
                                     supabase.table("ppm_approvals").update({"status":"rejected","comments":reject_comment,"approver_name":user_name,"action_date":datetime.now().isoformat()}).eq("execution_id", ex["id"]).eq("approval_level","team_lead").execute()
                                     st.error("❌ Rejected"); st.rerun()
                                 else: st.error("⚠️ Reason required")
-            else:
-                st.success("✅ No pending approvals.")
+                else:
+                    st.success("✅ No submissions waiting for Team Lead confirmation.")
+            
+            # ============================================
+            # MANAGER APPROVAL
+            # ============================================
+            with approval_tabs[1]:
+                st.markdown("#### 🟢 Pending Manager Approval")
+                
+                if user_role not in ["admin", "approver"]:
+                    st.info("This section is for Managers/HOD only.")
+                else:
+                    pending_mgr = supabase.table("ppm_executions").select("*").eq("facility_code", fc).eq("status", "confirmed").order("created_at", desc=True).execute()
+                    
+                    if pending_mgr.data and len(pending_mgr.data) > 0:
+                        for ex in pending_mgr.data:
+                            sc = "#F59E0B"
+                            ppm_type = ex.get("ppm_type", "Scheduled PPM")
+                            
+                            st.markdown(f"""
+                            <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <div>
+                                        <div style="font-size:1rem;font-weight:700;">📋 {ex.get('execution_date','')} — {ppm_type}</div>
+                                        <div style="font-size:0.75rem;color:#666;">👤 {ex.get('executed_by_name','')} | 🏢 {ex.get('building','N/A')}</div>
+                                    </div>
+                                    <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">AWAITING MANAGER</span>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Show Team Lead confirmation
+                            tl_approval = supabase.table("ppm_approvals").select("*").eq("execution_id", ex["id"]).eq("approval_level","team_lead").single().execute()
+                            if tl_approval.data:
+                                st.caption(f"✅ Team Lead: {tl_approval.data.get('approver_name','N/A')} — {tl_approval.data.get('comments','')}")
+                            
+                            if ex.get("mitigation_plan"):
+                                st.error(f"🚨 Mitigation: {ex.get('mitigation_plan','')}")
+                            
+                            items = supabase.table("ppm_execution_items").select("*").eq("execution_id", ex["id"]).order("item_number").execute()
+                            if items.data:
+                                with st.expander("📋 View Checklist Results"):
+                                    for item in items.data:
+                                        res = item.get("result","")
+                                        if res in ["Pass","Yes","Clear","Good","Normal","Tight","Ok"]:
+                                            icon = "✅"
+                                        elif res in ["Fail","No","Damage","Dirty","Abnormal","Loose","Not Ok"]:
+                                            icon = "❌"
+                                        else:
+                                            icon = "📝"
+                                        st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — *{item.get('actual_value', res)}*")
+                            
+                            st.markdown("---")
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                mgr_comment = st.text_area("Approval Comment*", key=f"mgr_approve_{ex['id']}", height=60)
+                                if st.button("🟢 FINAL APPROVE", key=f"mgr_btn_approve_{ex['id']}", use_container_width=True, type="primary"):
+                                    if mgr_comment:
+                                        supabase.table("ppm_executions").update({"status":"approved"}).eq("id", ex["id"]).execute()
+                                        supabase.table("ppm_approvals").update({"status":"approved","comments":mgr_comment,"approver_name":user_name,"action_date":datetime.now().isoformat()}).eq("execution_id", ex["id"]).eq("approval_level","manager").execute()
+                                        st.success("🟢 Fully Approved!"); st.balloons(); st.rerun()
+                                    else: st.error("⚠️ Comment required")
+                            with c2:
+                                mgr_reject = st.text_area("Rejection Reason*", key=f"mgr_reject_{ex['id']}", height=60)
+                                if st.button("❌ REJECT", key=f"mgr_btn_reject_{ex['id']}", use_container_width=True):
+                                    if mgr_reject:
+                                        supabase.table("ppm_executions").update({"status":"rejected"}).eq("id", ex["id"]).execute()
+                                        supabase.table("ppm_approvals").update({"status":"rejected","comments":mgr_reject,"approver_name":user_name,"action_date":datetime.now().isoformat()}).eq("execution_id", ex["id"]).eq("approval_level","manager").execute()
+                                        st.error("❌ Rejected"); st.rerun()
+                                    else: st.error("⚠️ Reason required")
+                    else:
+                        st.success("✅ No submissions waiting for Manager approval.")
     
     # ============================================
     # TAB 5: CHECKLIST BUILDER (ADMIN) — INTERACTIVE
