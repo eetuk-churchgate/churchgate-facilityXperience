@@ -6744,7 +6744,7 @@ def page_ppm_activities():
                     if uploaded_file:
                         try:
                             if uploaded_file.name.endswith(".csv"):
-                                import_df = pd.read_csv(uploaded_file)
+                                import_df = pd.read_csv(uploaded_file, encoding='latin-1')
                             else:
                                 import_df = pd.read_excel(uploaded_file)
                             
