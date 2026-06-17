@@ -6555,76 +6555,116 @@ def page_ppm_activities():
                 st.success("✅ No pending approvals.")
     
     # ============================================
-    # TAB 5: CHECKLIST BUILDER (ADMIN)
+    # TAB 5: CHECKLIST BUILDER (ADMIN) — INTERACTIVE
     # ============================================
     with tabs[5]:
-        st.markdown("### ⚙️ Custom Checklist Builder")
+        st.markdown("### ⚙️ Interactive Checklist Builder")
         
         if not is_admin:
             st.error("⛔ Admin access only")
         else:
-            # Show existing custom checklists
-            st.markdown("#### 📋 Existing Custom Checklists")
-            if custom_checklists.data:
-                for c in custom_checklists.data:
-                    st.markdown(f"""
-                    <div style="background:white;border-left:4px solid #3B82F6;border-radius:6px;padding:0.6rem;margin:0.2rem 0;">
-                        <b>{c.get('template_name','')}</b> — {c.get('international_standard','Custom')}
-                        <br><span style="font-size:0.65rem;color:#666;">🏷️ {c.get('asset_category','')}</span>
-                    </div>
-                    """, unsafe_allow_html=True)
+            builder_tabs = st.tabs(["📋 Create Template", "✏️ Edit Template", "📅 Schedule Settings"])
             
-            st.markdown("---")
-            st.markdown("#### ➕ Create New Checklist Template")
-            
-            with st.form("create_checklist_form"):
-                c1, c2 = st.columns(2)
-                with c1:
-                    new_template_name = st.text_input("Template Name*", placeholder="e.g. HVAC ODU/IDU VRV Checklist")
-                    new_category = st.selectbox("Asset Category", sorted(df["dept_full"].dropna().unique().tolist()))
-                with c2:
-                    new_standard = st.text_input("Standard Reference", placeholder="e.g. ASHRAE 180, Custom")
-                    new_description = st.text_area("Description", height=60)
+            # ============================================
+            # SUB-TAB: CREATE TEMPLATE
+            # ============================================
+            with builder_tabs[0]:
+                st.markdown("#### ➕ Create New Checklist Template")
                 
-                st.markdown("---")
-                st.markdown("### 📝 Checklist Items")
-                
-                # Entry mode selector
-                entry_mode = st.radio("Entry Mode", ["📋 Manual Entry (Structured)", "📋 Quick Paste (Copy from Excel/Word)"], horizontal=True)
-                
-                if entry_mode == "📋 Manual Entry (Structured)":
-                    st.caption("Format: Item Number | Description | Type (yes_no/status/reading/text/section) | Options (use / separator)")
-                    st.caption("Example: 1 | Safety Precautions | section |")
-                    st.caption("Example: 2 | LOTO: Power isolated | yes_no |")
-                    st.caption("Example: 3 | Filter Condition | status | Clean/Dirty/Replaced")
-                    st.caption("Example: 4 | Measure temperature | reading |")
-                    
-                    checklist_text = st.text_area("Checklist Items*", height=300, 
-                        placeholder="1 | Safety Precautions & Pre-Checks | section |\n2 | LOTO: Power isolated and locked out | yes_no |\n3 | Air Filter Condition | status | Clean/Dirty/Replaced\n4 | Measure air-on temperature | reading |\n5 | Observations | text |")
-                
-                else:
-                    st.caption("📋 **Copy from Excel: SNO | Description columns**")
-                    st.caption("Format: Each line = one checklist item. Use Tab or | as separator.")
-                    st.caption("Example: 1 | Safety Precautions & Pre-Checks")
-                    
-                    quick_paste = st.text_area("Paste Checklist Here*", height=400,
-                        placeholder="1\tSafety Precautions & Pre-Checks\n2\tLOTO (Lock-Out/Tag-Out): Power isolated and locked out\n3\tPPE: Appropriate PPE worn\n4\tWork Area Assessment: Area clear of obstructions\n5\tPermits: All necessary work permits obtained")
+                with st.form("create_template_form"):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        template_name = st.text_input("Report Name*", placeholder="e.g. Automated Motor Monthly Checklist")
+                    with c2:
+                        period = st.selectbox("Period*", ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"])
+                    with c3:
+                        image_required = st.selectbox("Image Option*", ["Yes", "No"])
                     
                     c1, c2 = st.columns(2)
                     with c1:
-                        default_type = st.selectbox("Default Answer Type", ["yes_no", "status", "reading", "text", "section"])
+                        perform_time = st.number_input("Perform Time (in Minutes)*", min_value=0, value=30)
+                        buffer_days = st.number_input("Buffer Days*", min_value=0, value=0, help="Days before/after scheduled date when PPM can be performed")
                     with c2:
-                        if default_type == "status":
-                            default_options = st.text_input("Status Options", value="Yes/No", help="Use / separator. e.g., Clean/Dirty/Replaced")
+                        asset_category = st.selectbox("Asset Category", sorted(df["dept_full"].dropna().unique().tolist()))
+                        standard_ref = st.text_input("Standard Reference", placeholder="e.g. ISO 8100, NFPA 25, Custom")
+                    
+                    st.markdown("---")
+                    st.markdown("### 📝 Checklist Items")
+                    st.caption("Add items one by one. Set the answer type and threshold options for each.")
+                    
+                    # Dynamic item builder
+                    if "checklist_builder_items" not in st.session_state:
+                        st.session_state.checklist_builder_items = [
+                            {"sno": 1, "description": "", "answer_type": "yes_no", "threshold": "Yes/No"}
+                        ]
+                    
+                    # Display current items as an editable table
+                    item_data = []
+                    for item in st.session_state.checklist_builder_items:
+                        item_data.append({
+                            "SNO": item["sno"],
+                            "Description": item["description"],
+                            "Answer Type": item["answer_type"],
+                            "Threshold / Options": item["threshold"]
+                        })
+                    
+                    if len(item_data) > 0:
+                        items_df = pd.DataFrame(item_data)
+                        st.dataframe(items_df, use_container_width=True, hide_index=True, height=200)
+                    
+                    # Add new item
+                    st.markdown("**➕ Add Checklist Item**")
+                    c1, c2, c3, c4 = st.columns([1, 3, 2, 2])
+                    with c1:
+                        new_sno = st.number_input("SNO", min_value=1, value=len(st.session_state.checklist_builder_items)+1, key="new_sno")
+                    with c2:
+                        new_desc = st.text_input("Description", key="new_desc", placeholder="e.g. Check damages on Rollers/Conveyor Belt")
+                    with c3:
+                        answer_type = st.selectbox("Answer Type", ["yes_no", "pass_fail", "status", "reading", "text", "section"], key="new_type")
+                    with c4:
+                        if answer_type == "yes_no":
+                            threshold = st.text_input("Options", value="Yes/No", key="new_thresh", help="Use / separator")
+                        elif answer_type == "pass_fail":
+                            threshold = st.text_input("Options", value="Pass/Fail/NA", key="new_thresh")
+                        elif answer_type == "status":
+                            threshold = st.text_input("Options", value="Normal/Abnormal", key="new_thresh", help="e.g., High/Low, Clean/Dirty, Tight/Loose, Good/Damage")
+                        elif answer_type == "reading":
+                            threshold = st.text_input("Unit", value="°C", key="new_thresh", placeholder="e.g., °C, V, A, Bar")
                         else:
-                            default_options = ""
+                            threshold = st.text_input("Options", value="", key="new_thresh")
+                    
+                    c1, c2, c3 = st.columns([1, 1, 2])
+                    with c1:
+                        if st.button("➕ Add Item", use_container_width=True):
+                            if new_desc:
+                                st.session_state.checklist_builder_items.append({
+                                    "sno": new_sno,
+                                    "description": new_desc,
+                                    "answer_type": answer_type,
+                                    "threshold": threshold
+                                })
+                                st.rerun()
+                    with c2:
+                        if st.button("🗑️ Clear All", use_container_width=True):
+                            st.session_state.checklist_builder_items = [{"sno": 1, "description": "", "answer_type": "yes_no", "threshold": "Yes/No"}]
+                            st.rerun()
+                    with c3:
+                        if st.button("🗑️ Remove Last", use_container_width=True) and len(st.session_state.checklist_builder_items) > 1:
+                            st.session_state.checklist_builder_items.pop()
+                            st.rerun()
+                    
+                    # Quick Paste option
+                    st.markdown("---")
+                    st.markdown("### 📋 Quick Paste (Alternative)")
+                    st.caption("Paste from Excel: SNO | Description columns separated by Tab or |")
+                    
+                    quick_paste = st.text_area("Paste items here", height=150, key="quick_paste_builder",
+                        placeholder="1\tCheck damages on Rollers/Conveyor Belt\n2\tCheck Sensors/Photocells Sensitivity Status\n3\tCheck Moving Parts Lubrications\n4\tCheck Backup Batteries Status\n5\tCheck Mis-alignment/Knocks/Loose Bracket")
                     
                     if quick_paste:
                         lines = [l.strip() for l in quick_paste.strip().split("\n") if l.strip()]
-                        st.caption(f"📋 **{len(lines)} items detected**")
-                        
-                        with st.expander("👁️ Preview Parsed Items"):
-                            for i, line in enumerate(lines[:10]):
+                        if st.button(f"📋 Parse {len(lines)} Items", use_container_width=True):
+                            for i, line in enumerate(lines):
                                 if "\t" in line:
                                     parts = line.split("\t")
                                     desc = parts[-1].strip()
@@ -6633,65 +6673,108 @@ def page_ppm_activities():
                                     desc = parts[-1].strip()
                                 else:
                                     desc = line.strip()
-                                st.markdown(f"**{i+1}.** {desc[:100]}")
-                            if len(lines) > 10:
-                                st.caption(f"... and {len(lines)-10} more items")
-                        
-                        checklist_text = ""
-                        for i, line in enumerate(lines):
-                            if "\t" in line:
-                                parts = line.split("\t")
-                                desc = parts[-1].strip()
-                            elif "|" in line:
-                                parts = line.split("|")
-                                desc = parts[-1].strip()
-                            else:
-                                desc = line.strip()
-                            opts = default_options if default_options else ""
-                            checklist_text += f"{i+1} | {desc} | {default_type} | {opts}\n"
-                    else:
-                        checklist_text = ""
-                
-                if st.form_submit_button("💾 CREATE CHECKLIST TEMPLATE", use_container_width=True, type="primary"):
-                    if new_template_name and checklist_text:
-                        # Create template
-                        template_result = supabase.table("ppm_checklist_templates").insert({
-                            "template_name": new_template_name,
-                            "asset_category": new_category,
-                            "international_standard": new_standard,
-                            "description": new_description,
-                            "is_active": True
-                        }).execute()
-                        
-                        if template_result.data:
-                            template_id = template_result.data[0]["id"]
-                            
-                            # Parse checklist items
-                            lines = checklist_text.strip().split("\n")
-                            for line in lines:
-                                parts = [p.strip() for p in line.split("|")]
-                                if len(parts) >= 3:
-                                    item_num = parts[0]
-                                    item_desc = parts[1]
-                                    item_type = parts[2]
-                                    item_opts = parts[3] if len(parts) > 3 else None
-                                    
-                                    supabase.table("ppm_checklist_items").insert({
-                                        "template_id": template_id,
-                                        "item_number": int(item_num) if item_num.isdigit() else 1,
-                                        "description": item_desc,
-                                        "check_type": item_type,
-                                        "expected_value": item_opts,
-                                        "sort_order": int(item_num) if item_num.isdigit() else 1
-                                    }).execute()
-                            
-                            st.success(f"✅ Checklist '{new_template_name}' created with items!")
-                            st.balloons()
+                                st.session_state.checklist_builder_items.append({
+                                    "sno": len(st.session_state.checklist_builder_items) + 1,
+                                    "description": desc,
+                                    "answer_type": "yes_no",
+                                    "threshold": "Yes/No"
+                                })
                             st.rerun()
+                    
+                    st.markdown("---")
+                    
+                    if st.form_submit_button("💾 CREATE CHECKLIST TEMPLATE", use_container_width=True, type="primary"):
+                        if template_name and len(st.session_state.checklist_builder_items) > 0:
+                            valid_items = [i for i in st.session_state.checklist_builder_items if i["description"].strip()]
+                            
+                            if len(valid_items) == 0:
+                                st.error("⚠️ Add at least one checklist item with a description")
+                            else:
+                                template_result = supabase.table("ppm_checklist_templates").insert({
+                                    "template_name": template_name,
+                                    "asset_category": asset_category,
+                                    "international_standard": standard_ref,
+                                    "description": f"Period: {period} | Time: {perform_time}min | Buffer: {buffer_days}days | Image: {image_required}",
+                                    "is_active": True
+                                }).execute()
+                                
+                                if template_result.data:
+                                    template_id = template_result.data[0]["id"]
+                                    
+                                    for item in valid_items:
+                                        supabase.table("ppm_checklist_items").insert({
+                                            "template_id": template_id,
+                                            "item_number": item["sno"],
+                                            "description": item["description"],
+                                            "check_type": item["answer_type"],
+                                            "expected_value": item["threshold"],
+                                            "sort_order": item["sno"]
+                                        }).execute()
+                                    
+                                    # Clear builder
+                                    st.session_state.checklist_builder_items = [{"sno": 1, "description": "", "answer_type": "yes_no", "threshold": "Yes/No"}]
+                                    st.success(f"✅ Template '{template_name}' created with {len(valid_items)} items!")
+                                    st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to create template")
                         else:
-                            st.error("❌ Failed to create template")
-                    else:
-                        st.error("⚠️ Template name and checklist items are required")
+                            st.error("⚠️ Template name and at least one item are required")
+            
+            # ============================================
+            # SUB-TAB: EDIT TEMPLATE
+            # ============================================
+            with builder_tabs[1]:
+                st.markdown("#### ✏️ Edit Existing Template")
+                
+                all_templates = supabase.table("ppm_checklist_templates").select("*").order("created_at", desc=True).execute()
+                
+                if all_templates.data and len(all_templates.data) > 0:
+                    template_names_list = [t.get("template_name","") for t in all_templates.data]
+                    edit_template_name = st.selectbox("Select Template to Edit", template_names_list, key="edit_template")
+                    
+                    if edit_template_name:
+                        edit_template = next((t for t in all_templates.data if t.get("template_name") == edit_template_name), None)
+                        
+                        if edit_template:
+                            st.markdown(f"**Template:** {edit_template.get('template_name')} | **Standard:** {edit_template.get('international_standard','Custom')}")
+                            
+                            # Load existing items
+                            existing_items = supabase.table("ppm_checklist_items").select("*").eq("template_id", edit_template["id"]).order("sort_order").execute()
+                            
+                            if existing_items.data:
+                                st.markdown("**Current Items:**")
+                                edit_data = []
+                                for item in existing_items.data:
+                                    edit_data.append({
+                                        "SNO": item.get("item_number"),
+                                        "Description": item.get("description"),
+                                        "Type": item.get("check_type"),
+                                        "Threshold/Options": item.get("expected_value")
+                                    })
+                                edit_df = pd.DataFrame(edit_data)
+                                st.dataframe(edit_df, use_container_width=True, hide_index=True)
+                            
+                            # Delete template
+                            if st.button("🗑️ DELETE THIS TEMPLATE", use_container_width=True, type="secondary"):
+                                supabase.table("ppm_checklist_items").delete().eq("template_id", edit_template["id"]).execute()
+                                supabase.table("ppm_checklist_templates").delete().eq("id", edit_template["id"]).execute()
+                                st.warning("Template deleted!")
+                                st.rerun()
+                else:
+                    st.info("No templates created yet.")
+            
+            # ============================================
+            # SUB-TAB: SCHEDULE SETTINGS
+            # ============================================
+            with builder_tabs[2]:
+                st.markdown("#### 📅 Schedule Settings")
+                st.info("Schedule dates are managed when enrolling assets in the Checklist Status page. Use the Bulk Enrollment feature to set frequency and dates.")
+                
+                if st.button("📋 GO TO CHECKLIST STATUS", use_container_width=True, type="primary"):
+                    st.session_state.page = "cs"
+                    st.rerun()
+
 
 # ============================================
 # ROUTER
