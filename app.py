@@ -5630,7 +5630,8 @@ def page_cal():
     st.caption(f"📅 Current Week: {today.isocalendar()[1]} | {today.strftime('%d %B %Y')}")
 
 # ============================================
-# CHECKLIST STATUS — ENROLLMENT & ACTIVATION
+# CHECKLIST STATUS — CONSOLIDATED DASHBOARD
+# FORTUNE 500 GRADE — PAGINATED & FILTERED
 # ============================================
 def page_cs():
     fc = st.session_state.get("facility", "WTC")
@@ -5646,179 +5647,247 @@ def page_cs():
     
     df = pd.DataFrame(all_assets)
     
-    # Get all checklist templates
+    # Get templates
     templates = supabase.table("ppm_checklist_templates").select("*").execute()
     template_names = [t.get("template_name","") for t in templates.data] if templates.data else []
     
     # ============================================
-    # KPI CARDS
+    # FILTERS ROW
     # ============================================
-    total_assets = len(df)
-    enrolled = len(df[df["checklist"].notna() & (df["checklist"] != "") & (df["checklist"] != "NA")]) if "checklist" in df.columns else 0
-    not_enrolled = total_assets - enrolled
+    st.markdown("### 🔍 Filter Assets")
     
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Total Assets</div><div style="font-size:1.8rem;font-weight:800;">{total_assets}</div></div>""", unsafe_allow_html=True)
+        departments = ["All"] + sorted(df["department"].dropna().unique().tolist())
+        sel_dept = st.selectbox("Select Department", departments, key="cs_dept")
     with c2:
-        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">✅ Enrolled</div><div style="font-size:1.8rem;font-weight:800;color:#10B981;">{enrolled}</div></div>""", unsafe_allow_html=True)
+        # Filter assets by department
+        if sel_dept != "All":
+            dept_assets = df[df["department"] == sel_dept]
+        else:
+            dept_assets = df
+        asset_list = ["All"] + sorted(dept_assets["name"].dropna().unique().tolist())
+        sel_asset = st.selectbox("Select Asset", asset_list, key="cs_asset")
     with c3:
-        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">⚠️ Not Enrolled</div><div style="font-size:1.8rem;font-weight:800;color:#F59E0B;">{not_enrolled}</div></div>""", unsafe_allow_html=True)
+        # Sub-asset (parent asset)
+        if sel_asset != "All":
+            sub_list = ["All"] + sorted(dept_assets[dept_assets["name"] == sel_asset]["parent_asset"].dropna().unique().tolist())
+        else:
+            sub_list = ["All"]
+        sel_sub = st.selectbox("Select Sub Asset", sub_list, key="cs_sub")
     with c4:
-        enrollment_rate = round(enrolled/total_assets*100, 1) if total_assets > 0 else 0
-        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Enrollment Rate</div><div style="font-size:1.8rem;font-weight:800;color:#3B82F6;">{enrollment_rate}%</div></div>""", unsafe_allow_html=True)
+        sel_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cs_bldg")
     
-    if enrollment_rate < 50:
-        st.warning(f"🤖 **AI Insight:** Only {enrollment_rate}% of assets have checklists enrolled. Recommend bulk enrollment for remaining {not_enrolled} assets.")
+    # Date range
+    c1, c2 = st.columns(2)
+    with c1:
+        from_date = st.date_input("From Date", date.today() - timedelta(days=30), key="cs_from")
+    with c2:
+        to_date = st.date_input("To Date", date.today(), key="cs_to")
     
     st.markdown("---")
     
     # ============================================
-    # FILTERS
+    # CHECKLIST TYPE TABS
     # ============================================
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        cs_dept = st.selectbox("Department", ["All"] + sorted(df["department"].dropna().unique().tolist()), key="cs_dept")
-    with c2:
-        cs_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cs_bldg")
-    with c3:
-        cs_status = st.selectbox("Enrollment", ["All", "Enrolled", "Not Enrolled"], key="cs_status")
-    with c4:
-        cs_search = st.text_input("🔍 Search", key="cs_search", placeholder="Asset name...")
+    st.markdown("### 📋 Checklist Reports")
     
-    # Apply filters
-    display_df = df.copy()
-    if cs_dept != "All": display_df = display_df[display_df["department"] == cs_dept]
-    if cs_bldg != "All": display_df = display_df[display_df["location_building"] == cs_bldg]
-    if cs_status == "Enrolled": 
-        display_df = display_df[display_df["checklist"].notna() & (display_df["checklist"] != "") & (display_df["checklist"] != "NA")]
-    elif cs_status == "Not Enrolled":
-        display_df = display_df[~(display_df["checklist"].notna() & (display_df["checklist"] != "") & (display_df["checklist"] != "NA"))]
-    if cs_search:
-        display_df = display_df[display_df["name"].str.contains(cs_search, case=False, na=False)]
+    checklist_tabs = st.tabs(["📅 Scheduled PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 Summary"])
     
-    st.caption(f"📋 Showing {len(display_df)} of {total_assets} assets")
+    # Apply base filters
+    filtered = df.copy()
+    if sel_dept != "All": filtered = filtered[filtered["department"] == sel_dept]
+    if sel_asset != "All": filtered = filtered[filtered["name"] == sel_asset]
+    if sel_sub != "All": filtered = filtered[filtered["parent_asset"] == sel_sub]
+    if sel_bldg != "All": filtered = filtered[filtered["location_building"] == sel_bldg]
+    
+    total_filtered = len(filtered)
+    enrolled_count = len(filtered[filtered["checklist"].notna() & (filtered["checklist"] != "") & (filtered["checklist"] != "NA")])
+    not_enrolled = total_filtered - enrolled_count
     
     # ============================================
-    # CHECKLIST TABLE
+    # TAB 0: SCHEDULED PPM
     # ============================================
-    if len(display_df) > 0:
-        for _, asset in display_df.iterrows():
-            is_enrolled = pd.notna(asset.get("checklist")) and str(asset.get("checklist","")).strip() not in ["","NA","na"]
-            border_color = "#10B981" if is_enrolled else "#F59E0B"
-            bg_color = "#ECFDF5" if is_enrolled else "#FFFBEB"
-            status_text = "✅ ENROLLED" if is_enrolled else "⚠️ NOT ENROLLED"
-            
-            with st.expander(f"{'✅' if is_enrolled else '⚠️'} {asset.get('name','N/A')} — {asset.get('department','')} | {status_text}"):
-                c1, c2 = st.columns([2, 1])
-                with c1:
-                    st.write(f"**Asset Code:** {asset.get('asset_tag','N/A')}")
-                    st.write(f"**Department:** {asset.get('department','')} — {asset.get('sub_division','')}")
-                    st.write(f"**Location:** {asset.get('location_building','')}")
-                    st.write(f"**Manufacturer:** {asset.get('manufacturer','N/A')}")
-                    
-                    if is_enrolled:
-                        st.write(f"**Current Checklist:** {asset.get('checklist','N/A')}")
-                        st.write(f"**PPM Frequency:** {asset.get('ppm_frequency', asset.get('verification_frequency', 'N/A'))}")
-                    else:
-                        st.warning("No checklist enrolled for this asset.")
-                
-                with c2:
-                    # Enroll/Edit Checklist
-                    st.markdown("**📋 Enroll Checklist**")
-                    
-                    current_template = asset.get("checklist","")
-                    default_idx = 0
-                    if current_template and current_template in template_names:
-                        default_idx = template_names.index(current_template) + 1
-                    
-                    template_options = ["Select Template..."] + template_names
-                    selected_template = st.selectbox("Template", template_options, index=min(default_idx, len(template_options)-1), key=f"cs_template_{asset.get('id','')}")
-                    
-                    new_frequency = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], 
-                        index=["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"].index(asset.get("ppm_frequency","Monthly")) if asset.get("ppm_frequency") in ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"] else 3,
-                        key=f"cs_freq_{asset.get('id','')}")
-                    
-                    if st.button("💾 Enroll / Update", key=f"cs_enroll_{asset.get('id','')}", use_container_width=True):
-                        if selected_template != "Select Template...":
-                            DB.update("assets", asset["id"], {
-                                "checklist": selected_template,
-                                "ppm_frequency": new_frequency,
-                                "checklist_template": selected_template
-                            })
-                            st.success(f"✅ {asset.get('name','N/A')} enrolled with {selected_template}!")
-                            st.rerun()
-                        else:
-                            st.error("⚠️ Please select a template")
-                    
-                    if is_enrolled:
-                        if st.button("🗑️ Remove Enrollment", key=f"cs_remove_{asset.get('id','')}", use_container_width=True):
-                            DB.update("assets", asset["id"], {"checklist": None, "checklist_template": None})
-                            st.warning("Checklist enrollment removed")
-                            st.rerun()
-    else:
-        st.info("No assets match your filters.")
-    
-    st.markdown("---")
-    
-    # ============================================
-    # BULK ENROLLMENT
-    # ============================================
-    st.markdown("### 📦 Bulk Enrollment")
-    
-    with st.form("bulk_enroll_form"):
+    with checklist_tabs[0]:
+        st.markdown("#### 📅 Scheduled PPM Checklist Status")
+        
         c1, c2, c3 = st.columns(3)
+        with c1: st.metric("📋 Total", total_filtered)
+        with c2: st.metric("⏳ Pending", not_enrolled)
+        with c3: st.metric("✅ Enrolled", enrolled_count)
+        
+        st.markdown("---")
+        
+        # Pagination
+        page_size = 20
+        if "cs_page_scheduled" not in st.session_state:
+            st.session_state.cs_page_scheduled = 1
+        
+        total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+        start = (st.session_state.cs_page_scheduled - 1) * page_size
+        end = min(start + page_size, total_filtered)
+        
+        page_data = filtered.iloc[start:end]
+        
+        # Pagination controls
+        c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
         with c1:
-            bulk_dept = st.selectbox("Target Department", ["All"] + sorted(df["department"].dropna().unique().tolist()), key="bulk_dept")
+            if st.button("◀◀", key="cs_first_sched"): st.session_state.cs_page_scheduled = 1; st.rerun()
         with c2:
-            bulk_bldg = st.selectbox("Target Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="bulk_bldg")
+            if st.button("◀", key="cs_prev_sched") and st.session_state.cs_page_scheduled > 1:
+                st.session_state.cs_page_scheduled -= 1; st.rerun()
         with c3:
-            bulk_template = st.selectbox("Checklist Template", template_names, key="bulk_template")
+            st.markdown(f"**Page {st.session_state.cs_page_scheduled} of {total_pages}**")
+        with c4:
+            if st.button("▶", key="cs_next_sched") and st.session_state.cs_page_scheduled < total_pages:
+                st.session_state.cs_page_scheduled += 1; st.rerun()
+        with c5:
+            if st.button("▶▶", key="cs_last_sched"): st.session_state.cs_page_scheduled = total_pages; st.rerun()
         
-        bulk_frequency = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="bulk_freq")
+        st.caption(f"Showing {start+1}–{end} of {total_filtered} assets")
         
-        if st.form_submit_button("🚀 BULK ENROLL", use_container_width=True, type="primary"):
-            if bulk_template:
-                bulk_df = df.copy()
-                if bulk_dept != "All": bulk_df = bulk_df[bulk_df["department"] == bulk_dept]
-                if bulk_bldg != "All": bulk_df = bulk_df[bulk_df["location_building"] == bulk_bldg]
-                
-                count = 0
-                for _, asset in bulk_df.iterrows():
-                    DB.update("assets", asset["id"], {
-                        "checklist": bulk_template,
-                        "ppm_frequency": bulk_frequency,
-                        "checklist_template": bulk_template
-                    })
-                    count += 1
-                
-                st.success(f"✅ {count} assets enrolled with {bulk_template}!")
-                st.balloons()
-                st.rerun()
-            else:
-                st.error("⚠️ Please select a template")
-    
-    st.markdown("---")
-    
-    # ============================================
-    # TEMPLATE REFERENCE
-    # ============================================
-    st.markdown("### 📋 Available International Standard Templates")
-    
-    if templates.data:
-        for t in templates.data:
-            items_count = 0
-            items_res = supabase.table("ppm_checklist_items").select("id", count="exact").eq("template_id", t["id"]).execute()
-            items_count = items_res.count or 0
+        for _, asset in page_data.iterrows():
+            is_enrolled = pd.notna(asset.get("checklist")) and str(asset.get("checklist","")).strip() not in ["","NA","na"]
+            border = "#10B981" if is_enrolled else "#e5e7eb"
+            bg = "#ECFDF5" if is_enrolled else "#fafafa"
+            badge = "✅ Enrolled" if is_enrolled else "⚠️ Not Enrolled"
+            badge_bg = "#10B981" if is_enrolled else "#F59E0B"
             
             st.markdown(f"""
-            <div style="background:white;border-radius:8px;padding:0.8rem;margin:0.3rem 0;border-left:4px solid #3B82F6;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <b>{t.get('template_name','')}</b> — {t.get('international_standard','')}
-                <br><span style="font-size:0.7rem;color:#666;">📋 {items_count} checklist items | 🏷️ {t.get('asset_category','')}</span>
+            <div style="background:{bg};border-left:3px solid {border};border-radius:6px;padding:0.5rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <b>{asset.get('name','N/A')}</b>
+                    <br><span style="font-size:0.65rem;color:#666;">{asset.get('department','')} | {asset.get('location_building','')} | {asset.get('ppm_frequency', asset.get('verification_frequency', 'N/A'))}</span>
+                </div>
+                <span style="background:{badge_bg};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{badge}</span>
             </div>
             """, unsafe_allow_html=True)
-    else:
-        st.info("No checklist templates configured.")
+    
+    # ============================================
+    # TAB 1: DAILY CHECKLIST
+    # ============================================
+    with checklist_tabs[1]:
+        st.markdown("#### 📋 Daily Checklist Status")
+        
+        daily_assets = filtered[filtered["verification_frequency"].isin(["Daily","daily"])] if "verification_frequency" in filtered.columns else filtered.head(10)
+        
+        c1, c2 = st.columns(2)
+        with c1: st.metric("📋 Total Daily", len(daily_assets))
+        with c2: st.metric("⏳ Pending Today", len(daily_assets))
+        
+        st.markdown("---")
+        
+        # Pagination for daily
+        page_size = 20
+        if "cs_page_daily" not in st.session_state:
+            st.session_state.cs_page_daily = 1
+        
+        total_pages_d = max(1, (len(daily_assets) + page_size - 1) // page_size)
+        start_d = (st.session_state.cs_page_daily - 1) * page_size
+        end_d = min(start_d + page_size, len(daily_assets))
+        
+        c1, c2, c3 = st.columns([1, 1, 2])
+        with c1:
+            if st.button("◀", key="cs_prev_daily") and st.session_state.cs_page_daily > 1:
+                st.session_state.cs_page_daily -= 1; st.rerun()
+        with c2:
+            if st.button("▶", key="cs_next_daily") and st.session_state.cs_page_daily < total_pages_d:
+                st.session_state.cs_page_daily += 1; st.rerun()
+        with c3:
+            st.markdown(f"**Page {st.session_state.cs_page_daily} of {total_pages_d}**")
+        
+        st.caption(f"Showing {start_d+1}–{end_d} of {len(daily_assets)}")
+        
+        if len(daily_assets) > 0:
+            for _, asset in daily_assets.iloc[start_d:end_d].iterrows():
+                st.markdown(f"""
+                <div style="background:white;border-left:3px solid #3B82F6;border-radius:6px;padding:0.5rem;margin:0.2rem 0;">
+                    <b>{asset.get('name','N/A')}</b> — {asset.get('department','')}
+                    <br><span style="font-size:0.65rem;color:#666;">📍 {asset.get('location_building','')} | 📅 Daily</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No daily checklist assets found.")
+    
+    # ============================================
+    # TAB 2: HOURLY CHECKLIST
+    # ============================================
+    with checklist_tabs[2]:
+        st.markdown("#### ⏰ Hourly Checklist Status")
+        
+        hourly_assets = filtered[filtered["verification_frequency"].isin(["Hourly","hourly","Bi-Weekly"])] if "verification_frequency" in filtered.columns else pd.DataFrame()
+        
+        c1, c2 = st.columns(2)
+        with c1: st.metric("📋 Total Hourly/Bi-Weekly", len(hourly_assets))
+        with c2: st.metric("⏳ Pending", len(hourly_assets))
+        
+        st.markdown("---")
+        
+        if len(hourly_assets) > 0:
+            for _, asset in hourly_assets.head(20).iterrows():
+                st.markdown(f"""
+                <div style="background:white;border-left:3px solid #8B5CF6;border-radius:6px;padding:0.5rem;margin:0.2rem 0;">
+                    <b>{asset.get('name','N/A')}</b> — {asset.get('department','')}
+                    <br><span style="font-size:0.65rem;color:#666;">📍 {asset.get('location_building','')} | ⏰ {asset.get('verification_frequency','N/A')}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No hourly checklist assets found.")
+    
+    # ============================================
+    # TAB 3: SUMMARY
+    # ============================================
+    with checklist_tabs[3]:
+        st.markdown("#### 📊 Checklist Summary")
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #CC0000;"><div style="font-size:0.6rem;color:#888;">Total Assets</div><div style="font-size:1.8rem;font-weight:800;">{total_filtered}</div></div>""", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #10B981;"><div style="font-size:0.6rem;color:#888;">✅ Enrolled</div><div style="font-size:1.8rem;font-weight:800;color:#10B981;">{enrolled_count}</div></div>""", unsafe_allow_html=True)
+        with c3:
+            st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #F59E0B;"><div style="font-size:0.6rem;color:#888;">⏳ Pending</div><div style="font-size:1.8rem;font-weight:800;color:#F59E0B;">{not_enrolled}</div></div>""", unsafe_allow_html=True)
+        with c4:
+            rate = round(enrolled_count/total_filtered*100,1) if total_filtered > 0 else 0
+            st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #3B82F6;"><div style="font-size:0.6rem;color:#888;">Enrollment Rate</div><div style="font-size:1.8rem;font-weight:800;color:#3B82F6;">{rate}%</div></div>""", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Template reference
+        st.markdown("### 📋 Available Templates")
+        if templates.data:
+            for t in templates.data:
+                items_count = 0
+                try:
+                    items_res = supabase.table("ppm_checklist_items").select("id", count="exact").eq("template_id", t["id"]).execute()
+                    items_count = items_res.count or 0
+                except: pass
+                
+                st.markdown(f"""
+                <div style="background:white;border-radius:8px;padding:0.6rem;margin:0.2rem 0;border-left:4px solid #3B82F6;">
+                    <b>{t.get('template_name','')}</b> — {t.get('international_standard','')}
+                    <br><span style="font-size:0.65rem;color:#666;">📋 {items_count} items | 🏷️ {t.get('asset_category','')}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Bulk enrollment
+        st.markdown("---")
+        st.markdown("### 📦 Bulk Enrollment")
+        with st.form("cs_bulk_enroll"):
+            c1, c2 = st.columns(2)
+            with c1:
+                bulk_template = st.selectbox("Template", template_names, key="cs_bulk_tpl")
+            with c2:
+                bulk_freq = st.selectbox("Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="cs_bulk_freq")
+            
+            if st.form_submit_button("🚀 Enroll All Filtered Assets", use_container_width=True, type="primary"):
+                count = 0
+                for _, asset in filtered.iterrows():
+                    DB.update("assets", asset["id"], {"checklist": bulk_template, "ppm_frequency": bulk_freq, "checklist_template": bulk_template})
+                    count += 1
+                st.success(f"✅ {count} assets enrolled!")
+                st.balloons()
+                st.rerun()
 
 # ============================================
 # INCIDENT CHECK (FULL)
