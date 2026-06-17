@@ -5694,7 +5694,7 @@ def page_cs():
     # ============================================
     st.markdown("### 📋 Checklist Reports")
     
-    checklist_tabs = st.tabs(["📅 Scheduled PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 Summary"])
+    checklist_tabs = st.tabs(["📅 Scheduled PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 Summary", "📋 Consolidated Report"])
     
     # Apply base filters
     filtered = df.copy()
@@ -5927,6 +5927,124 @@ def page_cs():
                     st.rerun()
                 else:
                     st.error("⚠️ Please select a template")
+
+# ============================================
+    # TAB 4: CONSOLIDATED REPORT
+    # ============================================
+    with checklist_tabs[4]:
+        st.markdown("#### 📋 Consolidated Checklist Report")
+        
+        # Build consolidated data
+        consolidated = []
+        for _, asset in filtered.iterrows():
+            is_enrolled = pd.notna(asset.get("checklist")) and str(asset.get("checklist","")).strip() not in ["","NA","na"]
+            
+            consolidated.append({
+                "SNO": len(consolidated) + 1,
+                "Asset": asset.get("parent_asset", "") or asset.get("name", "N/A"),
+                "Sub Asset": asset.get("name", "N/A"),
+                "Checklist Name": asset.get("checklist", "Not Enrolled") if is_enrolled else "Not Enrolled",
+                "Frequency": asset.get("ppm_frequency", asset.get("verification_frequency", "N/A")),
+                "Date": str(today),
+                "Status": "Enrolled" if is_enrolled else "Pending"
+            })
+        
+        cons_df = pd.DataFrame(consolidated)
+        
+        # Filters for consolidated view
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            cons_status = st.selectbox("Status", ["All", "Enrolled", "Pending"], key="cons_status")
+        with c2:
+            cons_freq = st.selectbox("Frequency", ["All", "Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="cons_freq")
+        with c3:
+            cons_search = st.text_input("🔍 Search Asset or Checklist", key="cons_search", placeholder="Search...")
+        
+        # Apply filters
+        display_cons = cons_df.copy()
+        if cons_status != "All":
+            display_cons = display_cons[display_cons["Status"] == cons_status]
+        if cons_freq != "All":
+            display_cons = display_cons[display_cons["Frequency"] == cons_freq]
+        if cons_search:
+            mask = display_cons["Asset"].str.contains(cons_search, case=False, na=False) | display_cons["Sub Asset"].str.contains(cons_search, case=False, na=False) | display_cons["Checklist Name"].str.contains(cons_search, case=False, na=False)
+            display_cons = display_cons[mask]
+        
+        # Counts
+        enrolled_total = len(display_cons[display_cons["Status"] == "Enrolled"])
+        pending_total = len(display_cons[display_cons["Status"] == "Pending"])
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("📋 Total", len(display_cons))
+        with c2: st.metric("⏳ Pending", pending_total)
+        with c3: st.metric("✅ Enrolled", enrolled_total)
+        
+        st.markdown("---")
+        
+        # Pagination
+        page_size = 25
+        if "cons_page" not in st.session_state:
+            st.session_state.cons_page = 1
+        
+        total_pages_cons = max(1, (len(display_cons) + page_size - 1) // page_size)
+        start_cons = (st.session_state.cons_page - 1) * page_size
+        end_cons = min(start_cons + page_size, len(display_cons))
+        
+        page_data_cons = display_cons.iloc[start_cons:end_cons]
+        
+        # Pagination controls
+        c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+        with c1:
+            if st.button("◀◀", key="cons_first"): st.session_state.cons_page = 1; st.rerun()
+        with c2:
+            if st.button("◀", key="cons_prev") and st.session_state.cons_page > 1:
+                st.session_state.cons_page -= 1; st.rerun()
+        with c3:
+            st.markdown(f"**Page {st.session_state.cons_page} of {total_pages_cons}**")
+        with c4:
+            if st.button("▶", key="cons_next") and st.session_state.cons_page < total_pages_cons:
+                st.session_state.cons_page += 1; st.rerun()
+        with c5:
+            if st.button("▶▶", key="cons_last"): st.session_state.cons_page = total_pages_cons; st.rerun()
+        
+        st.caption(f"Showing {start_cons+1}–{end_cons} of {len(display_cons)} records")
+        
+        # Table with color coding
+        if len(page_data_cons) > 0:
+            for _, row in page_data_cons.iterrows():
+                is_enrolled_row = row["Status"] == "Enrolled"
+                border = "#10B981" if is_enrolled_row else "#F59E0B"
+                bg = "#ECFDF5" if is_enrolled_row else "#FFFBEB"
+                badge = "✅ Enrolled" if is_enrolled_row else "⏳ Pending"
+                badge_bg = "#10B981" if is_enrolled_row else "#F59E0B"
+                
+                st.markdown(f"""
+                <div style="background:{bg};border-left:3px solid {border};border-radius:6px;padding:0.5rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="flex:1;">
+                        <b>#{row['SNO']} {row['Asset']}</b>
+                        <br><span style="font-size:0.65rem;color:#666;">└ {row['Sub Asset'][:80]}</span>
+                        <br><span style="font-size:0.6rem;color:#888;">📋 {row['Checklist Name']} | 📅 {row['Frequency']} | {row['Date']}</span>
+                    </div>
+                    <span style="background:{badge_bg};color:white;padding:3px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;white-space:nowrap;">{badge}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No records match your filters.")
+        
+        # Export
+        st.markdown("---")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button("📥 Download CSV", display_cons.to_csv(index=False), f"consolidated_checklist_{today}.csv", "text/csv", use_container_width=True)
+        with c2:
+            logo_b64 = get_logo_base64()
+            html_export = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px;font-size:10px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:6px}}td{{padding:4px;border-bottom:1px solid #eee}}.enrolled{{color:#059669}}.pending{{color:#D97706}}</style></head><body><h1>Consolidated Checklist Report</h1><p>{info.get('full_name',fc)} | {today}</p><table><tr><th>SNO</th><th>Asset</th><th>Sub Asset</th><th>Checklist</th><th>Frequency</th><th>Status</th></tr>"""
+            for _, r in display_cons.head(200).iterrows():
+                cls = "enrolled" if r['Status'] == "Enrolled" else "pending"
+                html_export += f"<tr><td>{r['SNO']}</td><td>{r['Asset']}</td><td>{r['Sub Asset'][:60]}</td><td>{r['Checklist Name']}</td><td>{r['Frequency']}</td><td class='{cls}'>{r['Status']}</td></tr>"
+            html_export += "</table></body></html>"
+            st.download_button("📥 Download HTML", html_export, f"consolidated_checklist_{today}.html", "text/html", use_container_width=True)
+
 
 # ============================================
 # INCIDENT CHECK (FULL)
