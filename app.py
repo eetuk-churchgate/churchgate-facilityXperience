@@ -5636,6 +5636,7 @@ def page_cal():
 def page_cs():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
+    today = date.today()
     
     st.markdown(f'## ✅ Checklist Status — {info.get("full_name", fc)}')
     
@@ -5671,9 +5672,16 @@ def page_cs():
         asset_list = ["All"] + sorted(dept_assets["name"].dropna().unique().tolist())
         sel_asset = st.selectbox("Select Asset", asset_list, key="cs_asset")
     with c3:
-        # Sub-asset (parent asset)
+        # Sub-asset (parent asset) — filtered by selected asset
         if sel_asset != "All":
-            sub_list = ["All"] + sorted(dept_assets[dept_assets["name"] == sel_asset]["parent_asset"].dropna().unique().tolist())
+            asset_parent = dept_assets[dept_assets["name"] == sel_asset]["parent_asset"].dropna()
+            if len(asset_parent) > 0:
+                parent_val = asset_parent.iloc[0]
+                # Show all sub-assets under this parent
+                sub_assets = dept_assets[dept_assets["parent_asset"] == parent_val]["name"].dropna()
+                sub_list = ["All"] + sorted(sub_assets.unique().tolist())
+            else:
+                sub_list = ["All"]
         else:
             sub_list = ["All"]
         sel_sub = st.selectbox("Select Sub Asset", sub_list, key="cs_sub")
