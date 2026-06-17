@@ -6193,7 +6193,8 @@ def page_ppm_activities():
     # ============================================
     # MAIN TABS
     # ============================================
-    tabs = st.tabs(["🔧 Execute PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 My Submissions", "⏳ Pending Approval", "⚙️ Checklist Builder"])
+    tabs = st.tabs(["🔧 Execute PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 My Submissions", "⏳ Pending Approval", "⚙️ Checklist Builder", "📋 Manage Schedules"])
+
     
     # ============================================
     # TAB 0: EXECUTE PPM (SCHEDULED)
@@ -7261,6 +7262,111 @@ def page_ppm_activities():
                     st.session_state.page = "cs"
                     st.rerun()
 
+    # ============================================
+    # TAB 6: MANAGE ENROLLED PPM SCHEDULES (ADMIN ONLY)
+    # ============================================
+    with tabs[6]:
+        st.markdown("### 📋 Manage Enrolled PPM Schedules")
+        
+        if not is_admin:
+            st.error("⛔ Admin access only")
+        else:
+            all_schedules = supabase.table("ppm_schedules").select("*").eq("facility_code", fc).order("next_due_date", desc=False).execute()
+            
+            if all_schedules.data and len(all_schedules.data) > 0:
+                sched_df = pd.DataFrame(all_schedules.data)
+                
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    filter_status = st.selectbox("Status", ["All", "scheduled", "completed", "overdue"], key="mgmt_status")
+                with c2:
+                    filter_freq = st.selectbox("Frequency", ["All", "Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="mgmt_freq")
+                with c3:
+                    search_sched = st.text_input("🔍 Search by title", key="mgmt_search", placeholder="Asset name...")
+                
+                display_sched = sched_df.copy()
+                if filter_status != "All":
+                    display_sched = display_sched[display_sched["status"] == filter_status]
+                if filter_freq != "All":
+                    display_sched = display_sched[display_sched["frequency"] == filter_freq]
+                if search_sched:
+                    display_sched = display_sched[display_sched["title"].str.contains(search_sched, case=False, na=False)]
+                
+                st.caption(f"📋 Showing {len(display_sched)} of {len(sched_df)} schedules")
+                
+                page_size = 15
+                if "mgmt_page" not in st.session_state:
+                    st.session_state.mgmt_page = 1
+                
+                total_pages = max(1, (len(display_sched) + page_size - 1) // page_size)
+                start = (st.session_state.mgmt_page - 1) * page_size
+                end = min(start + page_size, len(display_sched))
+                
+                c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+                with c1:
+                    if st.button("◀◀", key="mgmt_first"): st.session_state.mgmt_page = 1; st.rerun()
+                with c2:
+                    if st.button("◀", key="mgmt_prev") and st.session_state.mgmt_page > 1:
+                        st.session_state.mgmt_page -= 1; st.rerun()
+                with c3:
+                    st.markdown(f"**Page {st.session_state.mgmt_page} of {total_pages}**")
+                with c4:
+                    if st.button("▶", key="mgmt_next") and st.session_state.mgmt_page < total_pages:
+                        st.session_state.mgmt_page += 1; st.rerun()
+                with c5:
+                    if st.button("▶▶", key="mgmt_last"): st.session_state.mgmt_page = total_pages; st.rerun()
+                
+                page_data = display_sched.iloc[start:end]
+                
+                for _, sched in page_data.iterrows():
+                    status = sched.get("status", "scheduled")
+                    sc = {"scheduled": "#3B82F6", "completed": "#10B981", "overdue": "#EF4444"}.get(status, "#3B82F6")
+                    
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="background:white;border-left:5px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <b>{sched.get('title','N/A')[:80]}</b>
+                                    <br><span style="font-size:0.7rem;color:#666;">📅 Due: {sched.get('next_due_date','')} | 🔄 {sched.get('frequency','')} | 👤 {sched.get('assigned_team','')}</span>
+                                </div>
+                                <span style="background:{sc};color:white;padding:3px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">{status.upper()}</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        with st.expander("✏️ Edit Schedule"):
+                            c1, c2, c3 = st.columns(3)
+                            with c1:
+                                new_date = st.date_input("New Due Date", 
+                                    value=datetime.strptime(str(sched.get('next_due_date',''))[:10], "%Y-%m-%d").date() if sched.get('next_due_date') else date.today(),
+                                    key=f"edit_date_{sched['id']}")
+                            with c2:
+                                new_freq = st.selectbox("Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"],
+                                    index=["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"].index(sched.get("frequency","Monthly")) if sched.get("frequency","Monthly") in ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"] else 3,
+                                    key=f"edit_freq_{sched['id']}")
+                            with c3:
+                                new_status = st.selectbox("Status", ["scheduled","completed","overdue"],
+                                    index=["scheduled","completed","overdue"].index(sched.get("status","scheduled")) if sched.get("status","scheduled") in ["scheduled","completed","overdue"] else 0,
+                                    key=f"edit_status_{sched['id']}")
+                            
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if st.button("💾 Update", key=f"btn_update_{sched['id']}", use_container_width=True):
+                                    supabase.table("ppm_schedules").update({
+                                        "next_due_date": str(new_date),
+                                        "frequency": new_freq,
+                                        "status": new_status
+                                    }).eq("id", sched["id"]).execute()
+                                    st.success("✅ Updated!")
+                                    st.rerun()
+                            with c2:
+                                if st.button("🗑️ Delete", key=f"btn_delete_{sched['id']}", use_container_width=True):
+                                    supabase.table("ppm_schedules").delete().eq("id", sched["id"]).execute()
+                                    st.warning("🗑️ Deleted!")
+                                    st.rerun()
+            else:
+                st.info("No PPM schedules found.")
 
 # ============================================
 # ROUTER
