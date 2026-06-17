@@ -1487,9 +1487,9 @@ def page_ar():
             if len(rd_df) > 0:
                 styled = rd_df.style
                 if "Condition" in rd_df.columns:
-                    styled = styled.applymap(highlight_condition, subset=["Condition"])
+                    styled = styled.map(highlight_condition, subset=["Condition"])
                 if "Priority" in rd_df.columns:
-                    styled = styled.applymap(highlight_priority, subset=["Priority"])
+                    styled = styled.map(highlight_priority, subset=["Priority"])
                 
                 st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
             else:
