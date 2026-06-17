@@ -6381,11 +6381,10 @@ def page_ppm_activities():
                                     for item_result in checklist_results:
                                         supabase.table("ppm_execution_items").insert({
                                             "execution_id": execution_id,
-                                            "item_number": item_result["item_number"],
-                                            "description": item_result["description"],
-                                            "result": item_result["result"],
-                                            "actual_value": item_result["actual_value"],
-                                            "risk_level": item_result.get("risk_level", "None"),
+                                            "item_number": int(item_result.get("item_number", 1)),
+                                            "description": str(item_result.get("description", "N/A")),
+                                            "result": str(item_result.get("result", "pass")),
+                                            "actual_value": str(item_result.get("actual_value", "")),
                                             "created_at": datetime.now().isoformat()
                                         }).execute()
                                     
