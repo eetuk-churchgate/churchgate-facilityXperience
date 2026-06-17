@@ -570,7 +570,8 @@ def sidebar():
         
         all_nav = [
             ("🏠 COMMAND", [("🌐 Command Center", "cc"), ("📊 PPM Dashboard", "ppm")], ["Command Center", "PPM Dashboard"]),
-            ("🏗️ ASSETS & PPM", [("📋 Asset Register", "ar"), ("📅 52-Week Calendar", "cal"), ("✅ Checklist Status", "cs")], ["Asset Register", "52-Week Calendar", "Checklist Status"]),
+            ("🏗️ ASSETS & PPM", [("📋 Asset Register", "ar"), ("🔧 PPM Activities", "ppma"), ("✅ Checklist Status", "cs")], ["Asset Register", "PPM Activities", "Checklist Status"]),
+ Status", "cs")], ["Asset Register", "PPM Activities", "52-Week Calendar", "Checklist Status"]),
             ("🔧 MAINTENANCE", [("📋 Work Orders", "wo"), ("🛡️ Work Permits", "wp")], ["Work Orders", "Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"]),
             ("🏢 FACILITY OPERATIONS", [("📊 Operations Dashboard", "fo"), ("✅ Observations/Alerts", "oa")], ["Facility Operations"]),
             ("👥 PEOPLE", [("🛂 Visitor Management", "vm"), ("👤 User Management", "up")], ["Visitor Management", "User Management"]),
@@ -5630,20 +5631,195 @@ def page_cal():
     st.caption(f"📅 Current Week: {today.isocalendar()[1]} | {today.strftime('%d %B %Y')}")
 
 # ============================================
-# CHECKLIST STATUS (FULL)
+# CHECKLIST STATUS — ENROLLMENT & ACTIVATION
 # ============================================
 def page_cs():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## ✅ Checklist Status — {info.get("full_name",fc)}')
-    cats=DB.get_categories()
-    cat_names=sorted(list(set(c.get("name","") for c in cats)))
-    dept=st.selectbox("Select Department",cat_names)
-    assets=DB.get_assets(fc,200)
-    if assets:
-        df=pd.DataFrame(assets)
-        df["department"]=df["asset_categories"].apply(lambda x: x.get("name","") if isinstance(x,dict) else "")
-        df=df[df["department"]==dept] if dept else df
-        st.dataframe(df[[c for c in ["asset_tag","name","status","condition_rating","location_building","location_floor"] if c in df.columns]],use_container_width=True,hide_index=True)
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    
+    st.markdown(f'## ✅ Checklist Status — {info.get("full_name", fc)}')
+    
+    all_assets = DB.get_assets(fc, 50000)
+    
+    if not all_assets:
+        st.info("No assets registered.")
+        return
+    
+    df = pd.DataFrame(all_assets)
+    
+    # Get all checklist templates
+    templates = supabase.table("ppm_checklist_templates").select("*").execute()
+    template_names = [t.get("template_name","") for t in templates.data] if templates.data else []
+    
+    # ============================================
+    # KPI CARDS
+    # ============================================
+    total_assets = len(df)
+    enrolled = len(df[df["checklist"].notna() & (df["checklist"] != "") & (df["checklist"] != "NA")]) if "checklist" in df.columns else 0
+    not_enrolled = total_assets - enrolled
+    
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Total Assets</div><div style="font-size:1.8rem;font-weight:800;">{total_assets}</div></div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">✅ Enrolled</div><div style="font-size:1.8rem;font-weight:800;color:#10B981;">{enrolled}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">⚠️ Not Enrolled</div><div style="font-size:1.8rem;font-weight:800;color:#F59E0B;">{not_enrolled}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        enrollment_rate = round(enrolled/total_assets*100, 1) if total_assets > 0 else 0
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Enrollment Rate</div><div style="font-size:1.8rem;font-weight:800;color:#3B82F6;">{enrollment_rate}%</div></div>""", unsafe_allow_html=True)
+    
+    if enrollment_rate < 50:
+        st.warning(f"🤖 **AI Insight:** Only {enrollment_rate}% of assets have checklists enrolled. Recommend bulk enrollment for remaining {not_enrolled} assets.")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # FILTERS
+    # ============================================
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        cs_dept = st.selectbox("Department", ["All"] + sorted(df["department"].dropna().unique().tolist()), key="cs_dept")
+    with c2:
+        cs_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cs_bldg")
+    with c3:
+        cs_status = st.selectbox("Enrollment", ["All", "Enrolled", "Not Enrolled"], key="cs_status")
+    with c4:
+        cs_search = st.text_input("🔍 Search", key="cs_search", placeholder="Asset name...")
+    
+    # Apply filters
+    display_df = df.copy()
+    if cs_dept != "All": display_df = display_df[display_df["department"] == cs_dept]
+    if cs_bldg != "All": display_df = display_df[display_df["location_building"] == cs_bldg]
+    if cs_status == "Enrolled": 
+        display_df = display_df[display_df["checklist"].notna() & (display_df["checklist"] != "") & (display_df["checklist"] != "NA")]
+    elif cs_status == "Not Enrolled":
+        display_df = display_df[~(display_df["checklist"].notna() & (display_df["checklist"] != "") & (display_df["checklist"] != "NA"))]
+    if cs_search:
+        display_df = display_df[display_df["name"].str.contains(cs_search, case=False, na=False)]
+    
+    st.caption(f"📋 Showing {len(display_df)} of {total_assets} assets")
+    
+    # ============================================
+    # CHECKLIST TABLE
+    # ============================================
+    if len(display_df) > 0:
+        for _, asset in display_df.iterrows():
+            is_enrolled = pd.notna(asset.get("checklist")) and str(asset.get("checklist","")).strip() not in ["","NA","na"]
+            border_color = "#10B981" if is_enrolled else "#F59E0B"
+            bg_color = "#ECFDF5" if is_enrolled else "#FFFBEB"
+            status_text = "✅ ENROLLED" if is_enrolled else "⚠️ NOT ENROLLED"
+            
+            with st.expander(f"{'✅' if is_enrolled else '⚠️'} {asset.get('name','N/A')} — {asset.get('department','')} | {status_text}"):
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    st.write(f"**Asset Code:** {asset.get('asset_tag','N/A')}")
+                    st.write(f"**Department:** {asset.get('department','')} — {asset.get('sub_division','')}")
+                    st.write(f"**Location:** {asset.get('location_building','')}")
+                    st.write(f"**Manufacturer:** {asset.get('manufacturer','N/A')}")
+                    
+                    if is_enrolled:
+                        st.write(f"**Current Checklist:** {asset.get('checklist','N/A')}")
+                        st.write(f"**PPM Frequency:** {asset.get('ppm_frequency', asset.get('verification_frequency', 'N/A'))}")
+                    else:
+                        st.warning("No checklist enrolled for this asset.")
+                
+                with c2:
+                    # Enroll/Edit Checklist
+                    st.markdown("**📋 Enroll Checklist**")
+                    
+                    current_template = asset.get("checklist","")
+                    default_idx = 0
+                    if current_template and current_template in template_names:
+                        default_idx = template_names.index(current_template) + 1
+                    
+                    template_options = ["Select Template..."] + template_names
+                    selected_template = st.selectbox("Template", template_options, index=min(default_idx, len(template_options)-1), key=f"cs_template_{asset.get('id','')}")
+                    
+                    new_frequency = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], 
+                        index=["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"].index(asset.get("ppm_frequency","Monthly")) if asset.get("ppm_frequency") in ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"] else 3,
+                        key=f"cs_freq_{asset.get('id','')}")
+                    
+                    if st.button("💾 Enroll / Update", key=f"cs_enroll_{asset.get('id','')}", use_container_width=True):
+                        if selected_template != "Select Template...":
+                            DB.update("assets", asset["id"], {
+                                "checklist": selected_template,
+                                "ppm_frequency": new_frequency,
+                                "checklist_template": selected_template
+                            })
+                            st.success(f"✅ {asset.get('name','N/A')} enrolled with {selected_template}!")
+                            st.rerun()
+                        else:
+                            st.error("⚠️ Please select a template")
+                    
+                    if is_enrolled:
+                        if st.button("🗑️ Remove Enrollment", key=f"cs_remove_{asset.get('id','')}", use_container_width=True):
+                            DB.update("assets", asset["id"], {"checklist": None, "checklist_template": None})
+                            st.warning("Checklist enrollment removed")
+                            st.rerun()
+    else:
+        st.info("No assets match your filters.")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # BULK ENROLLMENT
+    # ============================================
+    st.markdown("### 📦 Bulk Enrollment")
+    
+    with st.form("bulk_enroll_form"):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            bulk_dept = st.selectbox("Target Department", ["All"] + sorted(df["department"].dropna().unique().tolist()), key="bulk_dept")
+        with c2:
+            bulk_bldg = st.selectbox("Target Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="bulk_bldg")
+        with c3:
+            bulk_template = st.selectbox("Checklist Template", template_names, key="bulk_template")
+        
+        bulk_frequency = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="bulk_freq")
+        
+        if st.form_submit_button("🚀 BULK ENROLL", use_container_width=True, type="primary"):
+            if bulk_template:
+                bulk_df = df.copy()
+                if bulk_dept != "All": bulk_df = bulk_df[bulk_df["department"] == bulk_dept]
+                if bulk_bldg != "All": bulk_df = bulk_df[bulk_df["location_building"] == bulk_bldg]
+                
+                count = 0
+                for _, asset in bulk_df.iterrows():
+                    DB.update("assets", asset["id"], {
+                        "checklist": bulk_template,
+                        "ppm_frequency": bulk_frequency,
+                        "checklist_template": bulk_template
+                    })
+                    count += 1
+                
+                st.success(f"✅ {count} assets enrolled with {bulk_template}!")
+                st.balloons()
+                st.rerun()
+            else:
+                st.error("⚠️ Please select a template")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TEMPLATE REFERENCE
+    # ============================================
+    st.markdown("### 📋 Available International Standard Templates")
+    
+    if templates.data:
+        for t in templates.data:
+            items_count = 0
+            items_res = supabase.table("ppm_checklist_items").select("id", count="exact").eq("template_id", t["id"]).execute()
+            items_count = items_res.count or 0
+            
+            st.markdown(f"""
+            <div style="background:white;border-radius:8px;padding:0.8rem;margin:0.3rem 0;border-left:4px solid #3B82F6;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                <b>{t.get('template_name','')}</b> — {t.get('international_standard','')}
+                <br><span style="font-size:0.7rem;color:#666;">📋 {items_count} checklist items | 🏷️ {t.get('asset_category','')}</span>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("No checklist templates configured.")
 
 # ============================================
 # INCIDENT CHECK (FULL)
@@ -5716,6 +5892,324 @@ def page_mis():
 
 
 # ============================================
+# PPM ACTIVITIES — TEAM EXECUTION DASHBOARD
+# FORTUNE 500 GRADE — FULL CHECKLIST WORKFLOW
+# ============================================
+def page_ppm_activities():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    user_name = st.session_state.get("user_name", "Team Member")
+    is_admin = user_role in ["admin", "approver"]
+    
+    st.markdown(f'## 🔧 PPM Activities — {info.get("full_name", fc)}')
+    
+    tabs = st.tabs(["📋 My PPM Tasks", "✅ Submit PPM", "📊 My Submissions", "⏳ Pending Approval"])
+    
+    # ============================================
+    # TAB 0: MY PPM TASKS
+    # ============================================
+    with tabs[0]:
+        st.markdown("### 📋 My Assigned PPM Tasks")
+        
+        ppm_schedules = DB.get_all("ppm_schedules", fc, 5000)
+        
+        if ppm_schedules:
+            ppm_df = pd.DataFrame(ppm_schedules)
+            
+            # Filter for this user's tasks
+            if "assigned_team" in ppm_df.columns:
+                my_tasks = ppm_df[ppm_df["assigned_team"].str.contains(user_name, case=False, na=False)]
+            else:
+                my_tasks = ppm_df.head(20)
+            
+            if len(my_tasks) > 0:
+                today_date = date.today()
+                
+                # Status summary
+                pending_tasks = my_tasks[my_tasks["status"] == "scheduled"] if "status" in my_tasks.columns else my_tasks
+                overdue_tasks = my_tasks[(pd.to_datetime(my_tasks["next_due_date"], errors='coerce').dt.date < today_date) & (my_tasks["status"] != "completed")] if "next_due_date" in my_tasks.columns else pd.DataFrame()
+                
+                c1, c2, c3 = st.columns(3)
+                with c1: st.metric("📋 Total Tasks", len(my_tasks))
+                with c2: st.metric("⏳ Pending", len(pending_tasks))
+                with c3: st.metric("🔴 Overdue", len(overdue_tasks))
+                
+                st.markdown("---")
+                
+                for _, task in my_tasks.head(20).iterrows():
+                    status = task.get("status", "scheduled")
+                    sc = {"completed": "#10B981", "scheduled": "#3B82F6", "pending": "#F59E0B", "overdue": "#EF4444"}.get(status, "#3B82F6")
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <b>{task.get('title','N/A')}</b>
+                                <br><span style="font-size:0.7rem;color:#666;">📅 Due: {str(task.get('next_due_date',''))[:10]} | 🔄 {task.get('frequency','N/A')}</span>
+                            </div>
+                            <span style="background:{sc};color:white;padding:3px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">{status.upper()}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info("No PPM tasks assigned to you. Check back when tasks are assigned.")
+        else:
+            st.info("No PPM schedules configured.")
+    
+    # ============================================
+    # TAB 1: SUBMIT PPM — FULL CHECKLIST WORKFLOW
+    # ============================================
+    with tabs[1]:
+        st.markdown("### ✅ Submit PPM Execution")
+        
+        # Get all assets for selection
+        all_assets = DB.get_assets(fc, 5000)
+        if not all_assets:
+            st.warning("No assets found.")
+        else:
+            assets_df = pd.DataFrame(all_assets)
+            
+            # Step 1: Select Building
+            buildings = sorted(assets_df["location_building"].dropna().unique().tolist())
+            selected_building = st.selectbox("🏢 Select Building", ["Select..."] + buildings, key="ppm_building")
+            
+            if selected_building != "Select...":
+                # Step 2: Filter assets by building
+                building_assets = assets_df[assets_df["location_building"] == selected_building]
+                asset_names = sorted(building_assets["name"].dropna().tolist())
+                selected_asset_name = st.selectbox("🔧 Select Asset", ["Select..."] + asset_names, key="ppm_asset")
+                
+                if selected_asset_name != "Select...":
+                    selected_asset = building_assets[building_assets["name"] == selected_asset_name].iloc[0]
+                    
+                    st.markdown("---")
+                    st.markdown(f"#### 📋 Asset: **{selected_asset_name}**")
+                    st.caption(f"Department: {selected_asset.get('department','N/A')} | Location: {selected_asset.get('location_building','N/A')}")
+                    
+                    # Step 3: Load checklist template
+                    asset_category = selected_asset.get("category_name", "") or selected_asset.get("department", "")
+                    
+                    # Try to find matching checklist template
+                    templates = supabase.table("ppm_checklist_templates").select("*").execute()
+                    checklist_items = []
+                    
+                    if templates.data:
+                        # Find best matching template
+                        matched_template = None
+                        for t in templates.data:
+                            template_cat = t.get("asset_category", "").upper()
+                            asset_cat_upper = asset_category.upper()
+                            if template_cat in asset_cat_upper or asset_cat_upper in template_cat:
+                                matched_template = t
+                                break
+                        
+                        if matched_template:
+                            items_res = supabase.table("ppm_checklist_items").select("*").eq("template_id", matched_template["id"]).order("sort_number").execute()
+                            if items_res.data:
+                                checklist_items = items_res.data
+                                st.info(f"📋 Loaded checklist: **{matched_template.get('template_name')}** ({matched_template.get('international_standard','')})")
+                    
+                    if not checklist_items:
+                        # Default checklist
+                        checklist_items = [
+                            {"item_number": 1, "description": "Visual inspection of asset condition", "check_type": "visual", "expected_value": "No damage"},
+                            {"item_number": 2, "description": "Check for unusual noise/vibration", "check_type": "operational", "expected_value": "Smooth operation"},
+                            {"item_number": 3, "description": "Verify operating parameters", "check_type": "measurement", "expected_value": "Within range"},
+                            {"item_number": 4, "description": "Check connections and fittings", "check_type": "visual", "expected_value": "Tight and secure"},
+                            {"item_number": 5, "description": "Clean equipment and surrounding area", "check_type": "visual", "expected_value": "Clean"},
+                        ]
+                        st.info("📋 Using standard checklist template.")
+                    
+                    st.markdown("---")
+                    st.markdown("### 📝 PPM Checklist")
+                    
+                    with st.form("ppm_execution_form", clear_on_submit=True):
+                        checklist_results = []
+                        
+                        for item in checklist_items:
+                            st.markdown(f"**{item.get('item_number')}. {item.get('description')}**")
+                            exp_val = item.get('expected_value', 'N/A')
+                            st.caption(f"Expected: {exp_val} | Type: {item.get('check_type','visual')}")
+                            
+                            c1, c2 = st.columns([1, 2])
+                            with c1:
+                                result = st.selectbox("Result", ["Pass", "Fail", "N/A"], key=f"check_{item.get('item_number')}_{item.get('id','0')}")
+                            with c2:
+                                actual_value = st.text_input("Actual Value / Comment", key=f"actual_{item.get('item_number')}_{item.get('id','0')}", placeholder="Enter reading or observation...")
+                            
+                            checklist_results.append({
+                                "item_id": item.get("id"),
+                                "item_number": item.get("item_number"),
+                                "description": item.get("description"),
+                                "expected_value": exp_val,
+                                "result": result.lower(),
+                                "actual_value": actual_value
+                            })
+                            
+                            st.markdown("---")
+                        
+                        # Photo evidence
+                        st.markdown("### 📸 Photo Evidence (Required)")
+                        uploaded_photos = st.file_uploader("Upload photos of completed work", type=["png","jpg","jpeg"], accept_multiple_files=True, key="ppm_photos")
+                        
+                        # General comments
+                        st.markdown("### 📝 Execution Notes")
+                        execution_comments = st.text_area("Comments/Observations", height=80, placeholder="Any additional notes about this PPM execution...")
+                        
+                        # Execution date
+                        execution_date = st.date_input("Execution Date", date.today())
+                        execution_time = st.time_input("Execution Time", datetime.now().time())
+                        
+                        submitted = st.form_submit_button("✅ SUBMIT PPM EXECUTION", use_container_width=True, type="primary")
+                        
+                        if submitted:
+                            if not uploaded_photos:
+                                st.error("⚠️ Photo evidence is required before submission.")
+                            else:
+                                # Create execution record
+                                exec_data = {
+                                    "facility_code": fc,
+                                    "asset_id": selected_asset.get("id"),
+                                    "ppm_schedule_id": None,
+                                    "executed_by": user_name,
+                                    "executed_by_name": user_name,
+                                    "execution_date": str(execution_date),
+                                    "execution_time": str(execution_time),
+                                    "building": selected_building,
+                                    "location": str(selected_asset.get("location_floor","")),
+                                    "status": "submitted",
+                                    "general_comments": execution_comments,
+                                    "created_at": datetime.now().isoformat()
+                                }
+                                
+                                exec_result = DB.insert("ppm_executions", exec_data)
+                                
+                                if exec_result:
+                                    execution_id = exec_result["id"]
+                                    
+                                    # Insert checklist items
+                                    for item_result in checklist_results:
+                                        supabase.table("ppm_execution_items").insert({
+                                            "execution_id": execution_id,
+                                            "checklist_item_id": item_result["item_id"],
+                                            "item_number": item_result["item_number"],
+                                            "description": item_result["description"],
+                                            "expected_value": item_result["expected_value"],
+                                            "actual_value": item_result["actual_value"],
+                                            "result": item_result["result"],
+                                            "created_at": datetime.now().isoformat()
+                                        }).execute()
+                                    
+                                    # Create approval record
+                                    supabase.table("ppm_approvals").insert({
+                                        "execution_id": execution_id,
+                                        "approval_level": "team_lead",
+                                        "status": "pending",
+                                        "created_at": datetime.now().isoformat()
+                                    }).execute()
+                                    
+                                    st.success(f"✅ PPM Execution submitted successfully! Awaiting Team Lead confirmation.")
+                                    st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to submit. Please try again.")
+    
+    # ============================================
+    # TAB 2: MY SUBMISSIONS
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 📊 My Submitted PPMs")
+        
+        my_executions = supabase.table("ppm_executions").select("*").eq("facility_code", fc).eq("executed_by_name", user_name).order("created_at", desc=True).limit(50).execute()
+        
+        if my_executions.data and len(my_executions.data) > 0:
+            for ex in my_executions.data:
+                status = ex.get("status", "submitted")
+                sc = {"submitted": "#3B82F6", "confirmed": "#F59E0B", "approved": "#10B981", "rejected": "#EF4444"}.get(status, "#3B82F6")
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>📅 {ex.get('execution_date','N/A')}</b> — {ex.get('building','N/A')}
+                            <br><span style="font-size:0.7rem;color:#666;">👤 {ex.get('executed_by_name','')} | {ex.get('created_at','')[:16]}</span>
+                        </div>
+                        <span style="background:{sc};color:white;padding:3px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">{status.upper()}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No PPM submissions yet. Submit your first PPM in the 'Submit PPM' tab.")
+    
+    # ============================================
+    # TAB 3: PENDING APPROVAL (Team Lead View)
+    # ============================================
+    with tabs[3]:
+        st.markdown("### ⏳ Pending Approvals")
+        
+        if user_role not in ["admin", "approver", "authorizer", "confirmer"]:
+            st.info("This section is for Team Leads and Managers. Your submissions are visible in 'My Submissions'.")
+        else:
+            pending_executions = supabase.table("ppm_executions").select("*").eq("facility_code", fc).in_("status", ["submitted","confirmed"]).order("created_at", desc=True).execute()
+            
+            if pending_executions.data and len(pending_executions.data) > 0:
+                for ex in pending_executions.data:
+                    status = ex.get("status", "submitted")
+                    
+                    with st.expander(f"📋 {ex.get('execution_date','')} — {ex.get('building','')} — by {ex.get('executed_by_name','')} — {status.upper()}"):
+                        st.write(f"**Date:** {ex.get('execution_date','')} {ex.get('execution_time','')}")
+                        st.write(f"**Building:** {ex.get('building','')}")
+                        st.write(f"**Location:** {ex.get('location','')}")
+                        st.write(f"**Executed by:** {ex.get('executed_by_name','')}")
+                        st.write(f"**Comments:** {ex.get('general_comments','N/A')}")
+                        
+                        # Show checklist items
+                        items = supabase.table("ppm_execution_items").select("*").eq("execution_id", ex["id"]).order("item_number").execute()
+                        if items.data:
+                            st.markdown("**Checklist Results:**")
+                            for item in items.data:
+                                icon = "✅" if item.get("result")=="pass" else "❌" if item.get("result")=="fail" else "➖"
+                                st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — {item.get('actual_value','N/A')}")
+                        
+                        # Approval actions
+                        st.markdown("---")
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            confirm_comment = st.text_area("Confirmation Comment*", key=f"confirm_cmt_{ex['id']}", height=60, placeholder="Required for confirmation...")
+                            if st.button("✅ CONFIRM", key=f"confirm_{ex['id']}", use_container_width=True, type="primary"):
+                                if confirm_comment:
+                                    supabase.table("ppm_executions").update({"status":"confirmed"}).eq("id", ex["id"]).execute()
+                                    supabase.table("ppm_approvals").update({
+                                        "status":"approved",
+                                        "comments": confirm_comment,
+                                        "approver_name": user_name,
+                                        "action_date": datetime.now().isoformat()
+                                    }).eq("execution_id", ex["id"]).eq("approval_level","team_lead").execute()
+                                    st.success("✅ Confirmed!")
+                                    st.rerun()
+                                else:
+                                    st.error("⚠️ Comment required")
+                        with c2:
+                            reject_comment = st.text_area("Rejection Reason*", key=f"reject_cmt_{ex['id']}", height=60, placeholder="Required for rejection...")
+                            if st.button("❌ REJECT", key=f"reject_{ex['id']}", use_container_width=True):
+                                if reject_comment:
+                                    supabase.table("ppm_executions").update({"status":"rejected"}).eq("id", ex["id"]).execute()
+                                    supabase.table("ppm_approvals").update({
+                                        "status":"rejected",
+                                        "comments": reject_comment,
+                                        "approver_name": user_name,
+                                        "action_date": datetime.now().isoformat()
+                                    }).eq("execution_id", ex["id"]).eq("approval_level","team_lead").execute()
+                                    st.error("❌ Rejected")
+                                    st.rerun()
+                                else:
+                                    st.error("⚠️ Reason required")
+            else:
+                st.success("✅ No pending approvals. All PPMs have been reviewed.")
+
+
+# ============================================
 # ROUTER
 # ============================================
 ROUTER={
@@ -5723,6 +6217,7 @@ ROUTER={
     "wo":page_wo,"wp":page_wp,"fo":page_fo,"oa":page_oa,
     "vm": page_visitor,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb": page_feedback,
     "ac":page_ac,"ic":page_ic,"hot":page_hot,"uc":page_uc,"mis":page_mis,
+    "ppma": page_ppm_activities,  # <-- ADD THIS LINE
 }
 
 # ============================================
