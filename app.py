@@ -5631,7 +5631,7 @@ def page_cal():
 
 # ============================================
 # CHECKLIST STATUS — CONSOLIDATED DASHBOARD
-# FORTUNE 500 GRADE — PAGINATED & FILTERED
+# FORTUNE 500 GRADE — ASSET → SUB-ASSET DRILLDOWN
 # ============================================
 def page_cs():
     fc = st.session_state.get("facility", "WTC")
@@ -5648,48 +5648,51 @@ def page_cs():
     
     df = pd.DataFrame(all_assets)
     
+    # Clean up checklist values
+    df["checklist_clean"] = df["checklist"].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() not in ["", "NA", "na", "APPLICABLE", "NOTAPPLICABLE", "None"] else None)
+    
     # Get templates
     templates = supabase.table("ppm_checklist_templates").select("*").execute()
     template_names = [t.get("template_name","") for t in templates.data] if templates.data else []
     
     # ============================================
-    # FILTERS ROW
+    # FILTERS — ASSET → SUB-ASSET DRILLDOWN
     # ============================================
     st.markdown("### 🔍 Filter Assets")
     
-    # Create department — sub_division labels once
+    # Create department — sub_division labels
     df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
     
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         departments = ["All"] + sorted(df["dept_full"].dropna().unique().tolist())
         sel_dept = st.selectbox("Select Department", departments, key="cs_dept")
+    
+    # Filter by department
+    if sel_dept != "All":
+        dept_df = df[df["dept_full"] == sel_dept]
+    else:
+        dept_df = df.copy()
+    
     with c2:
-        # Filter assets by department FIRST
-        if sel_dept != "All":
-            dept_assets = df[df["dept_full"] == sel_dept]
-        else:
-            dept_assets = df.copy()
-        asset_list = ["All"] + sorted(dept_assets["name"].dropna().unique().tolist())
+        # Asset = parent_asset
+        asset_list = ["All"] + sorted(dept_df["parent_asset"].dropna().unique().tolist())
         sel_asset = st.selectbox("Select Asset", asset_list, key="cs_asset")
+    
+    # Filter by asset (parent)
+    if sel_asset != "All":
+        asset_df = dept_df[dept_df["parent_asset"] == sel_asset]
+    else:
+        asset_df = dept_df.copy()
+    
     with c3:
-        # Sub-asset
-        if sel_asset != "All":
-            asset_row = dept_assets[dept_assets["name"] == sel_asset]
-            if len(asset_row) > 0:
-                parent_val = asset_row["parent_asset"].iloc[0]
-                if pd.notna(parent_val):
-                    sub_assets = dept_assets[dept_assets["parent_asset"] == parent_val]["name"].dropna()
-                    sub_list = ["All"] + sorted(sub_assets.unique().tolist())
-                else:
-                    sub_list = ["All"]
-            else:
-                sub_list = ["All"]
-        else:
-            sub_list = ["All"]
+        # Sub-Asset = name
+        sub_list = ["All"] + sorted(asset_df["name"].dropna().unique().tolist())
         sel_sub = st.selectbox("Select Sub Asset", sub_list, key="cs_sub")
+    
     with c4:
-        sel_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cs_bldg")
+        bldg_list = ["All"] + sorted(df["location_building"].dropna().unique().tolist())
+        sel_bldg = st.selectbox("Building", bldg_list, key="cs_bldg")
     
     # Date range
     c1, c2 = st.columns(2)
@@ -5701,13 +5704,15 @@ def page_cs():
     # Apply all filters
     filtered = df.copy()
     if sel_dept != "All": filtered = filtered[filtered["dept_full"] == sel_dept]
-    if sel_asset != "All": filtered = filtered[filtered["name"] == sel_asset]
+    if sel_asset != "All": filtered = filtered[filtered["parent_asset"] == sel_asset]
     if sel_sub != "All": filtered = filtered[filtered["name"] == sel_sub]
     if sel_bldg != "All": filtered = filtered[filtered["location_building"] == sel_bldg]
     
     total_filtered = len(filtered)
-    enrolled_count = len(filtered[filtered["checklist"].notna() & (filtered["checklist"] != "") & (filtered["checklist"] != "NA")])
+    enrolled_count = len(filtered[filtered["checklist_clean"].notna()])
     not_enrolled = total_filtered - enrolled_count
+    
+    st.markdown("---")
     
     # ============================================
     # CHECKLIST TYPE TABS
@@ -5715,17 +5720,6 @@ def page_cs():
     st.markdown("### 📋 Checklist Reports")
     
     checklist_tabs = st.tabs(["📅 Scheduled PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 Summary", "📋 Consolidated Report"])
-    
-    # Apply base filters
-    filtered = df.copy()
-    if sel_dept != "All": filtered = filtered[filtered["department"] == sel_dept]
-    if sel_asset != "All": filtered = filtered[filtered["name"] == sel_asset]
-    if sel_sub != "All": filtered = filtered[filtered["parent_asset"] == sel_sub]
-    if sel_bldg != "All": filtered = filtered[filtered["location_building"] == sel_bldg]
-    
-    total_filtered = len(filtered)
-    enrolled_count = len(filtered[filtered["checklist"].notna() & (filtered["checklist"] != "") & (filtered["checklist"] != "NA")])
-    not_enrolled = total_filtered - enrolled_count
     
     # ============================================
     # TAB 0: SCHEDULED PPM
@@ -5754,32 +5748,33 @@ def page_cs():
         # Pagination controls
         c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
         with c1:
-            if st.button("◀◀", key="cs_first_sched"): st.session_state.cs_page_scheduled = 1; st.rerun()
+            if st.button("◀◀", key="cs_first"): st.session_state.cs_page_scheduled = 1; st.rerun()
         with c2:
-            if st.button("◀", key="cs_prev_sched") and st.session_state.cs_page_scheduled > 1:
+            if st.button("◀", key="cs_prev") and st.session_state.cs_page_scheduled > 1:
                 st.session_state.cs_page_scheduled -= 1; st.rerun()
         with c3:
             st.markdown(f"**Page {st.session_state.cs_page_scheduled} of {total_pages}**")
         with c4:
-            if st.button("▶", key="cs_next_sched") and st.session_state.cs_page_scheduled < total_pages:
+            if st.button("▶", key="cs_next") and st.session_state.cs_page_scheduled < total_pages:
                 st.session_state.cs_page_scheduled += 1; st.rerun()
         with c5:
-            if st.button("▶▶", key="cs_last_sched"): st.session_state.cs_page_scheduled = total_pages; st.rerun()
+            if st.button("▶▶", key="cs_last"): st.session_state.cs_page_scheduled = total_pages; st.rerun()
         
         st.caption(f"Showing {start+1}–{end} of {total_filtered} assets")
         
         for _, asset in page_data.iterrows():
-            is_enrolled = pd.notna(asset.get("checklist")) and str(asset.get("checklist","")).strip() not in ["","NA","na"]
-            border = "#10B981" if is_enrolled else "#e5e7eb"
-            bg = "#ECFDF5" if is_enrolled else "#fafafa"
-            badge = "✅ Enrolled" if is_enrolled else "⚠️ Not Enrolled"
-            badge_bg = "#10B981" if is_enrolled else "#F59E0B"
+            enrolled = pd.notna(asset.get("checklist_clean"))
+            border = "#10B981" if enrolled else "#e5e7eb"
+            bg = "#ECFDF5" if enrolled else "#fafafa"
+            badge = "✅ Enrolled" if enrolled else "⚠️ Not Enrolled"
+            badge_bg = "#10B981" if enrolled else "#F59E0B"
+            checklist_name = asset.get("checklist_clean") if enrolled else "Not Enrolled"
             
             st.markdown(f"""
             <div style="background:{bg};border-left:3px solid {border};border-radius:6px;padding:0.5rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
                 <div>
-                    <b>{asset.get('name','N/A')}</b>
-                    <br><span style="font-size:0.65rem;color:#666;">{asset.get('department','')} | {asset.get('location_building','')} | {asset.get('ppm_frequency', asset.get('verification_frequency', 'N/A'))}</span>
+                    <b>{asset.get('parent_asset','N/A')}</b> → {asset.get('name','N/A')[:60]}
+                    <br><span style="font-size:0.65rem;color:#666;">📋 {checklist_name} | 📅 {asset.get('ppm_frequency', asset.get('verification_frequency', 'N/A'))}</span>
                 </div>
                 <span style="background:{badge_bg};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{badge}</span>
             </div>
@@ -5791,7 +5786,7 @@ def page_cs():
     with checklist_tabs[1]:
         st.markdown("#### 📋 Daily Checklist Status")
         
-        daily_assets = filtered[filtered["verification_frequency"].isin(["Daily","daily"])] if "verification_frequency" in filtered.columns else filtered.head(10)
+        daily_assets = filtered[filtered["verification_frequency"].isin(["Daily","daily"])] if "verification_frequency" in filtered.columns else pd.DataFrame()
         
         c1, c2 = st.columns(2)
         with c1: st.metric("📋 Total Daily", len(daily_assets))
@@ -5799,32 +5794,11 @@ def page_cs():
         
         st.markdown("---")
         
-        # Pagination for daily
-        page_size = 20
-        if "cs_page_daily" not in st.session_state:
-            st.session_state.cs_page_daily = 1
-        
-        total_pages_d = max(1, (len(daily_assets) + page_size - 1) // page_size)
-        start_d = (st.session_state.cs_page_daily - 1) * page_size
-        end_d = min(start_d + page_size, len(daily_assets))
-        
-        c1, c2, c3 = st.columns([1, 1, 2])
-        with c1:
-            if st.button("◀", key="cs_prev_daily") and st.session_state.cs_page_daily > 1:
-                st.session_state.cs_page_daily -= 1; st.rerun()
-        with c2:
-            if st.button("▶", key="cs_next_daily") and st.session_state.cs_page_daily < total_pages_d:
-                st.session_state.cs_page_daily += 1; st.rerun()
-        with c3:
-            st.markdown(f"**Page {st.session_state.cs_page_daily} of {total_pages_d}**")
-        
-        st.caption(f"Showing {start_d+1}–{end_d} of {len(daily_assets)}")
-        
         if len(daily_assets) > 0:
-            for _, asset in daily_assets.iloc[start_d:end_d].iterrows():
+            for _, asset in daily_assets.head(20).iterrows():
                 st.markdown(f"""
                 <div style="background:white;border-left:3px solid #3B82F6;border-radius:6px;padding:0.5rem;margin:0.2rem 0;">
-                    <b>{asset.get('name','N/A')}</b> — {asset.get('department','')}
+                    <b>{asset.get('parent_asset','N/A')}</b> → {asset.get('name','N/A')[:60]}
                     <br><span style="font-size:0.65rem;color:#666;">📍 {asset.get('location_building','')} | 📅 Daily</span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -5849,7 +5823,7 @@ def page_cs():
             for _, asset in hourly_assets.head(20).iterrows():
                 st.markdown(f"""
                 <div style="background:white;border-left:3px solid #8B5CF6;border-radius:6px;padding:0.5rem;margin:0.2rem 0;">
-                    <b>{asset.get('name','N/A')}</b> — {asset.get('department','')}
+                    <b>{asset.get('parent_asset','N/A')}</b> → {asset.get('name','N/A')[:60]}
                     <br><span style="font-size:0.65rem;color:#666;">📍 {asset.get('location_building','')} | ⏰ {asset.get('verification_frequency','N/A')}</span>
                 </div>
                 """, unsafe_allow_html=True)
@@ -5857,7 +5831,7 @@ def page_cs():
             st.info("No hourly checklist assets found.")
     
     # ============================================
-    # TAB 3: SUMMARY
+    # TAB 3: SUMMARY + BULK ENROLLMENT
     # ============================================
     with checklist_tabs[3]:
         st.markdown("#### 📊 Checklist Summary")
@@ -5876,7 +5850,7 @@ def page_cs():
         st.markdown("---")
         
         # Template reference
-        st.markdown("### 📋 Available Templates")
+        st.markdown("### 📋 Available International Standard Templates")
         if templates.data:
             for t in templates.data:
                 items_count = 0
@@ -5895,40 +5869,25 @@ def page_cs():
         # Bulk enrollment
         st.markdown("---")
         st.markdown("### 📦 Bulk Enrollment")
-        st.caption("Enroll all currently filtered assets, or narrow by department/building below.")
+        st.caption("Enroll all currently filtered assets with a checklist template.")
         
         with st.form("cs_bulk_enroll"):
             c1, c2, c3 = st.columns(3)
             with c1:
-                bulk_dept = st.selectbox("Target Department", ["All"] + sorted(df["dept_full"].dropna().unique().tolist()), key="cs_bulk_dept")
-            with c2:
-                bulk_bldg = st.selectbox("Target Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cs_bulk_bldg")
-            with c3:
                 bulk_template = st.selectbox("Checklist Template", template_names, key="cs_bulk_tpl")
-            
-            c1, c2 = st.columns(2)
-            with c1:
-                bulk_freq = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="cs_bulk_freq")
             with c2:
-                overwrite_existing = st.checkbox("Overwrite existing enrollments", value=True, key="cs_bulk_overwrite")
+                bulk_freq = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="cs_bulk_freq")
+            with c3:
+                overwrite_existing = st.checkbox("Overwrite existing", value=True, key="cs_bulk_overwrite")
             
-            # Show preview count
-            preview_df = filtered.copy()
-            if bulk_dept != "All": preview_df = preview_df[preview_df["dept_full"] == bulk_dept]
-            if bulk_bldg != "All": preview_df = preview_df[preview_df["location_building"] == bulk_bldg]
-            
-            st.caption(f"📋 {len(preview_df)} assets will be enrolled with **{bulk_template}** at **{bulk_freq}** frequency")
+            st.caption(f"📋 {len(filtered)} assets will be enrolled with **{bulk_template}** at **{bulk_freq}** frequency")
             
             if st.form_submit_button("🚀 ENROLL ASSETS", use_container_width=True, type="primary"):
                 if bulk_template:
-                    enroll_df = filtered.copy()
-                    if bulk_dept != "All": enroll_df = enroll_df[enroll_df["dept_full"] == bulk_dept]
-                    if bulk_bldg != "All": enroll_df = enroll_df[enroll_df["location_building"] == bulk_bldg]
-                    
                     count = 0
                     skipped = 0
-                    for _, asset in enroll_df.iterrows():
-                        is_enrolled = pd.notna(asset.get("checklist")) and str(asset.get("checklist","")).strip() not in ["","NA","na"]
+                    for _, asset in filtered.iterrows():
+                        is_enrolled = pd.notna(asset.get("checklist_clean"))
                         if is_enrolled and not overwrite_existing:
                             skipped += 1
                             continue
@@ -5947,8 +5906,8 @@ def page_cs():
                     st.rerun()
                 else:
                     st.error("⚠️ Please select a template")
-
-# ============================================
+    
+    # ============================================
     # TAB 4: CONSOLIDATED REPORT
     # ============================================
     with checklist_tabs[4]:
@@ -5957,21 +5916,21 @@ def page_cs():
         # Build consolidated data
         consolidated = []
         for _, asset in filtered.iterrows():
-            is_enrolled = pd.notna(asset.get("checklist")) and str(asset.get("checklist","")).strip() not in ["","NA","na"]
+            enrolled = pd.notna(asset.get("checklist_clean"))
             
             consolidated.append({
                 "SNO": len(consolidated) + 1,
-                "Asset": asset.get("parent_asset", "") or asset.get("name", "N/A"),
+                "Asset": asset.get("parent_asset", "N/A"),
                 "Sub Asset": asset.get("name", "N/A"),
-                "Checklist Name": asset.get("checklist", "Not Enrolled") if is_enrolled else "Not Enrolled",
+                "Checklist Name": asset.get("checklist_clean") if enrolled else "Not Enrolled",
                 "Frequency": asset.get("ppm_frequency", asset.get("verification_frequency", "N/A")),
                 "Date": str(today),
-                "Status": "Enrolled" if is_enrolled else "Pending"
+                "Status": "Enrolled" if enrolled else "Pending"
             })
         
         cons_df = pd.DataFrame(consolidated)
         
-        # Filters for consolidated view
+        # Filters
         c1, c2, c3 = st.columns(3)
         with c1:
             cons_status = st.selectbox("Status", ["All", "Enrolled", "Pending"], key="cons_status")
@@ -5980,7 +5939,6 @@ def page_cs():
         with c3:
             cons_search = st.text_input("🔍 Search Asset or Checklist", key="cons_search", placeholder="Search...")
         
-        # Apply filters
         display_cons = cons_df.copy()
         if cons_status != "All":
             display_cons = display_cons[display_cons["Status"] == cons_status]
@@ -6016,7 +5974,6 @@ def page_cs():
         
         page_data_cons = display_cons.iloc[start_cons:end_cons]
         
-        # Pagination controls
         c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
         with c1:
             if st.button("◀◀", key="cons_first"): st.session_state.cons_page = 1; st.rerun()
@@ -6033,7 +5990,6 @@ def page_cs():
         
         st.caption(f"Showing {start_cons+1}–{end_cons} of {len(display_cons)} records")
         
-        # Table with color coding
         if len(page_data_cons) > 0:
             for _, row in page_data_cons.iterrows():
                 is_enrolled_row = row["Status"] == "Enrolled"
@@ -6061,13 +6017,7 @@ def page_cs():
         with c1:
             st.download_button("📥 Download CSV", display_cons.to_csv(index=False), f"consolidated_checklist_{today}.csv", "text/csv", use_container_width=True)
         with c2:
-            logo_b64 = get_logo_base64()
-            html_export = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px;font-size:10px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:6px}}td{{padding:4px;border-bottom:1px solid #eee}}.enrolled{{color:#059669}}.pending{{color:#D97706}}</style></head><body><h1>Consolidated Checklist Report</h1><p>{info.get('full_name',fc)} | {today}</p><table><tr><th>SNO</th><th>Asset</th><th>Sub Asset</th><th>Checklist</th><th>Frequency</th><th>Status</th></tr>"""
-            for _, r in display_cons.head(200).iterrows():
-                cls = "enrolled" if r['Status'] == "Enrolled" else "pending"
-                html_export += f"<tr><td>{r['SNO']}</td><td>{r['Asset']}</td><td>{r['Sub Asset'][:60]}</td><td>{r['Checklist Name']}</td><td>{r['Frequency']}</td><td class='{cls}'>{r['Status']}</td></tr>"
-            html_export += "</table></body></html>"
-            st.download_button("📥 Download HTML", html_export, f"consolidated_checklist_{today}.html", "text/html", use_container_width=True)
+            st.download_button("📥 Download HTML", display_cons.to_html(index=False), f"consolidated_checklist_{today}.html", "text/html", use_container_width=True)
 
 
 # ============================================
