@@ -282,10 +282,13 @@ class DB:
     @staticmethod
     def insert(table, data):
         try:
-            res=supabase.table(table).insert(data).execute()
-            return res.data[0] if res.data else None
+            res = supabase.table(table).insert(data).execute()
+            if res.data:
+                return res.data[0]
+            return None
         except Exception as e:
-            st.error(f"Error: {e}"); return None
+            st.error(f"Insert Error: {str(e)[:200]}")
+            return None
 
     @staticmethod
     def update(table, id_val, data):
@@ -6361,9 +6364,18 @@ def page_ppm_activities():
                             else:
                                 exec_data = {
                                     "facility_code": fc,
+                                    "asset_id": selected_asset.get("id"),
                                     "executed_by_name": user_name,
                                     "execution_date": str(execution_date),
+                                    "execution_time": str(execution_time),
+                                    "building": str(selected_asset.get("location_building",""))[:100],
                                     "status": "submitted",
+                                    "general_comments": execution_comments if execution_comments else None,
+                                    "is_early_execution": is_early,
+                                    "early_execution_reason": early_reason if early_reason else None,
+                                    "mitigation_plan": mitigation_plan if mitigation_plan else None,
+                                    "mitigation_deadline": str(mitigation_deadline) if mitigation_deadline else None,
+                                    "ppm_type": ppm_type,
                                     "created_at": datetime.now().isoformat()
                                 }
                                 
