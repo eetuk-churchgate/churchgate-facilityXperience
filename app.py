@@ -6364,18 +6364,9 @@ def page_ppm_activities():
                             else:
                                 exec_data = {
                                     "facility_code": fc,
-                                    "asset_id": selected_asset.get("id"),
                                     "executed_by_name": user_name,
                                     "execution_date": str(execution_date),
-                                   "execution_time": execution_time.strftime("%H:%M"),
-                                    "building": str(selected_asset.get("location_building",""))[:100],
                                     "status": "submitted",
-                                    "general_comments": execution_comments if execution_comments else None,
-                                    "is_early_execution": is_early,
-                                    "early_execution_reason": early_reason if early_reason else None,
-                                    "mitigation_plan": mitigation_plan if mitigation_plan else None,
-                                    "mitigation_deadline": str(mitigation_deadline) if mitigation_deadline else None,
-                                    "ppm_type": ppm_type,
                                     "created_at": datetime.now().isoformat()
                                 }
                                 
