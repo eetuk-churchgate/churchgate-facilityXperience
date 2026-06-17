@@ -5919,16 +5919,44 @@ def page_cs():
                         })
                         
                         # Also create PPM schedule record for calendar
-                        supabase.table("ppm_schedules").insert({
-                            "facility_code": fc,
-                            "asset_id": asset.get("id"),
-                            "title": f"{asset.get('name','PPM')} - {bulk_template}",
-                            "frequency": bulk_freq,
-                            "status": "scheduled",
-                            "assigned_team": asset.get("department", ""),
-                            "next_due_date": str(date.today()),
-                            "created_at": datetime.now().isoformat()
-                        }).execute()
+                        # Get template schedule dates
+                        template_dates = None
+                        tpl_res = supabase.table("ppm_checklist_templates").select("schedule_dates").eq("template_name", bulk_template).single().execute()
+                        if tpl_res.data and tpl_res.data.get("schedule_dates"):
+                            template_dates = tpl_res.data["schedule_dates"].split(",")
+                        
+                        if template_dates:
+                            for d in template_dates:
+                                d = d.strip()
+                                try:
+                                    parsed_date = datetime.strptime(d, "%d-%m-%Y").strftime("%Y-%m-%d")
+                                except:
+                                    try:
+                                        parsed_date = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-%m-%d")
+                                    except:
+                                        parsed_date = str(date.today())
+                                
+                                supabase.table("ppm_schedules").insert({
+                                    "facility_code": fc,
+                                    "asset_id": asset.get("id"),
+                                    "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                                    "frequency": bulk_freq,
+                                    "status": "scheduled",
+                                    "assigned_team": asset.get("department", ""),
+                                    "next_due_date": parsed_date,
+                                    "created_at": datetime.now().isoformat()
+                                }).execute()
+                        else:
+                            supabase.table("ppm_schedules").insert({
+                                "facility_code": fc,
+                                "asset_id": asset.get("id"),
+                                "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                                "frequency": bulk_freq,
+                                "status": "scheduled",
+                                "assigned_team": asset.get("department", ""),
+                                "next_due_date": str(date.today()),
+                                "created_at": datetime.now().isoformat()
+                            }).execute()
                         
                         count += 1
                     
@@ -7061,28 +7089,164 @@ def page_ppm_activities():
                         if edit_template:
                             st.markdown(f"**Template:** {edit_template.get('template_name')} | **Standard:** {edit_template.get('international_standard','Custom')}")
                             
-                            # Load existing items
+                            # Editable fields
+                            c1, c2, c3 = st.columns(3)
+                            with c1:
+                                new_name = st.text_input("Report Name", value=edit_template.get("template_name",""), key="edit_tpl_name")
+                            with c2:
+                                desc_parts = edit_template.get("description","").split("|")
+                                period_val = desc_parts[0].replace("Period:","").strip() if len(desc_parts) > 0 else "Monthly"
+                                new_period = st.selectbox("Period", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], 
+                                    index=["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"].index(period_val) if period_val in ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"] else 3, key="edit_period")
+                            with c3:
+                                new_image = st.selectbox("Image Option", ["Yes","No"], key="edit_image")
+                            
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                time_val = desc_parts[1].replace("Time:","").replace("min","").strip() if len(desc_parts) > 1 else "30"
+                                new_time = st.number_input("Perform Time (min)", value=int(time_val) if time_val.isdigit() else 30, key="edit_time")
+                            with c2:
+                                buf_val = desc_parts[2].replace("Buffer:","").replace("days","").strip() if len(desc_parts) > 2 else "0"
+                                new_buffer = st.number_input("Buffer Days", value=int(buf_val) if buf_val.isdigit() else 0, key="edit_buffer")
+                            
+                            new_standard = st.text_input("Standard Reference", value=edit_template.get("international_standard",""), key="edit_std")
+                            
+                            st.markdown("---")
+                            
+                            # Edit dates
+                            st.markdown("### 📅 Schedule Dates")
+                            existing_dates = edit_template.get("schedule_dates","")
+                            existing_dates_list = existing_dates.split(",") if existing_dates else []
+                            
+                            date_edit_mode = st.radio("Date Mode", ["📅 Manual Entry", "🔄 Auto-Generate"], horizontal=True, key="edit_date_mode")
+                            
+                            if date_edit_mode == "📅 Manual Entry":
+                                edit_manual = st.text_area("Enter dates (comma-separated, DD-MM-YYYY)", 
+                                    value=existing_dates, height=80, key="edit_manual_dates",
+                                    placeholder="29-06-2026,29-07-2026,29-08-2026")
+                                new_dates_string = edit_manual
+                            else:
+                                if "edit_generated_dates" not in st.session_state:
+                                    st.session_state.edit_generated_dates = existing_dates_list
+                                
+                                c1, c2 = st.columns(2)
+                                with c1:
+                                    edit_start = st.date_input("Start Date", date.today(), key="edit_start")
+                                with c2:
+                                    edit_end = st.date_input("End Date", date.today() + timedelta(days=365), key="edit_end")
+                                
+                                if st.button("🔄 Generate Dates", key="edit_gen_dates", use_container_width=True):
+                                    dates_list = []
+                                    current = edit_start
+                                    while current <= edit_end:
+                                        dates_list.append(current.strftime("%d-%m-%Y"))
+                                        if new_period == "Monthly":
+                                            current = date(current.year, current.month+1, min(current.day,28)) if current.month < 12 else date(current.year+1,1,min(current.day,28))
+                                        elif new_period == "Quarterly":
+                                            nm = current.month+3
+                                            current = date(current.year+1,nm-12,min(current.day,28)) if nm > 12 else date(current.year,nm,min(current.day,28))
+                                        elif new_period == "Weekly":
+                                            current += timedelta(days=7)
+                                        elif new_period == "Bi-Weekly":
+                                            current += timedelta(days=14)
+                                        elif new_period == "Half-Yearly":
+                                            nm = current.month+6
+                                            current = date(current.year+1,nm-12,min(current.day,28)) if nm > 12 else date(current.year,nm,min(current.day,28))
+                                        elif new_period == "Yearly":
+                                            current = date(current.year+1,current.month,min(current.day,28))
+                                        else:
+                                            current += timedelta(days=1)
+                                    st.session_state.edit_generated_dates = dates_list
+                                    st.rerun()
+                                
+                                if st.session_state.edit_generated_dates:
+                                    selected = st.multiselect("Select Dates", st.session_state.edit_generated_dates, default=st.session_state.edit_generated_dates, key="edit_multi_dates")
+                                    new_dates_string = ",".join(selected)
+                                    st.caption(f"📅 {len(selected)} dates selected")
+                                else:
+                                    new_dates_string = existing_dates
+                            
+                            st.markdown("---")
+                            
+                            # Edit checklist items
+                            st.markdown("### 📝 Checklist Items")
+                            
                             existing_items = supabase.table("ppm_checklist_items").select("*").eq("template_id", edit_template["id"]).order("sort_order").execute()
                             
                             if existing_items.data:
-                                st.markdown("**Current Items:**")
-                                edit_data = []
+                                st.markdown("**Current Items (click to edit):**")
                                 for item in existing_items.data:
-                                    edit_data.append({
-                                        "SNO": item.get("item_number"),
-                                        "Description": item.get("description"),
-                                        "Type": item.get("check_type"),
-                                        "Threshold/Options": item.get("expected_value")
-                                    })
-                                edit_df = pd.DataFrame(edit_data)
-                                st.dataframe(edit_df, use_container_width=True, hide_index=True)
+                                    c1, c2, c3, c4 = st.columns([1, 4, 2, 2])
+                                    with c1:
+                                        new_sno = st.text_input("SNO", value=str(item.get("item_number","")), key=f"edit_sno_{item['id']}", label_visibility="collapsed")
+                                    with c2:
+                                        new_desc = st.text_input("Desc", value=item.get("description",""), key=f"edit_desc_{item['id']}", label_visibility="collapsed")
+                                    with c3:
+                                        new_type = st.selectbox("Type", ["yes_no","pass_fail","status","reading","text","section"], 
+                                            index=["yes_no","pass_fail","status","reading","text","section"].index(item.get("check_type","yes_no")) if item.get("check_type","yes_no") in ["yes_no","pass_fail","status","reading","text","section"] else 0,
+                                            key=f"edit_type_{item['id']}", label_visibility="collapsed")
+                                    with c4:
+                                        new_thresh = st.text_input("Options", value=item.get("expected_value","") or "", key=f"edit_thresh_{item['id']}", label_visibility="collapsed")
+                                
+                                st.markdown("---")
                             
-                            # Delete template
-                            if st.button("🗑️ DELETE THIS TEMPLATE", use_container_width=True, type="secondary"):
-                                supabase.table("ppm_checklist_items").delete().eq("template_id", edit_template["id"]).execute()
-                                supabase.table("ppm_checklist_templates").delete().eq("id", edit_template["id"]).execute()
-                                st.warning("Template deleted!")
-                                st.rerun()
+                            # Add new item to existing template
+                            st.markdown("**➕ Add New Item:**")
+                            c1, c2, c3, c4 = st.columns([1, 4, 2, 2])
+                            with c1:
+                                add_sno = st.number_input("SNO", min_value=1, value=len(existing_items.data)+1 if existing_items.data else 1, key="edit_add_sno")
+                            with c2:
+                                add_desc = st.text_input("Description", key="edit_add_desc", placeholder="New checklist item...")
+                            with c3:
+                                add_type = st.selectbox("Type", ["yes_no","pass_fail","status","reading","text"], key="edit_add_type")
+                            with c4:
+                                add_thresh = st.text_input("Options", value="Yes/No", key="edit_add_thresh")
+                            
+                            if st.button("➕ Add Item to Template", key="edit_btn_add", use_container_width=True):
+                                if add_desc.strip():
+                                    supabase.table("ppm_checklist_items").insert({
+                                        "template_id": edit_template["id"],
+                                        "item_number": int(add_sno),
+                                        "description": add_desc.strip(),
+                                        "check_type": add_type,
+                                        "expected_value": add_thresh,
+                                        "sort_order": int(add_sno)
+                                    }).execute()
+                                    st.success("✅ Item added!")
+                                    st.rerun()
+                            
+                            st.markdown("---")
+                            
+                            # Save all changes
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                if st.button("💾 SAVE ALL CHANGES", use_container_width=True, type="primary"):
+                                    # Update template
+                                    supabase.table("ppm_checklist_templates").update({
+                                        "template_name": new_name,
+                                        "international_standard": new_standard,
+                                        "description": f"Period: {new_period} | Time: {new_time}min | Buffer: {new_buffer}days | Image: {new_image}",
+                                        "schedule_dates": new_dates_string if new_dates_string else None
+                                    }).eq("id", edit_template["id"]).execute()
+                                    
+                                    # Update existing items
+                                    for item in existing_items.data:
+                                        supabase.table("ppm_checklist_items").update({
+                                            "item_number": int(st.session_state.get(f"edit_sno_{item['id']}", item.get("item_number",1)) or 1),
+                                            "description": st.session_state.get(f"edit_desc_{item['id']}", item.get("description","")),
+                                            "check_type": st.session_state.get(f"edit_type_{item['id']}", item.get("check_type","yes_no")),
+                                            "expected_value": st.session_state.get(f"edit_thresh_{item['id']}", item.get("expected_value","") or "")
+                                        }).eq("id", item["id"]).execute()
+                                    
+                                    st.success("✅ Template updated!")
+                                    st.balloons()
+                                    st.rerun()
+                            with c2:
+                                if st.button("🗑️ DELETE TEMPLATE", use_container_width=True):
+                                    supabase.table("ppm_checklist_items").delete().eq("template_id", edit_template["id"]).execute()
+                                    supabase.table("ppm_checklist_templates").delete().eq("id", edit_template["id"]).execute()
+                                    st.warning("✅ Template deleted!")
+                                    st.rerun()
                 else:
                     st.info("No templates created yet.")
             
