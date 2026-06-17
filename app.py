@@ -5734,16 +5734,28 @@ def page_cs():
         
         st.markdown("---")
         
+        # Search bar
+        cs_search_main = st.text_input("🔍 Search Asset or Sub-Asset", key="cs_search_main", placeholder="Type to filter assets...")
+        
+        # Apply search filter
+        if cs_search_main:
+            mask = filtered["parent_asset"].str.contains(cs_search_main, case=False, na=False) | filtered["name"].str.contains(cs_search_main, case=False, na=False)
+            display_filtered = filtered[mask]
+        else:
+            display_filtered = filtered.copy()
+        
+        total_display = len(display_filtered)
+        
         # Pagination
         page_size = 20
         if "cs_page_scheduled" not in st.session_state:
             st.session_state.cs_page_scheduled = 1
         
-        total_pages = max(1, (total_filtered + page_size - 1) // page_size)
+        total_pages = max(1, (total_display + page_size - 1) // page_size)
         start = (st.session_state.cs_page_scheduled - 1) * page_size
-        end = min(start + page_size, total_filtered)
+        end = min(start + page_size, total_display)
         
-        page_data = filtered.iloc[start:end]
+        page_data = display_filtered.iloc[start:end]
         
         # Pagination controls
         c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
@@ -5760,7 +5772,7 @@ def page_cs():
         with c5:
             if st.button("▶▶", key="cs_last"): st.session_state.cs_page_scheduled = total_pages; st.rerun()
         
-        st.caption(f"Showing {start+1}–{end} of {total_filtered} assets")
+        st.caption(f"Showing {start+1}–{end} of {total_display} assets")
         
         for _, asset in page_data.iterrows():
             enrolled = pd.notna(asset.get("checklist_clean"))
