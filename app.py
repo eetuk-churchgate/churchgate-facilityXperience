@@ -1551,7 +1551,7 @@ def page_ar():
                         pdf.image(str(logo_path), x=14, y=8, h=8)
                     pdf.set_font('Helvetica','B',14)
                     pdf.set_text_color(204,0,0)
-                    pdf.cell(260,8,f'Asset Readings Report - {info.get("full_name",fc)}',0,1)
+                    pdf.cell(260,8,f'Asset Readings Report - {safe_text(info.get("full_name",fc))}',0,1)
                     pdf.set_font('Helvetica','',8)
                     pdf.set_text_color(0,0,0)
                     pdf.cell(260,5,f'Generated: {today.strftime("%d %B %Y")} | Total Assets: {len(rd_df)}',0,1)
