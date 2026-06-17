@@ -6675,10 +6675,65 @@ def page_ppm_activities():
                 c1, c2 = st.columns(2)
                 with c1:
                     perform_time = st.number_input("Perform Time (in Minutes)*", min_value=0, value=30, key="tpl_time")
-                    buffer_days = st.number_input("Buffer Days*", min_value=0, value=0, key="tpl_buffer", help="Days before/after scheduled date when PPM can be performed")
+                    buffer_days = st.number_input("Buffer Days*", min_value=0, value=0, key="tpl_buffer")
                 with c2:
                     asset_category = st.selectbox("Asset Category", sorted(df["dept_full"].dropna().unique().tolist()), key="tpl_cat")
                     standard_ref = st.text_input("Standard Reference", placeholder="e.g. ISO 8100, NFPA 25, Custom", key="tpl_std")
+                
+                st.markdown("---")
+                st.markdown("### 📅 Schedule Dates")
+                
+                if "generated_dates" not in st.session_state:
+                    st.session_state.generated_dates = []
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    start_date = st.date_input("Start Date", date.today(), key="tpl_start_date")
+                    end_date = st.date_input("End Schedule Date", date.today() + timedelta(days=365), key="tpl_end_date")
+                
+                with c2:
+                    if st.button("🔄 Generate Dates", key="btn_gen_dates", use_container_width=True):
+                        selected_period = period
+                        dates_list = []
+                        current = start_date
+                        while current <= end_date:
+                            dates_list.append(current.strftime("%d-%m-%Y"))
+                            if selected_period == "Daily":
+                                current += timedelta(days=1)
+                            elif selected_period == "Weekly":
+                                current += timedelta(days=7)
+                            elif selected_period == "Bi-Weekly":
+                                current += timedelta(days=14)
+                            elif selected_period == "Monthly":
+                                if current.month == 12:
+                                    current = current.replace(year=current.year+1, month=1)
+                                else:
+                                    current = current.replace(month=current.month+1)
+                            elif selected_period == "Quarterly":
+                                if current.month > 9:
+                                    current = current.replace(year=current.year+1, month=((current.month+3)%12) or 12)
+                                else:
+                                    current = current.replace(month=current.month+3)
+                            elif selected_period == "Half-Yearly":
+                                if current.month > 6:
+                                    current = current.replace(year=current.year+1, month=current.month-6)
+                                else:
+                                    current = current.replace(month=current.month+6)
+                            elif selected_period == "Yearly":
+                                current = current.replace(year=current.year+1)
+                        st.session_state.generated_dates = dates_list
+                        st.rerun()
+                
+                if st.session_state.generated_dates:
+                    selected_dates = st.multiselect("Select Dates*", st.session_state.generated_dates, default=st.session_state.generated_dates[:3] if len(st.session_state.generated_dates) >= 3 else st.session_state.generated_dates, key="tpl_selected_dates")
+                    dates_string = ",".join(selected_dates)
+                    st.caption(f"📅 {len(selected_dates)} dates selected")
+                else:
+                    dates_string = ""
+                    st.caption("Click 'Generate Dates' to create schedule dates based on the period.")
+                
+                st.markdown("---")
+                st.markdown("### 📝 Checklist Items")
                 
                 st.markdown("---")
                 st.markdown("### 📝 Checklist Items")
@@ -6891,6 +6946,7 @@ def page_ppm_activities():
                                     "asset_category": asset_category,
                                     "international_standard": standard_ref,
                                     "description": f"Period: {period} | Time: {perform_time}min | Buffer: {buffer_days}days | Image: {image_required}",
+                                    "schedule_dates": dates_string if dates_string else None,
                                     "is_active": True
                                 }).execute()
                                 
