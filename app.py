@@ -1582,56 +1582,10 @@ def page_ar():
                     st.error(f"PDF: {str(e)[:50]}")
     
     # ============================================
-    # TAB 5: PPM CALENDAR — FORTUNE 500 PRODUCTION GRADE
+    # TAB 5: PPM CALENDAR — REDESIGNED
     # ============================================
     with ar_tabs[5]:
-        st.markdown("### 📅 PPM Calendar — Financial Year Command Center")
-        
-        # Inject CSS for compact calendar buttons
-        st.markdown("""
-        <style>
-            /* Calendar button styling */
-            .cal-btn-row button {
-                padding: 2px 0 !important;
-                min-height: 28px !important;
-                height: 28px !important;
-                font-size: 0.7rem !important;
-                font-weight: 500 !important;
-                border-radius: 3px !important;
-                border: 1px solid #e5e7eb !important;
-                margin: 0 !important;
-                line-height: 1 !important;
-                width: 100% !important;
-                transition: all 0.1s !important;
-            }
-            .cal-btn-row button:hover {
-                outline: 2px solid #CC0000 !important;
-                outline-offset: -1px !important;
-                z-index: 10 !important;
-                position: relative !important;
-                transform: scale(1.05) !important;
-            }
-            /* Day name headers */
-            .cal-day-hdr {
-                text-align: center;
-                font-size: 0.55rem;
-                font-weight: 700;
-                color: #9ca3af;
-                padding: 2px 0;
-                background: #f9fafb;
-                border: 1px solid #e5e7eb;
-            }
-            /* Month header */
-            .cal-month-hdr {
-                padding: 6px 0;
-                text-align: center;
-                font-weight: 700;
-                font-size: 0.8rem;
-                color: white;
-                border-radius: 8px 8px 0 0;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown("### 📅 PPM Calendar — Financial Year View")
         
         today = date.today()
         if today.month >= 4:
@@ -1649,8 +1603,37 @@ def page_ar():
         block_start_month = ((block_start_month - 1) % 12) + 1
         
         months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        months_full = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
         
-        # Navigation
+        # Role-based department filter
+        user_depts = safe_parse_permissions(st.session_state.get("user", {}).get("department_permissions", []))
+        user_role = st.session_state.get("user_role", "staff")
+        is_admin = user_role in ["admin", "approver"]
+        
+        # ============================================
+        # FILTERS
+        # ============================================
+        st.markdown("### 🔍 Filters")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
+            if is_admin:
+                dept_options = ["All"] + sorted(df["dept_full"].dropna().unique().tolist())
+            else:
+                dept_options = ["All"] + [d for d in sorted(df["dept_full"].dropna().unique().tolist()) if any(ud in d for ud in user_depts)] if user_depts else ["All"]
+            cal_dept = st.selectbox("Department", dept_options, key="cal_dept_filter")
+        with c2:
+            cal_asset = st.selectbox("Asset", ["All"] + sorted(df["parent_asset"].dropna().unique().tolist()), key="cal_asset_filter")
+        with c3:
+            cal_sub = st.selectbox("Sub Asset", ["All"] + sorted(df["name"].dropna().unique().tolist())[:100], key="cal_sub_filter")
+        with c4:
+            cal_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cal_bldg_filter")
+        
+        st.markdown("---")
+        
+        # ============================================
+        # NAVIGATION & LEGEND
+        # ============================================
         c1, c2, c3 = st.columns([1, 2, 1])
         with c1:
             if st.button("◀ PREV 6 MONTHS", key="cal_prev6", use_container_width=True):
@@ -1667,25 +1650,31 @@ def page_ar():
         # Legend
         st.markdown("""
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
-        <span style="background:#FEF2F2;color:#DC2626;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">🔴 Overdue</span>
-        <span style="background:#FFFBEB;color:#D97706;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">🟡 Due Today</span>
-        <span style="background:#EFF6FF;color:#2563EB;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">📆 Upcoming</span>
-        <span style="background:#ECFDF5;color:#059669;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">✅ Completed</span>
-        <span style="background:#F5F3FF;color:#7C3AED;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">⏳ Pending</span>
-        <span style="background:#F0FDF4;color:#059669;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">🟢 Approved</span>
+        <span style="background:#FEF2F2;color:#DC2626;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">🔴 Overdue</span>
+        <span style="background:#CC0000;color:white;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">📍 Today</span>
+        <span style="background:#EFF6FF;color:#2563EB;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">📆 Upcoming</span>
+        <span style="background:#ECFDF5;color:#059669;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">✅ Completed</span>
+        <span style="background:#F5F3FF;color:#7C3AED;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">⏳ Pending</span>
+        <span style="background:#FAFAFA;color:#999;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">⬜ No PPM</span>
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("---")
         
-        # Get PPM data
+        # ============================================
+        # GET PPM DATA WITH FILTERS
+        # ============================================
         ppm_schedules = DB.get_all("ppm_schedules", fc, 5000)
         ppm_df = pd.DataFrame(ppm_schedules) if ppm_schedules else pd.DataFrame()
         
         if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
             ppm_df["due_date_dt"] = pd.to_datetime(ppm_df["next_due_date"], errors='coerce')
         
-        # Build PPM lookup
+        # Apply filters to PPM data
+        if cal_dept != "All" and "assigned_team" in ppm_df.columns:
+            ppm_df = ppm_df[ppm_df["assigned_team"].str.contains(cal_dept.replace(" — "," "), case=False, na=False)]
+        
+        # Build lookup
         ppm_dates = {}
         if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
             for _, row in ppm_df.iterrows():
@@ -1695,6 +1684,163 @@ def page_ar():
                     if dk not in ppm_dates:
                         ppm_dates[dk] = []
                     ppm_dates[dk].append(row.to_dict())
+        
+        # ============================================
+        # KPI CARDS
+        # ============================================
+        total_ppm = len(ppm_df)
+        overdue_ppm = len(ppm_df[(ppm_df["due_date_dt"].dt.date < today) & (ppm_df["status"] != "completed")]) if len(ppm_df) > 0 else 0
+        today_ppm = len(ppm_df[ppm_df["due_date_dt"].dt.date == today]) if len(ppm_df) > 0 else 0
+        completed_ppm = len(ppm_df[ppm_df["status"] == "completed"]) if len(ppm_df) > 0 else 0
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.metric("📋 Total", total_ppm)
+        with c2: st.metric("🔴 Overdue", overdue_ppm)
+        with c3: st.metric("📍 Today", today_ppm)
+        with c4: st.metric("✅ Completed", completed_ppm)
+        
+        st.markdown("---")
+        
+        # ============================================
+        # 6-MONTH CALENDAR GRID
+        # ============================================
+        cal_html = """<style>
+            .cal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-family: 'Inter', sans-serif; }
+            .cal-month { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+            .cal-hdr { padding: 8px 0; text-align: center; font-weight: 700; font-size: 14px; color: white; }
+            .cal-hdr.cur { background: #CC0000; }
+            .cal-hdr.reg { background: #1a1a1a; }
+            .cal-tbl { width: 100%; border-collapse: collapse; }
+            .cal-tbl th { background: #f9fafb; padding: 4px 0; text-align: center; font-size: 10px; color: #9ca3af; font-weight: 700; border-bottom: 2px solid #e5e7eb; }
+            .cal-tbl td { text-align: center; padding: 0; height: 32px; cursor: pointer; border: 1px solid #f0f0f0; }
+            .cal-tbl td a { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-decoration: none; font-size: 11px; font-weight: 600; color: #374151; border-radius: 4px; }
+            .cal-tbl td:hover { outline: 2px solid #CC0000; outline-offset: -2px; z-index: 5; }
+            .cal-tbl td.em { background: #fafafa; cursor: default; }
+            .cal-tbl td.em:hover { outline: none; }
+            .cal-tbl td.td { background: #CC0000; }
+            .cal-tbl td.td a { color: white; font-weight: 800; }
+            .cal-tbl td.ov { background: #FEF2F2; }
+            .cal-tbl td.ov a { color: #DC2626; font-weight: 700; }
+            .cal-tbl td.up { background: #EFF6FF; }
+            .cal-tbl td.up a { color: #2563EB; font-weight: 700; }
+            .cal-tbl td.cp { background: #ECFDF5; }
+            .cal-tbl td.cp a { color: #059669; font-weight: 600; }
+            .cal-tbl td.pn { background: #F5F3FF; }
+            .cal-tbl td.pn a { color: #7C3AED; font-weight: 700; }
+            .cal-tbl td.no { background: #fdfdfd; }
+            .cal-tbl td.no a { color: #bbb; font-weight: 400; }
+            .cal-badge { font-size: 9px; background: #CC0000; color: white; border-radius: 10px; padding: 0px 5px; min-width: 16px; text-align: center; line-height: 1.2; }
+        </style><div class="cal-grid">"""
+        
+        for row_idx in range(2):
+            for col_idx in range(3):
+                mo = row_idx * 3 + col_idx
+                dm = ((block_start_month - 1 + mo) % 12) + 1
+                dy = block_start_year + ((block_start_month - 1 + mo) // 12)
+                
+                fd = date(dy, dm, 1)
+                if dm == 12: ld = date(dy, 12, 31)
+                else: ld = date(dy, dm + 1, 1) - timedelta(days=1)
+                
+                sw = fd.weekday()
+                ic = (dm == today.month and dy == today.year)
+                hc = "cur" if ic else "reg"
+                
+                cal_html += f'<div class="cal-month"><div class="cal-hdr {hc}">{months_short[dm-1]} {dy}</div><table class="cal-tbl"><tr><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th><th>S</th></tr>'
+                
+                dc = 1
+                for w in range(6):
+                    cal_html += "<tr>"
+                    for wd in range(7):
+                        if (w == 0 and wd < sw) or dc > ld.day:
+                            cal_html += '<td class="em"></td>'
+                        else:
+                            cd = date(dy, dm, dc)
+                            dk = cd.strftime("%Y-%m-%d")
+                            it = dk == today.strftime("%Y-%m-%d")
+                            pt = ppm_dates.get(dk, [])
+                            pc = len(pt)
+                            
+                            if it: cls = "td"
+                            elif pc == 0: cls = "no"
+                            else:
+                                ov = any(p.get("status") not in ["completed","approved"] for p in pt)
+                                ad = all(p.get("status") in ["completed","approved"] for p in pt)
+                                pn = any(p.get("status") == "pending" for p in pt)
+                                if ov: cls = "ov"
+                                elif ad: cls = "cp"
+                                elif pn: cls = "pn"
+                                else: cls = "up"
+                            
+                            badge = f'<span class="cal-badge">{pc}</span>' if pc > 0 else ''
+                            cal_html += f'<td class="{cls}"><a href="?ppm_d={dk}">{dc}{badge}</a></td>'
+                            dc += 1
+                    cal_html += "</tr>"
+                    if dc > ld.day: break
+                cal_html += "</table></div>"
+        
+        cal_html += "</div>"
+        st.markdown(cal_html, unsafe_allow_html=True)
+        
+        # Handle click via URL param
+        params = st.query_params
+        if "ppm_d" in params:
+            try:
+                st.session_state.selected_ppm_date = datetime.strptime(params["ppm_d"], "%Y-%m-%d").date()
+            except:
+                pass
+        
+        st.markdown("---")
+        
+        # ============================================
+        # PPM DETAILS FOR SELECTED DAY
+        # ============================================
+        if st.session_state.selected_ppm_date:
+            sel = st.session_state.selected_ppm_date
+            dks = sel.strftime("%Y-%m-%d")
+            pps = ppm_dates.get(dks, [])
+            
+            if pps:
+                st.markdown(f"### 📋 {len(pps)} PPMs — {sel.strftime('%d %B %Y')}")
+                
+                # Sub-filter for selected day
+                c1, c2 = st.columns(2)
+                with c1:
+                    day_dept = st.selectbox("Quick Filter", ["All"] + list(set(p.get("assigned_team","") for p in pps)), key="day_dept_filter")
+                with c2:
+                    if st.button("🔧 EXECUTE PPMs", key="goto_ppma", use_container_width=True, type="primary"):
+                        st.session_state.page = "ppma"
+                        st.rerun()
+                
+                display_pps = pps
+                if day_dept != "All":
+                    display_pps = [p for p in pps if p.get("assigned_team","") == day_dept]
+                
+                for p in display_pps:
+                    sts = p.get('status','scheduled')
+                    sc = {"completed":"#10B981","scheduled":"#3B82F6","pending":"#F59E0B","overdue":"#EF4444","approved":"#059669"}.get(sts,"#3B82F6")
+                    ic = {"completed":"✅","scheduled":"📆","pending":"⏳","overdue":"🔴","approved":"🟢"}.get(sts,"📋")
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <b>{ic} {p.get('title','N/A')[:80]}</b>
+                                <br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 🔄 {p.get('frequency','N/A')}</span>
+                            </div>
+                            <span style="background:{sc};color:white;padding:3px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">{sts.upper()}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            else:
+                st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled.")
+            
+            if st.button("❌ CLEAR SELECTION", key="clearppm", use_container_width=True):
+                st.session_state.selected_ppm_date = None
+                st.query_params.clear()
+                st.rerun()
+        else:
+            st.info("👆 **Click any day** on the calendar to view scheduled PPMs.")
         
         # ============================================
         # 6 MONTHS — 2 ROWS × 3 COLUMNS
