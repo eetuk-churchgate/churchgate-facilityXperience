@@ -1782,7 +1782,13 @@ def page_ar():
                     sts = p.get('status','scheduled')
                     sc = {"completed":"#10B981","scheduled":"#3B82F6","pending":"#F59E0B","overdue":"#EF4444","approved":"#059669"}.get(sts,"#3B82F6")
                     ic = {"completed":"✅","scheduled":"📆","pending":"⏳","overdue":"🔴","approved":"🟢"}.get(sts,"📋")
-                    st.markdown(f"""<div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{ic} {p.get('title','N/A')}</b><br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 📅 {str(p.get('next_due_date',''))[:10]} | 🔄 {p.get('frequency','N/A')}</span></div><span style="background:{sc};color:white;padding:3px 14px;border-radius:15px;font-size:0.65rem;font-weight:700;">{sts.upper()}</span></div></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{ic} {p.get('title','N/A')}</b><br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 📅 {str(p.get('next_due_date',''))[:10]} | 🔄 {p.get('frequency','N/A')}</span></div><span style="background:{sc};color:white;padding:3px 14px;border-radius:15px;font-size:0.65rem;font-weight:700;">{sts.upper()}</span></div></div>
+                        """, unsafe_allow_html=True)
+                            if st.button("🔧 EXECUTE THIS PPM", key=f"goto_ppm_{p.get('id',dk)}", use_container_width=True, type="primary"):
+                                st.session_state.page = "ppma"
+                                st.rerun()
+                else:
+                    st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled for this day.")
             else:
                 st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled for this day.")
             
@@ -6597,15 +6603,21 @@ def page_ppm_activities():
                         placeholder="1 | Safety Precautions & Pre-Checks | section |\n2 | LOTO: Power isolated and locked out | yes_no |\n3 | Air Filter Condition | status | Clean/Dirty/Replaced\n4 | Measure air-on temperature | reading |\n5 | Observations | text |")
                 
                 else:
-                    st.caption("📋 **Simply copy your checklist from Excel or Word and paste below.**")
-                    st.caption("The system will auto-detect the format. Each line becomes a checklist item.")
-                    st.caption("Tip: Copy the SNO and Description columns from Excel and paste here.")
+                    st.caption("📋 **Copy from Excel: SNO | Description columns**")
+                    st.caption("Format: Each line = one checklist item. Use Tab or | as separator.")
+                    st.caption("Example: 1 | Safety Precautions & Pre-Checks")
                     
                     quick_paste = st.text_area("Paste Checklist Here*", height=400,
-                        placeholder="Paste your checklist directly from Excel/Word...\n\nExample:\n1\tSafety Precautions & Pre-Checks\n2\tLOTO (Lock-Out/Tag-Out): Power isolated and locked out for relevant units before internal work.\n3\tPPE (Personal Protective Equipment): Appropriate PPE worn (gloves, safety glasses, etc.).\n4\tWork Area Assessment: Area clear of obstructions, safe access.\n5\tPermits: All necessary work permits obtained.")
+                        placeholder="1\tSafety Precautions & Pre-Checks\n2\tLOTO (Lock-Out/Tag-Out): Power isolated and locked out\n3\tPPE: Appropriate PPE worn\n4\tWork Area Assessment: Area clear of obstructions\n5\tPermits: All necessary work permits obtained")
                     
-                    auto_type = st.selectbox("Default Answer Type for All Items", ["yes_no", "status", "reading", "text"], 
-                        help="Select the default answer type. You can manually adjust specific items after creation.")
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        default_type = st.selectbox("Default Answer Type", ["yes_no", "status", "reading", "text", "section"])
+                    with c2:
+                        if default_type == "status":
+                            default_options = st.text_input("Status Options", value="Yes/No", help="Use / separator. e.g., Clean/Dirty/Replaced")
+                        else:
+                            default_options = ""
                     
                     if quick_paste:
                         lines = [l.strip() for l in quick_paste.strip().split("\n") if l.strip()]
@@ -6615,9 +6627,13 @@ def page_ppm_activities():
                             for i, line in enumerate(lines[:10]):
                                 if "\t" in line:
                                     parts = line.split("\t")
+                                    desc = parts[-1].strip()
+                                elif "|" in line:
+                                    parts = line.split("|")
+                                    desc = parts[-1].strip()
                                 else:
-                                    parts = [line]
-                                st.markdown(f"**{i+1}.** {parts[-1][:100]}")
+                                    desc = line.strip()
+                                st.markdown(f"**{i+1}.** {desc[:100]}")
                             if len(lines) > 10:
                                 st.caption(f"... and {len(lines)-10} more items")
                         
@@ -6626,9 +6642,13 @@ def page_ppm_activities():
                             if "\t" in line:
                                 parts = line.split("\t")
                                 desc = parts[-1].strip()
+                            elif "|" in line:
+                                parts = line.split("|")
+                                desc = parts[-1].strip()
                             else:
                                 desc = line.strip()
-                            checklist_text += f"{i+1} | {desc} | {auto_type} |\n"
+                            opts = default_options if default_options else ""
+                            checklist_text += f"{i+1} | {desc} | {default_type} | {opts}\n"
                     else:
                         checklist_text = ""
                 
