@@ -6370,7 +6370,11 @@ def page_ppm_activities():
                                     "created_at": datetime.now().isoformat()
                                 }
                                 
-                                exec_result = DB.insert("ppm_executions", exec_data)
+                                exec_result = supabase.table("ppm_executions").insert(exec_data).execute()
+                                if exec_result.data:
+                                    exec_result = exec_result.data[0]
+                                else:
+                                    exec_result = None
                                 
                                 if exec_result:
                                     execution_id = exec_result["id"]
