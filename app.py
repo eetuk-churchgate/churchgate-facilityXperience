@@ -6580,7 +6580,7 @@ def page_ppm_activities():
                     new_standard = st.text_input("Standard Reference", placeholder="e.g. ASHRAE 180, Custom")
                     new_description = st.text_area("Description", height=60)
                 
-               st.markdown("---")
+                st.markdown("---")
                 st.markdown("### 📝 Checklist Items")
                 
                 # Entry mode selector
@@ -6604,19 +6604,15 @@ def page_ppm_activities():
                     quick_paste = st.text_area("Paste Checklist Here*", height=400,
                         placeholder="Paste your checklist directly from Excel/Word...\n\nExample:\n1\tSafety Precautions & Pre-Checks\n2\tLOTO (Lock-Out/Tag-Out): Power isolated and locked out for relevant units before internal work.\n3\tPPE (Personal Protective Equipment): Appropriate PPE worn (gloves, safety glasses, etc.).\n4\tWork Area Assessment: Area clear of obstructions, safe access.\n5\tPermits: All necessary work permits obtained.")
                     
-                    # Auto-detect type for pasted items
                     auto_type = st.selectbox("Default Answer Type for All Items", ["yes_no", "status", "reading", "text"], 
                         help="Select the default answer type. You can manually adjust specific items after creation.")
                     
                     if quick_paste:
-                        # Parse pasted content
                         lines = [l.strip() for l in quick_paste.strip().split("\n") if l.strip()]
                         st.caption(f"📋 **{len(lines)} items detected**")
                         
-                        # Preview
                         with st.expander("👁️ Preview Parsed Items"):
                             for i, line in enumerate(lines[:10]):
-                                # Try to split by tab or multiple spaces
                                 if "\t" in line:
                                     parts = line.split("\t")
                                 else:
@@ -6625,7 +6621,6 @@ def page_ppm_activities():
                             if len(lines) > 10:
                                 st.caption(f"... and {len(lines)-10} more items")
                         
-                        # Convert to structured format
                         checklist_text = ""
                         for i, line in enumerate(lines):
                             if "\t" in line:
