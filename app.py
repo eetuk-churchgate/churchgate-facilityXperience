@@ -1782,11 +1782,11 @@ def page_ar():
                     sts = p.get('status','scheduled')
                     sc = {"completed":"#10B981","scheduled":"#3B82F6","pending":"#F59E0B","overdue":"#EF4444","approved":"#059669"}.get(sts,"#3B82F6")
                     ic = {"completed":"✅","scheduled":"📆","pending":"⏳","overdue":"🔴","approved":"🟢"}.get(sts,"📋")
-                    st.markdown(f"""<div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{ic} {p.get('title','N/A')}</b><br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 📅 {str(p.get('next_due_date',''))[:10]} | 🔄 {p.get('frequency','N/A')}</span></div><span style="background:{sc};color:white;padding:3px 14px;border-radius:15px;font-size:0.65rem;font-weight:700;">{sts.upper()}</span></div></div>
-                        """, unsafe_allow_html=True)
-                            if st.button("🔧 EXECUTE THIS PPM", key=f"goto_ppm_{p.get('id',dk)}", use_container_width=True, type="primary"):
-                                st.session_state.page = "ppma"
-                                st.rerun()
+                    st.markdown(f"""<div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{ic} {p.get('title','N/A')}</b><br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 📅 {str(p.get('next_due_date',''))[:10]} | 🔄 {p.get('frequency','N/A')}</span></div><span style="background:{sc};color:white;padding:3px 14px;border-radius:15px;font-size:0.65rem;font-weight:700;">{sts.upper()}</span></div></div>""", unsafe_allow_html=True)
+                    
+                    if st.button("🔧 EXECUTE THIS PPM", key=f"goto_ppm_{p.get('id',dk)}", use_container_width=True, type="primary"):
+                        st.session_state.page = "ppma"
+                        st.rerun()
                 else:
                     st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled for this day.")
             else:
