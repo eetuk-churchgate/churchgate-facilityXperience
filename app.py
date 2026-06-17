@@ -6683,54 +6683,99 @@ def page_ppm_activities():
                 st.markdown("---")
                 st.markdown("### 📅 Schedule Dates")
                 
-                if "generated_dates" not in st.session_state:
-                    st.session_state.generated_dates = []
+                date_mode = st.radio("Date Selection Mode", ["📅 Manual Multi-Date Picker", "🔄 Auto-Generate by Period"], horizontal=True, key="date_mode")
                 
-                c1, c2 = st.columns(2)
-                with c1:
-                    start_date = st.date_input("Start Date", date.today(), key="tpl_start_date")
-                    end_date = st.date_input("End Schedule Date", date.today() + timedelta(days=365), key="tpl_end_date")
+                if date_mode == "📅 Manual Multi-Date Picker":
+                    st.caption("Select any dates you want. Click on dates to add/remove them.")
+                    
+                    # Multi-date input using comma-separated dates
+                    manual_dates = st.text_area(
+                        "Enter dates (one per line or comma-separated)",
+                        height=100,
+                        key="tpl_manual_dates",
+                        placeholder="2026-06-26\n2026-07-31\n2026-08-28\n2026-09-25\n2026-10-30\n2026-11-27\n2026-12-25",
+                        help="Enter dates in YYYY-MM-DD format. One per line or comma-separated."
+                    )
+                    
+                    if manual_dates:
+                        # Parse dates from text
+                        parsed_dates = []
+                        for part in manual_dates.replace("\n", ",").split(","):
+                            part = part.strip()
+                            if part:
+                                try:
+                                    parsed_dates.append(datetime.strptime(part, "%Y-%m-%d").strftime("%d-%m-%Y"))
+                                except:
+                                    try:
+                                        parsed_dates.append(datetime.strptime(part, "%d/%m/%Y").strftime("%d-%m-%Y"))
+                                    except:
+                                        pass
+                        
+                        if parsed_dates:
+                            selected_dates = st.multiselect(
+                                "Confirm Selected Dates*",
+                                parsed_dates,
+                                default=parsed_dates,
+                                key="tpl_manual_selected"
+                            )
+                            dates_string = ",".join(selected_dates)
+                            st.caption(f"📅 {len(selected_dates)} dates selected")
+                        else:
+                            dates_string = ""
+                            st.caption("Enter valid dates in YYYY-MM-DD format")
+                    else:
+                        dates_string = ""
+                        st.caption("Enter dates above or switch to Auto-Generate mode.")
                 
-                with c2:
-                    if st.button("🔄 Generate Dates", key="btn_gen_dates", use_container_width=True):
-                        selected_period = period
-                        dates_list = []
-                        current = start_date
-                        while current <= end_date:
-                            dates_list.append(current.strftime("%d-%m-%Y"))
-                            if selected_period == "Daily":
-                                current += timedelta(days=1)
-                            elif selected_period == "Weekly":
-                                current += timedelta(days=7)
-                            elif selected_period == "Bi-Weekly":
-                                current += timedelta(days=14)
-                            elif selected_period == "Monthly":
-                                if current.month == 12:
-                                    current = current.replace(year=current.year+1, month=1)
-                                else:
-                                    current = current.replace(month=current.month+1)
-                            elif selected_period == "Quarterly":
-                                if current.month > 9:
-                                    current = current.replace(year=current.year+1, month=((current.month+3)%12) or 12)
-                                else:
-                                    current = current.replace(month=current.month+3)
-                            elif selected_period == "Half-Yearly":
-                                if current.month > 6:
-                                    current = current.replace(year=current.year+1, month=current.month-6)
-                                else:
-                                    current = current.replace(month=current.month+6)
-                            elif selected_period == "Yearly":
-                                current = current.replace(year=current.year+1)
-                        st.session_state.generated_dates = dates_list
-                        st.rerun()
-                
-                if st.session_state.generated_dates:
-                    selected_dates = st.multiselect("Select Dates*", st.session_state.generated_dates, default=st.session_state.generated_dates[:3] if len(st.session_state.generated_dates) >= 3 else st.session_state.generated_dates, key="tpl_selected_dates")
-                    dates_string = ",".join(selected_dates)
-                    st.caption(f"📅 {len(selected_dates)} dates selected")
                 else:
-                    dates_string = ""
-                    st.caption("Click 'Generate Dates' to create schedule dates based on the period.")
+                    if "generated_dates" not in st.session_state:
+                        st.session_state.generated_dates = []
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        start_date = st.date_input("Start Date", date.today(), key="tpl_start_date")
+                        end_date = st.date_input("End Schedule Date", date.today() + timedelta(days=365), key="tpl_end_date")
+                    
+                    with c2:
+                        if st.button("🔄 Generate Dates", key="btn_gen_dates", use_container_width=True):
+                            selected_period = period
+                            dates_list = []
+                            current = start_date
+                            while current <= end_date:
+                                dates_list.append(current.strftime("%d-%m-%Y"))
+                                if selected_period == "Daily":
+                                    current += timedelta(days=1)
+                                elif selected_period == "Weekly":
+                                    current += timedelta(days=7)
+                                elif selected_period == "Bi-Weekly":
+                                    current += timedelta(days=14)
+                                elif selected_period == "Monthly":
+                                    if current.month == 12:
+                                        current = current.replace(year=current.year+1, month=1)
+                                    else:
+                                        current = current.replace(month=current.month+1)
+                                elif selected_period == "Quarterly":
+                                    if current.month > 9:
+                                        current = current.replace(year=current.year+1, month=((current.month+3)%12) or 12)
+                                    else:
+                                        current = current.replace(month=current.month+3)
+                                elif selected_period == "Half-Yearly":
+                                    if current.month > 6:
+                                        current = current.replace(year=current.year+1, month=current.month-6)
+                                    else:
+                                        current = current.replace(month=current.month+6)
+                                elif selected_period == "Yearly":
+                                    current = current.replace(year=current.year+1)
+                            st.session_state.generated_dates = dates_list
+                            st.rerun()
+                    
+                    if st.session_state.generated_dates:
+                        selected_dates = st.multiselect("Select Dates*", st.session_state.generated_dates, default=st.session_state.generated_dates[:3] if len(st.session_state.generated_dates) >= 3 else st.session_state.generated_dates, key="tpl_auto_selected")
+                        dates_string = ",".join(selected_dates)
+                        st.caption(f"📅 {len(selected_dates)} dates selected")
+                    else:
+                        dates_string = ""
+                        st.caption("Click 'Generate Dates' to auto-generate schedule dates.")
                 
                 st.markdown("---")
                 st.markdown("### 📝 Checklist Items")
