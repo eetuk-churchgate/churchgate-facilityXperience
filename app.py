@@ -6771,30 +6771,30 @@ def page_ppm_activities():
                             while current <= end_date:
                                 dates_list.append(current.strftime("%d-%m-%Y"))
                                 if selected_period == "Daily":
-                                    current += timedelta(days=1)
+                                    current = current + timedelta(days=1)
                                 elif selected_period == "Weekly":
-                                    current += timedelta(days=7)
+                                    current = current + timedelta(days=7)
                                 elif selected_period == "Bi-Weekly":
-                                    current += timedelta(days=14)
+                                    current = current + timedelta(days=14)
                                 elif selected_period == "Monthly":
-                                if current.month == 12:
-                                    current = date(current.year+1, 1, current.day)
-                                else:
-                                    current = date(current.year, current.month+1, min(current.day, 28))
-                            elif selected_period == "Quarterly":
-                                new_month = current.month + 3
-                                if new_month > 12:
-                                    current = date(current.year+1, new_month-12, min(current.day, 28))
-                                else:
-                                    current = date(current.year, new_month, min(current.day, 28))
-                            elif selected_period == "Half-Yearly":
-                                new_month = current.month + 6
-                                if new_month > 12:
-                                    current = date(current.year+1, new_month-12, min(current.day, 28))
-                                else:
-                                    current = date(current.year, new_month, min(current.day, 28))
+                                    if current.month == 12:
+                                        current = date(current.year + 1, 1, min(current.day, 28))
+                                    else:
+                                        current = date(current.year, current.month + 1, min(current.day, 28))
+                                elif selected_period == "Quarterly":
+                                    nm = current.month + 3
+                                    if nm > 12:
+                                        current = date(current.year + 1, nm - 12, min(current.day, 28))
+                                    else:
+                                        current = date(current.year, nm, min(current.day, 28))
+                                elif selected_period == "Half-Yearly":
+                                    nm = current.month + 6
+                                    if nm > 12:
+                                        current = date(current.year + 1, nm - 12, min(current.day, 28))
+                                    else:
+                                        current = date(current.year, nm, min(current.day, 28))
                                 elif selected_period == "Yearly":
-                                    current = current.replace(year=current.year+1)
+                                    current = date(current.year + 1, current.month, min(current.day, 28))
                             st.session_state.generated_dates = dates_list
                             st.rerun()
                     
