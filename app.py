@@ -6686,46 +6686,75 @@ def page_ppm_activities():
                 date_mode = st.radio("Date Selection Mode", ["📅 Manual Multi-Date Picker", "🔄 Auto-Generate by Period"], horizontal=True, key="date_mode")
                 
                 if date_mode == "📅 Manual Multi-Date Picker":
-                    st.caption("Select any dates you want. Click on dates to add/remove them.")
+                    st.caption("Click dates on the calendar to add/remove them.")
                     
-                    # Multi-date input using comma-separated dates
-                    manual_dates = st.text_area(
-                        "Enter dates (one per line or comma-separated)",
-                        height=100,
-                        key="tpl_manual_dates",
-                        placeholder="2026-06-26\n2026-07-31\n2026-08-28\n2026-09-25\n2026-10-30\n2026-11-27\n2026-12-25",
-                        help="Enter dates in YYYY-MM-DD format. One per line or comma-separated."
-                    )
+                    # Store selected dates in session state
+                    if "manual_selected_dates" not in st.session_state:
+                        st.session_state.manual_selected_dates = []
                     
-                    if manual_dates:
-                        # Parse dates from text
-                        parsed_dates = []
-                        for part in manual_dates.replace("\n", ",").split(","):
-                            part = part.strip()
-                            if part:
-                                try:
-                                    parsed_dates.append(datetime.strptime(part, "%Y-%m-%d").strftime("%d-%m-%Y"))
-                                except:
-                                    try:
-                                        parsed_dates.append(datetime.strptime(part, "%d/%m/%Y").strftime("%d-%m-%Y"))
-                                    except:
-                                        pass
+                    # Date picker to add a single date
+                    c1, c2, c3 = st.columns([2, 1, 1])
+                    with c1:
+                        pick_date = st.date_input("Pick a date to add", date.today(), key="tpl_pick_date")
+                    with c2:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("➕ Add Date", key="btn_add_date", use_container_width=True):
+                            date_str = pick_date.strftime("%d-%m-%Y")
+                            if date_str not in st.session_state.manual_selected_dates:
+                                st.session_state.manual_selected_dates.append(date_str)
+                                st.session_state.manual_selected_dates.sort()
+                                st.rerun()
+                    with c3:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("🗑️ Clear All", key="btn_clear_dates", use_container_width=True):
+                            st.session_state.manual_selected_dates = []
+                            st.rerun()
+                    
+                    # Show selected dates as clickable chips
+                    if st.session_state.manual_selected_dates:
+                        st.markdown("**Selected Dates:**")
                         
-                        if parsed_dates:
-                            selected_dates = st.multiselect(
-                                "Confirm Selected Dates*",
-                                parsed_dates,
-                                default=parsed_dates,
-                                key="tpl_manual_selected"
-                            )
-                            dates_string = ",".join(selected_dates)
-                            st.caption(f"📅 {len(selected_dates)} dates selected")
-                        else:
-                            dates_string = ""
-                            st.caption("Enter valid dates in YYYY-MM-DD format")
+                        # Display as colored chips in a grid
+                        chips_html = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;">'
+                        for i, d in enumerate(st.session_state.manual_selected_dates):
+                            chips_html += f'''
+                            <div style="background:#EFF6FF;border:1px solid #3B82F6;border-radius:20px;padding:4px 10px;font-size:0.7rem;display:flex;align-items:center;gap:4px;cursor:pointer;" title="Click to remove">
+                                📅 {d}
+                            </div>
+                            '''
+                        chips_html += '</div>'
+                        st.markdown(chips_html, unsafe_allow_html=True)
+                        
+                        # Allow removing individual dates
+                        remove_date = st.selectbox("Remove a date", ["Select..."] + st.session_state.manual_selected_dates, key="tpl_remove_date")
+                        if remove_date != "Select...":
+                            if st.button(f"🗑️ Remove {remove_date}", key="btn_remove_date", use_container_width=True):
+                                st.session_state.manual_selected_dates.remove(remove_date)
+                                st.rerun()
+                        
+                        dates_string = ",".join(st.session_state.manual_selected_dates)
+                        st.caption(f"📅 {len(st.session_state.manual_selected_dates)} dates selected")
+                        
+                        # Show calendar preview
+                        if st.button("📅 Preview Calendar", key="btn_preview_cal"):
+                            cal_preview = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:0.6rem;text-align:center;">'
+                            cal_preview += '<div style="font-weight:700;">M</div><div style="font-weight:700;">T</div><div style="font-weight:700;">W</div><div style="font-weight:700;">T</div><div style="font-weight:700;">F</div><div style="font-weight:700;">S</div><div style="font-weight:700;">S</div>'
+                            # Simple calendar for current month
+                            first = date.today().replace(day=1)
+                            last = (first.replace(month=first.month+1) if first.month < 12 else first.replace(year=first.year+1, month=1)) - timedelta(days=1)
+                            for i in range(first.weekday()):
+                                cal_preview += '<div></div>'
+                            for d in range(1, last.day+1):
+                                cd = date(first.year, first.month, d)
+                                dk = cd.strftime("%d-%m-%Y")
+                                bg = "#ECFDF5" if dk in st.session_state.manual_selected_dates else "#fff"
+                                color = "#059669" if dk in st.session_state.manual_selected_dates else "#bbb"
+                                cal_preview += f'<div style="background:{bg};color:{color};padding:2px;border-radius:2px;">{d}</div>'
+                            cal_preview += '</div>'
+                            st.markdown(cal_preview, unsafe_allow_html=True)
                     else:
                         dates_string = ""
-                        st.caption("Enter dates above or switch to Auto-Generate mode.")
+                        st.caption("No dates selected yet. Use the date picker above to add dates.")
                 
                 else:
                     if "generated_dates" not in st.session_state:
