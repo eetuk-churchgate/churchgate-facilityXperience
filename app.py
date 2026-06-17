@@ -6104,6 +6104,7 @@ def page_mis():
 
 # ============================================
 # PPM ACTIVITIES — FORTUNE 500 EXECUTION CENTER
+# CUSTOM CHECKLISTS • DAILY/HOURLY/SCHEDULED
 # ROLE-BASED • DEPARTMENT-FILTERED • AI-POWERED
 # ============================================
 def page_ppm_activities():
@@ -6123,37 +6124,33 @@ def page_ppm_activities():
         return
     
     df = pd.DataFrame(all_assets)
-    
-    # Clean checklist values
     df["checklist_clean"] = df["checklist"].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() not in ["", "NA", "na", "APPLICABLE", "NOTAPPLICABLE", "None"] else None)
-    
-    # Create department — sub_division labels
     df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
     
-    # ============================================
-    # ROLE-BASED DEPARTMENT RESTRICTION
-    # ============================================
+    # Role-based department restriction
     if is_admin:
         allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
     elif user_depts and len(user_depts) > 0 and user_depts != ["All"]:
         allowed_depts = [d for d in sorted(df["dept_full"].dropna().unique().tolist()) if any(ud in d for ud in user_depts)]
-        if not allowed_depts:
-            allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
+        if not allowed_depts: allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
     else:
         allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
+    
+    # Get custom checklists from database
+    custom_checklists = supabase.table("ppm_checklist_templates").select("*").execute()
+    checklist_options = ["Standard Template"] + [c.get("template_name","") for c in custom_checklists.data] if custom_checklists.data else ["Standard Template"]
     
     # ============================================
     # MAIN TABS
     # ============================================
-    tabs = st.tabs(["🔧 Execute PPM", "📋 My Tasks", "📊 My Submissions", "⏳ Pending Approval", "📅 Calendar View"])
+    tabs = st.tabs(["🔧 Execute PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 My Submissions", "⏳ Pending Approval", "⚙️ Checklist Builder"])
     
     # ============================================
-    # TAB 0: EXECUTE PPM — FULL CHECKLIST WORKFLOW
+    # TAB 0: EXECUTE PPM (SCHEDULED)
     # ============================================
     with tabs[0]:
-        st.markdown("### 🔧 Execute PPM Checklist")
+        st.markdown("### 🔧 Execute Scheduled PPM")
         
-        # Asset drilldown
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             sel_dept = st.selectbox("Select Department*", ["Select..."] + allowed_depts, key="ppm_dept")
@@ -6178,8 +6175,8 @@ def page_ppm_activities():
                     with c4:
                         st.markdown(f"""
                         <div style="background:#EFF6FF;border-radius:8px;padding:0.6rem;text-align:center;border:1px solid #BFDBFE;margin-top:0.5rem;">
-                            <div style="font-size:0.6rem;color:#2563EB;">📋 Checklist</div>
-                            <div style="font-weight:700;font-size:0.8rem;">{selected_asset.get('checklist_clean','Not Enrolled')}</div>
+                            <div style="font-size:0.6rem;color:#2563EB;">📋 Frequency</div>
+                            <div style="font-weight:700;font-size:0.8rem;">{selected_asset.get('ppm_frequency', selected_asset.get('verification_frequency', 'Monthly'))}</div>
                         </div>
                         """, unsafe_allow_html=True)
                     
@@ -6201,122 +6198,164 @@ def page_ppm_activities():
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # Load checklist items
-                    is_enrolled = pd.notna(selected_asset.get("checklist_clean"))
+                    # ============================================
+                    # DYNAMIC CHECKLIST — CUSTOMIZABLE
+                    # ============================================
+                    st.markdown("### 📝 PPM Checklist")
+                    
+                    # Select checklist template
+                    sel_checklist = st.selectbox("Select Checklist Template", checklist_options, key="ppm_checklist_template")
+                    
+                    # Build checklist items
                     checklist_items = []
                     
-                    if is_enrolled:
-                        templates = supabase.table("ppm_checklist_templates").select("*").execute()
-                        matched_template = None
-                        if templates.data:
-                            for t in templates.data:
-                                if t.get("template_name","") == selected_asset.get("checklist_clean",""):
-                                    matched_template = t
-                                    break
-                        
-                        if matched_template:
-                            items_res = supabase.table("ppm_checklist_items").select("*").eq("template_id", matched_template["id"]).order("sort_order").execute()
-                            if items_res.data:
-                                checklist_items = items_res.data
-                                st.success(f"📋 Loaded: **{matched_template.get('template_name')}** — {matched_template.get('international_standard','')}")
-                    
-                    if not checklist_items:
+                    if sel_checklist == "Standard Template":
                         checklist_items = [
-                            {"item_number": 1, "description": "Visual inspection of asset condition", "check_type": "visual", "expected_value": "No damage, clean", "is_critical": True},
-                            {"item_number": 2, "description": "Check for unusual noise/vibration", "check_type": "operational", "expected_value": "Smooth operation", "is_critical": False},
-                            {"item_number": 3, "description": "Verify operating parameters within range", "check_type": "measurement", "expected_value": "Within manufacturer spec", "is_critical": True},
-                            {"item_number": 4, "description": "Inspect connections and fittings", "check_type": "visual", "expected_value": "Tight and secure", "is_critical": False},
-                            {"item_number": 5, "description": "Clean equipment and surrounding area", "check_type": "housekeeping", "expected_value": "Clean and tidy", "is_critical": False},
+                            {"item_number": 1, "description": "Safety Precautions & Pre-Checks", "check_type": "section", "options": None},
+                            {"item_number": 2, "description": "LOTO (Lock-Out/Tag-Out): Power isolated and locked out", "check_type": "yes_no", "options": None},
+                            {"item_number": 3, "description": "PPE: Appropriate PPE worn (gloves, safety glasses)", "check_type": "yes_no", "options": None},
+                            {"item_number": 4, "description": "Work Area Assessment: Area clear of obstructions", "check_type": "status", "options": ["Clear", "Not Clear"]},
+                            {"item_number": 5, "description": "Permits: All necessary work permits obtained", "check_type": "yes_no", "options": None},
+                            {"item_number": 6, "description": "Visual Inspection - Unit casing for damage, cleanliness", "check_type": "yes_no", "options": None},
+                            {"item_number": 7, "description": "Air Filter(s) - Inspect for cleanliness and damage", "check_type": "status", "options": ["Clean", "Dirty", "Replaced"]},
+                            {"item_number": 8, "description": "Fan & Motor - Check for unusual noise, vibration", "check_type": "status", "options": ["Normal", "Abnormal"]},
+                            {"item_number": 9, "description": "Condensate Drain - Inspect drain pan", "check_type": "status", "options": ["Good", "Damage", "Dirty"]},
+                            {"item_number": 10, "description": "Electrical - Check wiring for damage, loose connections", "check_type": "yes_no", "options": None},
+                            {"item_number": 11, "description": "Measure air-on temperature (°C)", "check_type": "reading", "options": None},
+                            {"item_number": 12, "description": "Measure air-off temperature (°C)", "check_type": "reading", "options": None},
+                            {"item_number": 13, "description": "Record voltage parameters - RY", "check_type": "reading", "options": None},
+                            {"item_number": 14, "description": "Record voltage parameters - YB", "check_type": "reading", "options": None},
+                            {"item_number": 15, "description": "Record voltage parameters - BR", "check_type": "reading", "options": None},
+                            {"item_number": 16, "description": "Record Amps parameters - R", "check_type": "reading", "options": None},
+                            {"item_number": 17, "description": "Record Amps parameters - Y", "check_type": "reading", "options": None},
+                            {"item_number": 18, "description": "Record Amps parameters - B", "check_type": "reading", "options": None},
+                            {"item_number": 19, "description": "Check earthing connections of the panel", "check_type": "status", "options": ["Tight", "Loose"]},
+                            {"item_number": 20, "description": "Check BMS integration units", "check_type": "yes_no", "options": None},
+                            {"item_number": 21, "description": "Replace defective indication lamps", "check_type": "yes_no", "options": None},
+                            {"item_number": 22, "description": "Observations / abnormality If any", "check_type": "text", "options": None},
                         ]
-                        st.info("📋 Using standard checklist template.")
+                    else:
+                        # Load from database
+                        matched = None
+                        for c in custom_checklists.data if custom_checklists.data else []:
+                            if c.get("template_name") == sel_checklist:
+                                matched = c
+                                break
+                        if matched:
+                            items_res = supabase.table("ppm_checklist_items").select("*").eq("template_id", matched["id"]).order("sort_order").execute()
+                            if items_res.data:
+                                for item in items_res.data:
+                                    opts = item.get("expected_value","").split("/") if item.get("expected_value") else None
+                                    checklist_items.append({
+                                        "item_number": item.get("item_number"),
+                                        "description": item.get("description"),
+                                        "check_type": item.get("check_type", "yes_no"),
+                                        "options": opts if len(opts) > 1 else None
+                                    })
                     
-                    st.markdown("---")
-                    st.markdown("### 📝 PPM Checklist Execution")
-                    
+                    # ============================================
+                    # RENDER DYNAMIC CHECKLIST
+                    # ============================================
                     with st.form("ppm_execution_form", clear_on_submit=True):
                         checklist_results = []
                         has_issues = False
                         
                         for item in checklist_items:
-                            is_critical = item.get("is_critical", False)
-                            icon = "🔴" if is_critical else "🟡"
+                            item_num = item.get("item_number", len(checklist_results)+1)
+                            item_type = item.get("check_type", "yes_no")
+                            item_desc = item.get("description", "")
+                            item_opts = item.get("options")
                             
-                            st.markdown(f"**{icon} {item.get('item_number')}. {item.get('description')}**")
-                            st.caption(f"Expected: {item.get('expected_value','N/A')} | Type: {item.get('check_type','visual')}")
+                            # Section headers
+                            if item_type == "section":
+                                st.markdown(f"### {item_desc}")
+                                continue
                             
-                            c1, c2, c3 = st.columns([1, 2, 1])
-                            with c1:
-                                result = st.selectbox("Result", ["Pass", "Fail", "N/A"], key=f"check_{item.get('item_number')}_{item.get('id','0')}")
-                                if result == "Fail":
-                                    has_issues = True
-                            with c2:
-                                actual_value = st.text_input("Actual Reading / Comment", key=f"actual_{item.get('item_number')}_{item.get('id','0')}", placeholder="Enter reading or observation...")
-                            with c3:
-                                if result == "Fail":
-                                    risk_level = st.selectbox("Risk Level", ["Low", "Medium", "High", "Critical"], key=f"risk_{item.get('item_number')}_{item.get('id','0')}")
-                                else:
-                                    risk_level = "None"
+                            st.markdown(f"**{item_num}. {item_desc}**")
                             
-                            checklist_results.append({
-                                "item_id": item.get("id"),
-                                "item_number": item.get("item_number"),
-                                "description": item.get("description"),
-                                "expected_value": item.get("expected_value",""),
-                                "result": result.lower(),
-                                "actual_value": actual_value,
-                                "risk_level": risk_level if result == "Fail" else "None",
-                                "is_critical": is_critical
-                            })
+                            c1, c2 = st.columns([1, 2])
+                            
+                            if item_type == "yes_no":
+                                with c1:
+                                    result = st.selectbox("Status", ["Yes", "No"], key=f"yn_{item_num}")
+                                with c2:
+                                    comment = st.text_input("Comment", key=f"cmt_{item_num}", placeholder="Optional note...")
+                                if result == "No": has_issues = True
+                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": result, "actual_value": comment, "risk_level": "None"})
+                            
+                            elif item_type == "status" and item_opts:
+                                with c1:
+                                    result = st.selectbox("Status", item_opts, key=f"st_{item_num}")
+                                with c2:
+                                    comment = st.text_input("Comment", key=f"cmt_{item_num}", placeholder="Optional note...")
+                                if result in ["Damage", "Dirty", "Abnormal", "Loose", "Not Clear", "Fault"]: has_issues = True
+                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": result, "actual_value": comment, "risk_level": "None"})
+                            
+                            elif item_type == "reading":
+                                with c1:
+                                    reading = st.text_input("Reading", key=f"rd_{item_num}", placeholder="Enter value...")
+                                with c2:
+                                    unit = st.text_input("Unit", key=f"un_{item_num}", placeholder="°C, V, A...")
+                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": "Reading", "actual_value": f"{reading} {unit}".strip(), "risk_level": "None"})
+                            
+                            elif item_type == "text":
+                                with c1:
+                                    text_val = st.text_area("Observation", key=f"txt_{item_num}", height=60)
+                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": "Noted", "actual_value": text_val, "risk_level": "None"})
+                            
+                            else:
+                                with c1:
+                                    result = st.selectbox("Status", ["Pass", "Fail", "N/A"], key=f"df_{item_num}")
+                                with c2:
+                                    comment = st.text_input("Comment", key=f"cmt_{item_num}", placeholder="Optional note...")
+                                if result == "Fail": has_issues = True
+                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": result, "actual_value": comment, "risk_level": "None"})
                             
                             st.markdown("---")
                         
-                        # Mitigation section for issues
+                        # Mitigation section
                         if has_issues:
-                            st.markdown("### 🚨 Mitigation Plan (Required for Failed Items)")
-                            mitigation_plan = st.text_area("Describe mitigation actions for failed items*", height=80, placeholder="Required when any item fails...")
-                            mitigation_deadline = st.date_input("Mitigation Deadline", date.today() + timedelta(days=7))
+                            st.markdown("### 🚨 Mitigation Plan (Required)")
+                            mitigation_plan = st.text_area("Describe mitigation actions*", height=80, placeholder="Required when items fail...")
+                            c1, c2 = st.columns(2)
+                            with c1: mitigation_deadline = st.date_input("Mitigation Deadline", date.today() + timedelta(days=7))
+                            with c2: st.markdown("<br>", unsafe_allow_html=True)
                         else:
-                            mitigation_plan = ""
-                            mitigation_deadline = None
+                            mitigation_plan, mitigation_deadline = "", None
                         
                         # Photo evidence
                         st.markdown("### 📸 Photo Evidence (Required)")
-                        uploaded_photos = st.file_uploader("Upload photos of completed work", type=["png","jpg","jpeg"], accept_multiple_files=True, key="ppm_photos")
+                        uploaded_photos = st.file_uploader("Upload photos", type=["png","jpg","jpeg"], accept_multiple_files=True, key="ppm_photos")
                         
-                        # Flexible scheduling
-                        st.markdown("### 📅 Schedule Information")
+                        # Schedule
+                        st.markdown("### 📅 Schedule")
                         c1, c2, c3 = st.columns(3)
-                        with c1:
-                            execution_date = st.date_input("Execution Date", date.today())
-                        with c2:
-                            execution_time = st.time_input("Execution Time", datetime.now().time())
+                        with c1: execution_date = st.date_input("Execution Date", date.today())
+                        with c2: execution_time = st.time_input("Execution Time", datetime.now().time())
                         with c3:
-                            is_early = st.checkbox("Early Execution (requires approval)", value=False)
+                            is_early = st.checkbox("Early Execution (requires approval)")
+                            ppm_type = st.selectbox("PPM Type", ["Scheduled PPM", "Daily Checklist", "Hourly Checklist"], key="ppm_type_select")
                         
+                        early_reason = ""
                         if is_early:
-                            early_reason = st.text_area("Reason for Early Execution*", height=60, placeholder="Required for early execution...")
-                        else:
-                            early_reason = ""
+                            early_reason = st.text_area("Reason for Early Execution*", height=60)
                         
-                        # General comments
-                        execution_comments = st.text_area("Execution Notes", height=60, placeholder="Any additional observations...")
+                        execution_comments = st.text_area("Execution Notes", height=60)
                         
                         submitted = st.form_submit_button("✅ SUBMIT PPM EXECUTION", use_container_width=True, type="primary")
                         
                         if submitted:
                             errors = []
                             if not uploaded_photos: errors.append("Photo evidence is required")
-                            if has_issues and not mitigation_plan: errors.append("Mitigation plan required when items fail")
+                            if has_issues and not mitigation_plan: errors.append("Mitigation plan required")
                             if is_early and not early_reason: errors.append("Reason required for early execution")
                             
                             if errors:
-                                for e in errors:
-                                    st.error(f"⚠️ {e}")
+                                for e in errors: st.error(f"⚠️ {e}")
                             else:
                                 exec_data = {
                                     "facility_code": fc,
                                     "asset_id": selected_asset.get("id"),
-                                    "ppm_schedule_id": None,
                                     "executed_by": user_name,
                                     "executed_by_name": user_name,
                                     "execution_date": str(execution_date),
@@ -6329,6 +6368,7 @@ def page_ppm_activities():
                                     "early_execution_reason": early_reason,
                                     "mitigation_plan": mitigation_plan,
                                     "mitigation_deadline": str(mitigation_deadline) if mitigation_deadline else None,
+                                    "ppm_type": ppm_type,
                                     "created_at": datetime.now().isoformat()
                                 }
                                 
@@ -6336,17 +6376,14 @@ def page_ppm_activities():
                                 
                                 if exec_result:
                                     execution_id = exec_result["id"]
-                                    
                                     for item_result in checklist_results:
                                         supabase.table("ppm_execution_items").insert({
                                             "execution_id": execution_id,
-                                            "checklist_item_id": item_result["item_id"],
                                             "item_number": item_result["item_number"],
                                             "description": item_result["description"],
-                                            "expected_value": item_result["expected_value"],
-                                            "actual_value": item_result["actual_value"],
                                             "result": item_result["result"],
-                                            "risk_level": item_result["risk_level"],
+                                            "actual_value": item_result["actual_value"],
+                                            "risk_level": item_result.get("risk_level", "None"),
                                             "created_at": datetime.now().isoformat()
                                         }).execute()
                                     
@@ -6357,57 +6394,78 @@ def page_ppm_activities():
                                         "created_at": datetime.now().isoformat()
                                     }).execute()
                                     
-                                    st.success("✅ PPM Execution submitted successfully!")
+                                    st.success("✅ PPM Execution submitted!")
                                     st.balloons()
                                     st.rerun()
                                 else:
                                     st.error("❌ Failed to submit.")
     
     # ============================================
-    # TAB 1: MY TASKS
+    # TAB 1: DAILY CHECKLIST
     # ============================================
     with tabs[1]:
-        st.markdown("### 📋 My Assigned PPM Tasks")
+        st.markdown("### 📋 Daily Checklist Execution")
         
-        # Filter assets by user's department
-        if is_admin:
-            my_assets = df.copy()
-        elif user_depts and len(user_depts) > 0 and user_depts != ["All"]:
-            my_assets = df[df["dept_full"].apply(lambda x: any(ud in str(x) for ud in user_depts))]
+        daily_assets = df[df["verification_frequency"].isin(["Daily","daily"])] if "verification_frequency" in df.columns else pd.DataFrame()
+        
+        if len(daily_assets) == 0:
+            st.info("No daily checklist assets found. Assets with 'Daily' verification frequency will appear here.")
         else:
-            my_assets = df.copy()
-        
-        enrolled_assets = my_assets[my_assets["checklist_clean"].notna()]
-        
-        c1, c2, c3 = st.columns(3)
-        with c1: st.metric("📋 My Assets", len(my_assets))
-        with c2: st.metric("✅ Enrolled", len(enrolled_assets))
-        with c3: st.metric("⏳ Pending Execution", len(enrolled_assets))
-        
-        st.markdown("---")
-        
-        search_my = st.text_input("🔍 Search", key="my_task_search", placeholder="Search asset...")
-        
-        display_my = enrolled_assets.copy()
-        if search_my:
-            mask = display_my["name"].str.contains(search_my, case=False, na=False) | display_my["parent_asset"].str.contains(search_my, case=False, na=False)
-            display_my = display_my[mask]
-        
-        for _, asset in display_my.head(30).iterrows():
-            with st.expander(f"📋 {asset.get('parent_asset','')} — {asset.get('name','')[:60]}"):
-                st.write(f"**Department:** {asset.get('dept_full','')}")
-                st.write(f"**Location:** {asset.get('location_building','')}")
-                st.write(f"**Checklist:** {asset.get('checklist_clean','N/A')}")
-                st.write(f"**Frequency:** {asset.get('ppm_frequency', asset.get('verification_frequency', 'N/A'))}")
-                
-                if st.button("🔧 Execute PPM", key=f"exec_{asset.get('id','')}", use_container_width=True):
-                    st.session_state.ppm_asset_name = asset.get("name","")
-                    st.rerun()
+            c1, c2 = st.columns(2)
+            with c1: st.metric("📋 Daily Assets", len(daily_assets))
+            with c2: st.metric("⏳ Pending Today", len(daily_assets))
+            
+            st.markdown("---")
+            
+            sel_daily_dept = st.selectbox("Department", ["All"] + sorted(daily_assets["dept_full"].dropna().unique().tolist()), key="daily_dept")
+            
+            display_daily = daily_assets.copy()
+            if sel_daily_dept != "All":
+                display_daily = display_daily[display_daily["dept_full"] == sel_daily_dept]
+            
+            for _, asset in display_daily.head(20).iterrows():
+                st.markdown(f"""
+                <div style="background:white;border-left:3px solid #3B82F6;border-radius:6px;padding:0.5rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <b>{asset.get('parent_asset','N/A')}</b> — {asset.get('name','N/A')[:50]}
+                        <br><span style="font-size:0.6rem;color:#666;">📍 {asset.get('location_building','')} | 📅 Daily</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.info("👆 Go to 'Execute PPM' tab, select this asset, and choose 'Daily Checklist' as PPM Type.")
     
     # ============================================
-    # TAB 2: MY SUBMISSIONS
+    # TAB 2: HOURLY CHECKLIST
     # ============================================
     with tabs[2]:
+        st.markdown("### ⏰ Hourly Checklist Execution")
+        
+        hourly_assets = df[df["verification_frequency"].isin(["Hourly","hourly","Bi-Weekly"])] if "verification_frequency" in df.columns else pd.DataFrame()
+        
+        if len(hourly_assets) == 0:
+            st.info("No hourly checklist assets found.")
+        else:
+            c1, c2 = st.columns(2)
+            with c1: st.metric("⏰ Hourly Assets", len(hourly_assets))
+            with c2: st.metric("⏳ Pending", len(hourly_assets))
+            
+            st.markdown("---")
+            
+            for _, asset in hourly_assets.head(20).iterrows():
+                st.markdown(f"""
+                <div style="background:white;border-left:3px solid #8B5CF6;border-radius:6px;padding:0.5rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <b>{asset.get('parent_asset','N/A')}</b> — {asset.get('name','N/A')[:50]}
+                        <br><span style="font-size:0.6rem;color:#666;">📍 {asset.get('location_building','')} | ⏰ {asset.get('verification_frequency','')}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ============================================
+    # TAB 3: MY SUBMISSIONS
+    # ============================================
+    with tabs[3]:
         st.markdown("### 📊 My Submitted PPMs")
         
         my_executions = supabase.table("ppm_executions").select("*").eq("facility_code", fc).eq("executed_by_name", user_name).order("created_at", desc=True).limit(50).execute()
@@ -6416,9 +6474,9 @@ def page_ppm_activities():
             for ex in my_executions.data:
                 status = ex.get("status", "submitted")
                 sc = {"submitted": "#3B82F6", "confirmed": "#F59E0B", "approved": "#10B981", "rejected": "#EF4444"}.get(status, "#3B82F6")
-                icon = {"submitted": "📤", "confirmed": "✅", "approved": "🟢", "rejected": "❌"}.get(status, "📋")
                 
-                with st.expander(f"{icon} {ex.get('execution_date','')} — {ex.get('building','')} — {status.upper()}"):
+                with st.expander(f"📋 {ex.get('execution_date','')} — {ex.get('ppm_type','PPM')} — {status.upper()}"):
+                    st.write(f"**Type:** {ex.get('ppm_type','Scheduled PPM')}")
                     st.write(f"**Date:** {ex.get('execution_date','')} {ex.get('execution_time','')}")
                     st.write(f"**Building:** {ex.get('building','')}")
                     st.write(f"**Comments:** {ex.get('general_comments','N/A')}")
@@ -6427,21 +6485,19 @@ def page_ppm_activities():
                     if ex.get("mitigation_plan"):
                         st.error(f"🚨 Mitigation Required — Deadline: {ex.get('mitigation_deadline','')}")
                     
-                    # Show checklist results
                     items = supabase.table("ppm_execution_items").select("*").eq("execution_id", ex["id"]).order("item_number").execute()
                     if items.data:
                         st.markdown("**Checklist Results:**")
                         for item in items.data:
-                            item_icon = "✅" if item.get("result")=="pass" else "❌" if item.get("result")=="fail" else "➖"
-                            risk = f" | Risk: {item.get('risk_level','')}" if item.get("risk_level") and item.get("risk_level") != "None" else ""
-                            st.markdown(f"{item_icon} **{item.get('item_number')}.** {item.get('description')} — {item.get('actual_value','N/A')}{risk}")
+                            icon = "✅" if item.get("result") in ["Pass","Yes","Clear","Good","Normal","Tight"] else "❌" if item.get("result") in ["Fail","No","Damage","Dirty","Abnormal","Loose"] else "📝"
+                            st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — {item.get('actual_value', item.get('result',''))}")
         else:
             st.info("No PPM submissions yet.")
     
     # ============================================
-    # TAB 3: PENDING APPROVAL (Team Lead/Manager)
+    # TAB 4: PENDING APPROVAL
     # ============================================
-    with tabs[3]:
+    with tabs[4]:
         st.markdown("### ⏳ Pending Approvals")
         
         if user_role not in ["admin", "approver", "authorizer", "confirmer"]:
@@ -6453,7 +6509,8 @@ def page_ppm_activities():
                 for ex in pending.data:
                     status = ex.get("status", "submitted")
                     
-                    with st.expander(f"📋 {ex.get('execution_date','')} — {ex.get('building','')} — by {ex.get('executed_by_name','')} — {status.upper()}"):
+                    with st.expander(f"📋 {ex.get('execution_date','')} — {ex.get('ppm_type','PPM')} — by {ex.get('executed_by_name','')} — {status.upper()}"):
+                        st.write(f"**Type:** {ex.get('ppm_type','Scheduled PPM')}")
                         st.write(f"**Date:** {ex.get('execution_date','')} {ex.get('execution_time','')}")
                         st.write(f"**Executed by:** {ex.get('executed_by_name','')}")
                         st.write(f"**Comments:** {ex.get('general_comments','N/A')}")
@@ -6467,9 +6524,8 @@ def page_ppm_activities():
                         if items.data:
                             st.markdown("**Checklist Results:**")
                             for item in items.data:
-                                item_icon = "✅" if item.get("result")=="pass" else "❌" if item.get("result")=="fail" else "➖"
-                                risk = f" | Risk: {item.get('risk_level','')}" if item.get("risk_level") and item.get("risk_level") != "None" else ""
-                                st.markdown(f"{item_icon} **{item.get('item_number')}.** {item.get('description')} — {item.get('actual_value','N/A')}{risk}")
+                                icon = "✅" if item.get("result") in ["Pass","Yes","Clear","Good","Normal","Tight"] else "❌" if item.get("result") in ["Fail","No","Damage","Dirty","Abnormal","Loose"] else "📝"
+                                st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — {item.get('actual_value', item.get('result',''))}")
                         
                         st.markdown("---")
                         c1, c2 = st.columns(2)
@@ -6480,8 +6536,7 @@ def page_ppm_activities():
                                     supabase.table("ppm_executions").update({"status":"confirmed"}).eq("id", ex["id"]).execute()
                                     supabase.table("ppm_approvals").update({"status":"approved","comments":confirm_comment,"approver_name":user_name,"action_date":datetime.now().isoformat()}).eq("execution_id", ex["id"]).eq("approval_level","team_lead").execute()
                                     st.success("✅ Confirmed!"); st.rerun()
-                                else:
-                                    st.error("⚠️ Comment required")
+                                else: st.error("⚠️ Comment required")
                         with c2:
                             reject_comment = st.text_area("Rejection Reason*", key=f"reject_{ex['id']}", height=60)
                             if st.button("❌ REJECT", key=f"btn_reject_{ex['id']}", use_container_width=True):
@@ -6489,22 +6544,139 @@ def page_ppm_activities():
                                     supabase.table("ppm_executions").update({"status":"rejected"}).eq("id", ex["id"]).execute()
                                     supabase.table("ppm_approvals").update({"status":"rejected","comments":reject_comment,"approver_name":user_name,"action_date":datetime.now().isoformat()}).eq("execution_id", ex["id"]).eq("approval_level","team_lead").execute()
                                     st.error("❌ Rejected"); st.rerun()
-                                else:
-                                    st.error("⚠️ Reason required")
+                                else: st.error("⚠️ Reason required")
             else:
                 st.success("✅ No pending approvals.")
     
     # ============================================
-    # TAB 4: CALENDAR VIEW (QUICK LINK TO PPM CALENDAR)
+    # TAB 5: CHECKLIST BUILDER (ADMIN)
     # ============================================
-    with tabs[4]:
-        st.markdown("### 📅 PPM Calendar — Quick Access")
-        st.info("👆 Use the calendar below to view scheduled PPMs. Click any date to see details.")
+    with tabs[5]:
+        st.markdown("### ⚙️ Custom Checklist Builder")
         
-        if st.button("📅 OPEN FULL PPM CALENDAR", use_container_width=True, type="primary"):
-            st.session_state.page = "ar"
-            st.session_state.selected_tab = 5
-            st.rerun()
+        if not is_admin:
+            st.error("⛔ Admin access only")
+        else:
+            # Show existing custom checklists
+            st.markdown("#### 📋 Existing Custom Checklists")
+            if custom_checklists.data:
+                for c in custom_checklists.data:
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid #3B82F6;border-radius:6px;padding:0.6rem;margin:0.2rem 0;">
+                        <b>{c.get('template_name','')}</b> — {c.get('international_standard','Custom')}
+                        <br><span style="font-size:0.65rem;color:#666;">🏷️ {c.get('asset_category','')}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            st.markdown("#### ➕ Create New Checklist Template")
+            
+            with st.form("create_checklist_form"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    new_template_name = st.text_input("Template Name*", placeholder="e.g. HVAC ODU/IDU VRV Checklist")
+                    new_category = st.selectbox("Asset Category", sorted(df["dept_full"].dropna().unique().tolist()))
+                with c2:
+                    new_standard = st.text_input("Standard Reference", placeholder="e.g. ASHRAE 180, Custom")
+                    new_description = st.text_area("Description", height=60)
+                
+               st.markdown("---")
+                st.markdown("### 📝 Checklist Items")
+                
+                # Entry mode selector
+                entry_mode = st.radio("Entry Mode", ["📋 Manual Entry (Structured)", "📋 Quick Paste (Copy from Excel/Word)"], horizontal=True)
+                
+                if entry_mode == "📋 Manual Entry (Structured)":
+                    st.caption("Format: Item Number | Description | Type (yes_no/status/reading/text/section) | Options (use / separator)")
+                    st.caption("Example: 1 | Safety Precautions | section |")
+                    st.caption("Example: 2 | LOTO: Power isolated | yes_no |")
+                    st.caption("Example: 3 | Filter Condition | status | Clean/Dirty/Replaced")
+                    st.caption("Example: 4 | Measure temperature | reading |")
+                    
+                    checklist_text = st.text_area("Checklist Items*", height=300, 
+                        placeholder="1 | Safety Precautions & Pre-Checks | section |\n2 | LOTO: Power isolated and locked out | yes_no |\n3 | Air Filter Condition | status | Clean/Dirty/Replaced\n4 | Measure air-on temperature | reading |\n5 | Observations | text |")
+                
+                else:
+                    st.caption("📋 **Simply copy your checklist from Excel or Word and paste below.**")
+                    st.caption("The system will auto-detect the format. Each line becomes a checklist item.")
+                    st.caption("Tip: Copy the SNO and Description columns from Excel and paste here.")
+                    
+                    quick_paste = st.text_area("Paste Checklist Here*", height=400,
+                        placeholder="Paste your checklist directly from Excel/Word...\n\nExample:\n1\tSafety Precautions & Pre-Checks\n2\tLOTO (Lock-Out/Tag-Out): Power isolated and locked out for relevant units before internal work.\n3\tPPE (Personal Protective Equipment): Appropriate PPE worn (gloves, safety glasses, etc.).\n4\tWork Area Assessment: Area clear of obstructions, safe access.\n5\tPermits: All necessary work permits obtained.")
+                    
+                    # Auto-detect type for pasted items
+                    auto_type = st.selectbox("Default Answer Type for All Items", ["yes_no", "status", "reading", "text"], 
+                        help="Select the default answer type. You can manually adjust specific items after creation.")
+                    
+                    if quick_paste:
+                        # Parse pasted content
+                        lines = [l.strip() for l in quick_paste.strip().split("\n") if l.strip()]
+                        st.caption(f"📋 **{len(lines)} items detected**")
+                        
+                        # Preview
+                        with st.expander("👁️ Preview Parsed Items"):
+                            for i, line in enumerate(lines[:10]):
+                                # Try to split by tab or multiple spaces
+                                if "\t" in line:
+                                    parts = line.split("\t")
+                                else:
+                                    parts = [line]
+                                st.markdown(f"**{i+1}.** {parts[-1][:100]}")
+                            if len(lines) > 10:
+                                st.caption(f"... and {len(lines)-10} more items")
+                        
+                        # Convert to structured format
+                        checklist_text = ""
+                        for i, line in enumerate(lines):
+                            if "\t" in line:
+                                parts = line.split("\t")
+                                desc = parts[-1].strip()
+                            else:
+                                desc = line.strip()
+                            checklist_text += f"{i+1} | {desc} | {auto_type} |\n"
+                    else:
+                        checklist_text = ""
+                
+                if st.form_submit_button("💾 CREATE CHECKLIST TEMPLATE", use_container_width=True, type="primary"):
+                    if new_template_name and checklist_text:
+                        # Create template
+                        template_result = supabase.table("ppm_checklist_templates").insert({
+                            "template_name": new_template_name,
+                            "asset_category": new_category,
+                            "international_standard": new_standard,
+                            "description": new_description,
+                            "is_active": True
+                        }).execute()
+                        
+                        if template_result.data:
+                            template_id = template_result.data[0]["id"]
+                            
+                            # Parse checklist items
+                            lines = checklist_text.strip().split("\n")
+                            for line in lines:
+                                parts = [p.strip() for p in line.split("|")]
+                                if len(parts) >= 3:
+                                    item_num = parts[0]
+                                    item_desc = parts[1]
+                                    item_type = parts[2]
+                                    item_opts = parts[3] if len(parts) > 3 else None
+                                    
+                                    supabase.table("ppm_checklist_items").insert({
+                                        "template_id": template_id,
+                                        "item_number": int(item_num) if item_num.isdigit() else 1,
+                                        "description": item_desc,
+                                        "check_type": item_type,
+                                        "expected_value": item_opts,
+                                        "sort_order": int(item_num) if item_num.isdigit() else 1
+                                    }).execute()
+                            
+                            st.success(f"✅ Checklist '{new_template_name}' created with items!")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to create template")
+                    else:
+                        st.error("⚠️ Template name and checklist items are required")
 
 # ============================================
 # ROUTER
