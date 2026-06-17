@@ -6656,34 +6656,127 @@ def page_ppm_activities():
                         st.rerun()
                 
                 # ============================================
-                # QUICK PASTE (OUTSIDE FORM)
+                # IMPORT OPTIONS
                 # ============================================
                 st.markdown("---")
-                st.markdown("### 📋 Quick Paste (Alternative)")
-                st.caption("Paste from Excel: SNO | Description columns separated by Tab or |")
+                st.markdown("### 📥 Import Checklist Items")
                 
-                quick_paste = st.text_area("Paste items here", height=150, key="quick_paste_builder",
-                    placeholder="1\tCheck damages on Rollers/Conveyor Belt\n2\tCheck Sensors/Photocells Sensitivity Status\n3\tCheck Moving Parts Lubrications\n4\tCheck Backup Batteries Status\n5\tCheck Mis-alignment/Knocks/Loose Bracket")
+                import_mode = st.radio("Import Method", ["📋 Quick Paste", "📁 Upload File"], horizontal=True, key="import_mode")
                 
-                if quick_paste:
-                    lines = [l.strip() for l in quick_paste.strip().split("\n") if l.strip()]
-                    if st.button(f"📋 Parse {len(lines)} Items", key="btn_parse", use_container_width=True):
-                        for i, line in enumerate(lines):
-                            if "\t" in line:
-                                parts = line.split("\t")
-                                desc = parts[-1].strip()
-                            elif "|" in line:
-                                parts = line.split("|")
-                                desc = parts[-1].strip()
+                if import_mode == "📋 Quick Paste":
+                    st.caption("Paste from Excel. Detects Tab or multiple spaces as column separator.")
+                    
+                    quick_paste = st.text_area("Paste items here", height=200, key="quick_paste_builder",
+                        placeholder="1\tCheck damages on Rollers/Conveyor Belt\tYes/No\n2\tCheck Sensors/Photocells Sensitivity Status\tHigh/Low\n3\tCheck Moving Parts Lubrications\tYes/No\n4\tCheck Backup Batteries Status\tOk/Not Ok\n5\tCheck Mis-alignment/Knocks/Loose Bracket\tYes/No")
+                    
+                    if quick_paste:
+                        import re
+                        lines = [l.strip() for l in quick_paste.strip().split("\n") if l.strip()]
+                        
+                        # Smart separator detection
+                        tab_count = sum(1 for l in lines if "\t" in l)
+                        separator = "tab" if tab_count > len(lines) * 0.5 else "spaces"
+                        
+                        st.caption(f"📋 {len(lines)} items | Separator: {separator}")
+                        
+                        # Preview
+                        preview_rows = []
+                        for i, line in enumerate(lines[:10]):
+                            if separator == "tab":
+                                parts = [p.strip() for p in line.split("\t") if p.strip()]
                             else:
-                                desc = line.strip()
-                            st.session_state.checklist_builder_items.append({
-                                "sno": len(st.session_state.checklist_builder_items) + 1,
-                                "description": desc,
-                                "answer_type": "yes_no",
-                                "threshold": "Yes/No"
-                            })
-                        st.rerun()
+                                parts = re.split(r'\s{2,}', line)
+                                parts = [p.strip() for p in parts if p.strip()]
+                            
+                            if len(parts) >= 2:
+                                sno, desc = parts[0], parts[1]
+                                status = parts[2] if len(parts) > 2 else "Yes/No"
+                            elif len(parts) == 1:
+                                sno, desc = str(i+1), parts[0]
+                                status = "Yes/No"
+                            else:
+                                continue
+                            preview_rows.append({"SNO": sno, "Description": desc[:100], "Status": status})
+                        
+                        if preview_rows:
+                            st.caption("👁️ Preview:")
+                            st.dataframe(pd.DataFrame(preview_rows), use_container_width=True, hide_index=True)
+                        
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            default_type_paste = st.selectbox("Default Answer Type", ["yes_no", "status", "pass_fail", "reading", "text"], key="paste_type")
+                        with c2:
+                            default_thresh_paste = st.text_input("Default Options", value="Yes/No", key="paste_thresh")
+                        
+                        if st.button(f"📋 Import {len(lines)} Items", key="btn_parse", use_container_width=True, type="primary"):
+                            imported = 0
+                            for i, line in enumerate(lines):
+                                if separator == "tab":
+                                    parts = [p.strip() for p in line.split("\t") if p.strip()]
+                                else:
+                                    parts = re.split(r'\s{2,}', line)
+                                    parts = [p.strip() for p in parts if p.strip()]
+                                
+                                if len(parts) >= 2:
+                                    desc = parts[1]
+                                    status = parts[2] if len(parts) > 2 else default_thresh_paste
+                                elif len(parts) == 1:
+                                    desc = parts[0]
+                                    status = default_thresh_paste
+                                else:
+                                    continue
+                                
+                                if desc:
+                                    st.session_state.checklist_builder_items.append({
+                                        "sno": len(st.session_state.checklist_builder_items) + 1,
+                                        "description": desc,
+                                        "answer_type": default_type_paste,
+                                        "threshold": status if status else default_thresh_paste
+                                    })
+                                    imported += 1
+                            st.success(f"✅ {imported} items imported!")
+                            st.rerun()
+                
+                else:
+                    st.caption("📁 Upload CSV or Excel file with columns: SNO, Description, Status")
+                    uploaded_file = st.file_uploader("Upload File", type=["csv", "xlsx"], key="checklist_upload")
+                    
+                    if uploaded_file:
+                        try:
+                            if uploaded_file.name.endswith(".csv"):
+                                import_df = pd.read_csv(uploaded_file)
+                            else:
+                                import_df = pd.read_excel(uploaded_file)
+                            
+                            st.dataframe(import_df.head(10), use_container_width=True)
+                            st.caption(f"📋 {len(import_df)} rows found")
+                            
+                            cols = import_df.columns.tolist()
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                desc_col = st.selectbox("Description Column", cols, key="map_desc")
+                            with c2:
+                                status_col = st.selectbox("Status Column (optional)", ["--None--"] + cols, key="map_status")
+                            
+                            default_type_upload = st.selectbox("Default Answer Type", ["yes_no", "status", "pass_fail", "reading", "text"], key="upload_type")
+                            
+                            if st.button(f"📋 Import {len(import_df)} Items", key="btn_upload_import", use_container_width=True, type="primary"):
+                                count = 0
+                                for _, row in import_df.iterrows():
+                                    desc = str(row[desc_col])
+                                    status = str(row[status_col]) if status_col != "--None--" else "Yes/No"
+                                    if desc and desc != "nan":
+                                        st.session_state.checklist_builder_items.append({
+                                            "sno": len(st.session_state.checklist_builder_items) + 1,
+                                            "description": desc,
+                                            "answer_type": default_type_upload,
+                                            "threshold": status if status != "nan" else "Yes/No"
+                                        })
+                                        count += 1
+                                st.success(f"✅ {count} items imported!")
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {str(e)}")
                 
                 # ============================================
                 # SUBMIT FORM (SEPARATE)
