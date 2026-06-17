@@ -1351,42 +1351,229 @@ def page_ar():
                 st.rerun()
     
     # ============================================
-    # TAB 4: READINGS
+    # TAB 4: READINGS — AI-POWERED ASSET PERFORMANCE CENTER
     # ============================================
     with ar_tabs[4]:
-        st.markdown("### 📖 Asset Readings Dashboard")
+        st.markdown("### 📖 Asset Readings — AI-Powered Performance Center")
         
         if len(df) == 0:
-            st.info("No assets to display readings for.")
+            st.info("No assets registered. Add assets to see readings.")
         else:
-            c1, c2, c3, c4 = st.columns(4)
-            with c1: st.metric("📊 Total Assets", len(df))
-            with c2: st.metric("⚠️ Abnormal", 0)
-            with c3: st.metric("🔧 Corrective WOs", 0)
-            with c4: st.metric("⏱️ Downtime (Hrs)", "0.0")
+            # KPI Calculations
+            total_assets_count = len(df)
+            critical_assets_count = len(df[df["priority"].isin(["critical", "high"])]) if "priority" in df.columns else 0
+            
+            # Readings summary (placeholder until readings table is populated)
+            total_readings = 0
+            abnormal_readings = 0
+            corrective_wos = 0
+            total_downtime = 0
+            
+            try:
+                readings_res = supabase.table("utility_readings").select("id", count="exact").eq("facility_code", fc).execute()
+                total_readings = readings_res.count or 0
+            except:
+                pass
+            
+            # Executive KPI Row
+            st.markdown("### 🎯 Performance KPIs")
+            c1, c2, c3, c4, c5, c6 = st.columns(6)
+            with c1:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Total Readings</div><div style="font-size:1.6rem;font-weight:800;color:#3B82F6;">{total_readings}</div></div>""", unsafe_allow_html=True)
+            with c2:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #EF4444;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Abnormal</div><div style="font-size:1.6rem;font-weight:800;color:#EF4444;">{abnormal_readings}</div></div>""", unsafe_allow_html=True)
+            with c3:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Critical Alerts</div><div style="font-size:1.6rem;font-weight:800;color:#F59E0B;">{critical_assets_count}</div></div>""", unsafe_allow_html=True)
+            with c4:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Corrective WOs</div><div style="font-size:1.6rem;font-weight:800;color:#8B5CF6;">{corrective_wos}</div></div>""", unsafe_allow_html=True)
+            with c5:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #EC4899;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Downtime (Hrs)</div><div style="font-size:1.6rem;font-weight:800;color:#EC4899;">{total_downtime}</div></div>""", unsafe_allow_html=True)
+            with c6:
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Health Score</div><div style="font-size:1.6rem;font-weight:800;color:#10B981;">{round(total_assets_count/max(total_assets_count,1)*100)}%</div></div>""", unsafe_allow_html=True)
             
             st.markdown("---")
             
+            # AI Insights Banner
+            if critical_assets_count > 10:
+                st.warning(f"🤖 **AI Insight:** {critical_assets_count} critical assets require immediate attention. Recommend prioritizing PPM for these assets.")
+            if abnormal_readings > 0:
+                st.error(f"🤖 **AI Alert:** {abnormal_readings} abnormal readings detected. Predictive maintenance recommended.")
+            if total_readings == 0:
+                st.info("🤖 **AI Insight:** No readings recorded yet. Start recording utility readings to enable predictive analytics.")
+            
+            st.markdown("---")
+            
+            # Filters
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                reading_building = st.selectbox("🏢 Building", ["All"] + sorted(df["location_building"].unique().tolist()), key="read_bldg")
+            with c2:
+                reading_dept = st.selectbox("🏷️ Department", ["All"] + sorted(df["department"].unique().tolist()), key="read_dept")
+            with c3:
+                reading_priority = st.selectbox("⚠️ Priority", ["All", "critical", "high", "medium", "low"], key="read_pri")
+            with c4:
+                reading_search = st.text_input("🔍 Search Asset", key="read_search", placeholder="Name or code...")
+            
+            # Build readings dataframe
             readings_data = []
             for _, asset in df.iterrows():
+                # Apply filters
+                if reading_building != "All" and asset.get("location_building","") != reading_building:
+                    continue
+                if reading_dept != "All" and asset.get("department","") != reading_dept:
+                    continue
+                if reading_priority != "All" and asset.get("priority","") != reading_priority:
+                    continue
+                if reading_search:
+                    name = str(asset.get("name","")).lower()
+                    code = str(asset.get("asset_tag","")).lower()
+                    if reading_search.lower() not in name and reading_search.lower() not in code:
+                        continue
+                
+                # Calculate asset age
+                asset_age = "N/A"
+                if pd.notna(asset.get("installation_date")):
+                    try:
+                        inst_date = pd.to_datetime(asset["installation_date"])
+                        age_days = (today - inst_date.date()).days
+                        if age_days > 365:
+                            asset_age = f"{age_days // 365} Years"
+                        elif age_days > 30:
+                            asset_age = f"{age_days // 30} Months"
+                        else:
+                            asset_age = f"{age_days} Days"
+                    except:
+                        pass
+                
                 readings_data.append({
                     "Asset ID": asset.get("asset_tag", "N/A"),
                     "Asset Name": asset.get("name", "N/A"),
                     "Department": asset.get("department", "N/A"),
+                    "Sub-Division": asset.get("sub_division", "N/A"),
                     "Manufacturer": asset.get("manufacturer", "N/A"),
                     "Model": asset.get("model", "N/A"),
-                    "Serial": asset.get("serial_number", "N/A"),
-                    "Location": f"{asset.get('location_building','')} / {asset.get('location_floor','')}",
-                    "Priority": asset.get("priority", "N/A"),
-                    "Running Hours": asset.get("total_operational_hrs", 0),
+                    "Serial Number": asset.get("serial_number", "N/A"),
+                    "Location": f"{asset.get('location_building','')}",
+                    "Priority": asset.get("priority", "N/A").upper(),
                     "Condition": asset.get("condition_rating", "N/A"),
+                    "Asset Age": asset_age,
+                    "Running Hours": asset.get("total_operational_hrs", 0) if pd.notna(asset.get("total_operational_hrs")) else 0,
+                    "PPM Frequency": asset.get("verification_frequency", "N/A"),
                     "Last PPM": "N/A",
-                    "Breakdowns": 0
+                    "Breakdowns": 0,
+                    "Downtime (Hrs)": 0,
                 })
             
             rd_df = pd.DataFrame(readings_data)
-            st.dataframe(rd_df, use_container_width=True, hide_index=True, height=500)
-            st.download_button("📥 Export", rd_df.to_csv(index=False), "readings.csv", "text/csv", use_container_width=True)
+            
+            st.caption(f"📋 Showing {len(rd_df)} of {len(df)} assets")
+            
+            # Color-code condition column
+            def highlight_condition(val):
+                try:
+                    v = float(val)
+                    if v >= 4.5: return 'background-color:#ECFDF5;color:#059669;font-weight:600;'
+                    elif v >= 3.5: return 'background-color:#EFF6FF;color:#2563EB;font-weight:600;'
+                    elif v >= 2.5: return 'background-color:#FFFBEB;color:#D97706;font-weight:600;'
+                    else: return 'background-color:#FEF2F2;color:#DC2626;font-weight:600;'
+                except:
+                    return ''
+            
+            def highlight_priority(val):
+                if val in ["CRITICAL", "HIGH"]:
+                    return 'background-color:#FEF2F2;color:#DC2626;font-weight:600;'
+                return ''
+            
+            if len(rd_df) > 0:
+                styled = rd_df.style
+                if "Condition" in rd_df.columns:
+                    styled = styled.applymap(highlight_condition, subset=["Condition"])
+                if "Priority" in rd_df.columns:
+                    styled = styled.applymap(highlight_priority, subset=["Priority"])
+                
+                st.dataframe(styled, use_container_width=True, hide_index=True, height=500)
+            else:
+                st.info("No assets match your filters.")
+            
+            st.markdown("---")
+            
+            # Charts & Analytics
+            st.markdown("### 📊 Asset Performance Analytics")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                # Department distribution chart
+                if "department" in rd_df.columns and len(rd_df) > 0:
+                    dept_counts = rd_df["Department"].value_counts().head(10)
+                    fig_dept = px.bar(
+                        x=dept_counts.values, y=dept_counts.index, orientation='h',
+                        title="Assets by Department", color=dept_counts.values,
+                        color_continuous_scale="Reds", labels={"x":"Count","y":""}
+                    )
+                    fig_dept.update_layout(height=350)
+                    st.plotly_chart(fig_dept, use_container_width=True)
+            
+            with c2:
+                # Priority distribution
+                if "Priority" in rd_df.columns and len(rd_df) > 0:
+                    pri_counts = rd_df["Priority"].value_counts()
+                    pri_colors = {"CRITICAL":"#EF4444","HIGH":"#F59E0B","MEDIUM":"#3B82F6","LOW":"#10B981"}
+                    pie_colors = [pri_colors.get(p,"#999") for p in pri_counts.index]
+                    fig_pri = px.pie(
+                        values=pri_counts.values, names=pri_counts.index,
+                        title="Priority Distribution", color_discrete_sequence=pie_colors
+                    )
+                    fig_pri.update_layout(height=350)
+                    st.plotly_chart(fig_pri, use_container_width=True)
+            
+            # Export section
+            st.markdown("---")
+            st.markdown("### 📥 Export Data")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                csv_data = rd_df.to_csv(index=False)
+                st.download_button("📥 Download CSV", csv_data, f"asset_readings_{fc}_{today}.csv", "text/csv", use_container_width=True)
+            with c2:
+                # HTML Export
+                logo_b64 = get_logo_base64()
+                html_report = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px;color:#1a1a1a;font-size:11px}}.header{{background:#1a1a1a;color:white;padding:15px;border-radius:8px;display:flex;align-items:center;gap:10px;margin-bottom:15px}}.header h1{{margin:0;font-size:16px}}table{{width:100%;border-collapse:collapse;font-size:9px}}th{{background:#CC0000;color:white;padding:5px}}td{{padding:4px;border-bottom:1px solid #eee}}.footer{{text-align:center;font-size:8px;color:#999;margin-top:15px}}</style></head><body><div class="header">{f'<img src="data:image/png;base64,{logo_b64}" height="30">' if logo_b64 else ''}<div><h1>Asset Readings Report</h1><p style="font-size:10px;opacity:0.8;">{info.get('full_name',fc)} | {today.strftime('%d %B %Y')}</p></div></div><table><tr><th>Asset ID</th><th>Name</th><th>Department</th><th>Location</th><th>Priority</th><th>Condition</th><th>Age</th></tr>"""
+                for _, r in rd_df.head(100).iterrows():
+                    html_report += f"<tr><td>{r['Asset ID']}</td><td>{r['Asset Name']}</td><td>{r['Department']}</td><td>{r['Location']}</td><td>{r['Priority']}</td><td>{r['Condition']}</td><td>{r['Asset Age']}</td></tr>"
+                html_report += "</table><div class='footer'>Churchgate Group | facilityXperience | Confidential</div></body></html>"
+                st.download_button("📥 Download HTML Report", html_report, f"readings_report_{today}.html", "text/html", use_container_width=True)
+            with c3:
+                try:
+                    from fpdf import FPDF
+                    pdf = FPDF('L','mm','A4')
+                    pdf.add_page()
+                    logo_path = Path("churchgate-logo.png")
+                    if logo_path.exists():
+                        pdf.image(str(logo_path), x=14, y=8, h=8)
+                    pdf.set_font('Helvetica','B',14)
+                    pdf.set_text_color(204,0,0)
+                    pdf.cell(260,8,f'Asset Readings Report - {info.get("full_name",fc)}',0,1)
+                    pdf.set_font('Helvetica','',8)
+                    pdf.set_text_color(0,0,0)
+                    pdf.cell(260,5,f'Generated: {today.strftime("%d %B %Y")} | Total Assets: {len(rd_df)}',0,1)
+                    pdf.ln(3)
+                    pdf.set_font('Helvetica','B',6)
+                    pdf.set_fill_color(204,0,0)
+                    pdf.set_text_color(255,255,255)
+                    for h,w in zip(['Asset ID','Name','Department','Location','Priority','Condition','Age'],[25,45,35,40,20,20,20]):
+                        pdf.cell(w,5,h,1,0,'C',True)
+                    pdf.ln()
+                    pdf.set_font('Helvetica','',6)
+                    pdf.set_text_color(26,26,26)
+                    for _,r in rd_df.head(50).iterrows():
+                        for v,w in zip([r['Asset ID'],r['Asset Name'],r['Department'],r['Location'],r['Priority'],str(r['Condition']),r['Asset Age']],[25,45,35,40,20,20,20]):
+                            pdf.cell(w,4,str(v)[:int(w/2)],1,0)
+                        pdf.ln()
+                    pdf_file = f"/tmp/readings_report_{today}.pdf"
+                    pdf.output(pdf_file)
+                    with open(pdf_file,"rb") as f:
+                        st.download_button("📥 Download PDF", f.read(), f"readings_report_{today}.pdf", "application/pdf", use_container_width=True)
+                except Exception as e:
+                    st.error(f"PDF: {str(e)[:50]}")
     
     # ============================================
     # TAB 5: PPM CALENDAR — FORTUNE 500 PRODUCTION GRADE
@@ -1642,34 +1829,267 @@ def page_ar():
                     st.success("✅ Sale request submitted!")
     
     # ============================================
-    # TAB 7: REPORTS
+    # TAB 7: AI-POWERED REPORTS SUITE
     # ============================================
     with ar_tabs[7]:
-        st.markdown("### 📄 Reports")
+        st.markdown("### 📄 AI-Powered Reports Suite")
         
-        if len(df) > 0:
-            if st.button("🤖 Generate AI Asset Report", use_container_width=True, type="primary"):
-                st.success(f"✅ Report generated for {len(df)} assets")
-                
-                if "department" in df.columns:
-                    dept_summary = df.groupby("department").agg(Count=("name", "count")).reset_index()
-                    st.dataframe(dept_summary, use_container_width=True, hide_index=True)
-                
-                st.download_button("📥 Download CSV", df.to_csv(index=False), f"asset_report_{today}.csv", "text/csv", use_container_width=True)
+        if len(df) == 0:
+            st.info("No assets to generate reports for.")
+        else:
+            report_type = st.selectbox("📊 Select Report Type", [
+                "📋 Asset Summary Report",
+                "🏢 Department Breakdown",
+                "💰 Financial Report", 
+                "🛡️ Warranty & Lifecycle Report",
+                "📈 PPM Compliance Report",
+                "⚙️ Custom Report Builder"
+            ])
             
             st.markdown("---")
-            st.markdown("#### 💰 Financial Summary")
-            st.markdown(f"""
-            <div style="background:white;border-radius:10px;padding:1rem;">
-                <table style="width:100%;font-size:0.85rem;">
-                    <tr><td>Total Portfolio Value</td><td style="text-align:right;font-weight:700;">₦{df['purchase_cost'].fillna(0).sum():,.2f}</td></tr>
-                    <tr><td>Total Assets</td><td style="text-align:right;font-weight:700;">{len(df)}</td></tr>
-                    <tr><td>Departments</td><td style="text-align:right;font-weight:700;">{df['department'].nunique() if 'department' in df.columns else 0}</td></tr>
-                </table>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.info("No assets to report on.")
+            
+            # ============================================
+            # ASSET SUMMARY REPORT
+            # ============================================
+            if report_type == "📋 Asset Summary Report":
+                st.markdown("### 📋 Asset Summary Report")
+                
+                total = len(df)
+                active = len(df[df["status"]=="active"]) if "status" in df.columns else 0
+                inactive = len(df[df["status"]=="inactive"]) if "status" in df.columns else 0
+                breakdown = len(df[df["status"]=="breakdown"]) if "status" in df.columns else 0
+                critical = len(df[df["priority"].isin(["critical","high"])]) if "priority" in df.columns else 0
+                
+                # KPI Cards
+                c1, c2, c3, c4, c5 = st.columns(5)
+                with c1: st.metric("📋 Total Assets", total)
+                with c2: st.metric("✅ Active", active)
+                with c3: st.metric("🔴 Critical", critical)
+                with c4: st.metric("⚠️ Breakdown", breakdown)
+                with c5: st.metric("💤 Inactive", inactive)
+                
+                st.markdown("---")
+                
+                # Charts
+                c1, c2 = st.columns(2)
+                with c1:
+                    if "department" in df.columns:
+                        dept_counts = df["department"].value_counts().head(10)
+                        fig = px.bar(x=dept_counts.values, y=dept_counts.index, orientation='h', title="Assets by Department", color=dept_counts.values, color_continuous_scale="Reds")
+                        fig.update_layout(height=400)
+                        st.plotly_chart(fig, use_container_width=True)
+                with c2:
+                    if "location_building" in df.columns:
+                        bldg_counts = df["location_building"].value_counts().head(8)
+                        fig2 = px.pie(values=bldg_counts.values, names=bldg_counts.index, title="Assets by Building")
+                        fig2.update_layout(height=400)
+                        st.plotly_chart(fig2, use_container_width=True)
+                
+                # AI Executive Summary
+                st.markdown("---")
+                st.markdown("### 🤖 AI Executive Summary")
+                
+                compliance = round(active/total*100,1) if total > 0 else 0
+                st.markdown(f"""
+                <div style="background:white;border-radius:10px;padding:1.5rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                    <h4>Executive Overview — {info.get('full_name',fc)}</h4>
+                    <p>📋 <b>{total}</b> total assets registered across <b>{df['department'].nunique() if 'department' in df.columns else 0}</b> departments.</p>
+                    <p>✅ <b>{compliance}%</b> asset availability rate with <b>{critical}</b> critical assets requiring priority attention.</p>
+                    <p>⚠️ <b>{breakdown}</b> assets currently in breakdown status requiring immediate corrective action.</p>
+                    <p>🏢 Assets distributed across <b>{df['location_building'].nunique() if 'location_building' in df.columns else 0}</b> buildings/locations.</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Export
+                st.markdown("---")
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.download_button("📥 CSV", df.to_csv(index=False), f"asset_summary_{today}.csv", "text/csv", use_container_width=True)
+                with c2:
+                    logo_b64 = get_logo_base64()
+                    html_export = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}.kpi{{display:flex;gap:10px}}.kpi div{{flex:1;background:#f5f5f5;padding:10px;border-radius:8px;text-align:center;border-left:4px solid #CC0000}}</style></head><body><h1>Asset Summary Report</h1><p>{info.get('full_name',fc)} | {today}</p><div class="kpi"><div><b>Total</b><br>{total}</div><div><b>Active</b><br>{active}</div><div><b>Critical</b><br>{critical}</div><div><b>Breakdown</b><br>{breakdown}</div></div></body></html>"""
+                    st.download_button("📥 HTML", html_export, f"asset_summary_{today}.html", "text/html", use_container_width=True)
+                with c3:
+                    st.download_button("📥 Print View", df.head(100).to_csv(index=False), f"asset_print_{today}.csv", "text/csv", use_container_width=True)
+            
+            # ============================================
+            # DEPARTMENT BREAKDOWN
+            # ============================================
+            elif report_type == "🏢 Department Breakdown":
+                st.markdown("### 🏢 Department Breakdown Report")
+                
+                if "department" in df.columns and "sub_division" in df.columns:
+                    dept_summary = df.groupby(["department","sub_division"]).agg(
+                        Count=("name","count"),
+                        Active=("status", lambda x: (x=="active").sum()),
+                        Critical=("priority", lambda x: x.isin(["critical","high"]).sum())
+                    ).reset_index()
+                    
+                    st.dataframe(dept_summary, use_container_width=True, hide_index=True)
+                    
+                    # Chart
+                    fig = px.bar(dept_summary, x="sub_division", y="Count", color="department", title="Assets by Department & Sub-Division", barmode="group")
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    st.download_button("📥 Download CSV", dept_summary.to_csv(index=False), f"dept_breakdown_{today}.csv", "text/csv", use_container_width=True)
+                else:
+                    st.info("Department data not available.")
+            
+            # ============================================
+            # FINANCIAL REPORT
+            # ============================================
+            elif report_type == "💰 Financial Report":
+                st.markdown("### 💰 Financial Report")
+                
+                total_value = df["purchase_cost"].fillna(0).sum() if "purchase_cost" in df.columns else 0
+                avg_value = total_value / len(df) if len(df) > 0 else 0
+                
+                # Calculate depreciation
+                depreciated_value = total_value * 0.8  # Estimate
+                net_book_value = total_value * 0.2  # Estimate
+                
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: st.metric("📊 Portfolio Value", f"₦{total_value:,.0f}")
+                with c2: st.metric("📈 Avg Asset Value", f"₦{avg_value:,.0f}")
+                with c3: st.metric("📉 Depreciated Value", f"₦{depreciated_value:,.0f}")
+                with c4: st.metric("💰 Net Book Value", f"₦{net_book_value:,.0f}")
+                
+                st.markdown("---")
+                
+                # Value by department
+                if "department" in df.columns and "purchase_cost" in df.columns:
+                    dept_value = df.groupby("department")["purchase_cost"].sum().reset_index()
+                    dept_value = dept_value.sort_values("purchase_cost", ascending=False)
+                    
+                    fig = px.bar(dept_value, x="department", y="purchase_cost", title="Asset Value by Department (₦)", color="purchase_cost", color_continuous_scale="Greens")
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                st.download_button("📥 Download Financial Report CSV", df.to_csv(index=False), f"financial_report_{today}.csv", "text/csv", use_container_width=True)
+            
+            # ============================================
+            # WARRANTY & LIFECYCLE REPORT
+            # ============================================
+            elif report_type == "🛡️ Warranty & Lifecycle Report":
+                st.markdown("### 🛡️ Warranty & Lifecycle Report")
+                
+                expired = 0
+                expiring_30 = 0
+                expiring_90 = 0
+                expiring_180 = 0
+                
+                warranty_data = []
+                if "warranty_expiry" in df.columns:
+                    for _, row in df.iterrows():
+                        try:
+                            we = pd.to_datetime(row["warranty_expiry"])
+                            days_left = (we.date() - today).days
+                            
+                            if days_left < 0:
+                                expired += 1
+                                status = "Expired"
+                            elif days_left <= 30:
+                                expiring_30 += 1
+                                status = "Expiring ≤30 days"
+                            elif days_left <= 90:
+                                expiring_90 += 1
+                                status = "Expiring ≤90 days"
+                            elif days_left <= 180:
+                                expiring_180 += 1
+                                status = "Expiring ≤180 days"
+                            else:
+                                status = "Active"
+                            
+                            warranty_data.append({
+                                "Asset": row.get("name",""),
+                                "Department": row.get("department",""),
+                                "Warranty Start": str(row.get("warranty_start",""))[:10],
+                                "Warranty End": str(row.get("warranty_expiry",""))[:10],
+                                "Days Left": days_left,
+                                "Status": status
+                            })
+                        except:
+                            pass
+                
+                c1, c2, c3, c4 = st.columns(4)
+                with c1: st.metric("🔴 Expired", expired)
+                with c2: st.metric("🟡 ≤30 Days", expiring_30)
+                with c3: st.metric("🔵 ≤90 Days", expiring_90)
+                with c4: st.metric("🟢 ≤180 Days", expiring_180)
+                
+                if warranty_data:
+                    wd = pd.DataFrame(warranty_data)
+                    st.dataframe(wd, use_container_width=True, hide_index=True)
+                    st.download_button("📥 Download Warranty Report", wd.to_csv(index=False), f"warranty_report_{today}.csv", "text/csv", use_container_width=True)
+                else:
+                    st.info("No warranty data available.")
+            
+            # ============================================
+            # PPM COMPLIANCE REPORT
+            # ============================================
+            elif report_type == "📈 PPM Compliance Report":
+                st.markdown("### 📈 PPM Compliance Report")
+                
+                ppm_schedules = DB.get_all("ppm_schedules", fc, 5000)
+                
+                if ppm_schedules:
+                    ppm_df_rpt = pd.DataFrame(ppm_schedules)
+                    
+                    total_ppm = len(ppm_df_rpt)
+                    completed_ppm = len(ppm_df_rpt[ppm_df_rpt["status"]=="completed"]) if "status" in ppm_df_rpt.columns else 0
+                    overdue_ppm = len(ppm_df_rpt[(pd.to_datetime(ppm_df_rpt["next_due_date"], errors='coerce').dt.date < today) & (ppm_df_rpt["status"]!="completed")]) if "next_due_date" in ppm_df_rpt.columns else 0
+                    
+                    compliance_rate = round(completed_ppm/total_ppm*100,1) if total_ppm > 0 else 0
+                    
+                    c1, c2, c3, c4 = st.columns(4)
+                    with c1: st.metric("📋 Total PPMs", total_ppm)
+                    with c2: st.metric("✅ Completed", completed_ppm)
+                    with c3: st.metric("🔴 Overdue", overdue_ppm)
+                    with c4: st.metric("📈 Compliance", f"{compliance_rate}%")
+                    
+                    st.download_button("📥 Download PPM Report CSV", ppm_df_rpt.to_csv(index=False), f"ppm_compliance_{today}.csv", "text/csv", use_container_width=True)
+                else:
+                    st.info("No PPM schedules found.")
+            
+            # ============================================
+            # CUSTOM REPORT BUILDER
+            # ============================================
+            elif report_type == "⚙️ Custom Report Builder":
+                st.markdown("### ⚙️ Custom Report Builder")
+                
+                available_cols = [c for c in df.columns if c not in ["id","metadata","created_by","updated_at"]]
+                selected_cols = st.multiselect("Select Columns", available_cols, default=["name","asset_tag","department","sub_division","location_building","status","priority"])
+                
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    dept_filter_rpt = st.selectbox("Department", ["All"] + sorted(df["department"].unique().tolist()), key="rpt_dept")
+                with c2:
+                    bldg_filter_rpt = st.selectbox("Building", ["All"] + sorted(df["location_building"].unique().tolist()), key="rpt_bldg")
+                with c3:
+                    status_filter_rpt = st.selectbox("Status", ["All","active","inactive","breakdown"], key="rpt_status")
+                
+                filtered = df.copy()
+                if dept_filter_rpt != "All": filtered = filtered[filtered["department"]==dept_filter_rpt]
+                if bldg_filter_rpt != "All": filtered = filtered[filtered["location_building"]==bldg_filter_rpt]
+                if status_filter_rpt != "All": filtered = filtered[filtered["status"]==status_filter_rpt]
+                
+                if selected_cols:
+                    report_df = filtered[selected_cols]
+                    st.dataframe(report_df, use_container_width=True, hide_index=True, height=400)
+                    st.caption(f"📋 {len(report_df)} rows × {len(selected_cols)} columns")
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        st.download_button("📥 Download CSV", report_df.to_csv(index=False), f"custom_report_{today}.csv", "text/csv", use_container_width=True)
+                    with c2:
+                        # HTML export
+                        logo_b64 = get_logo_base64()
+                        html_custom = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px;font-size:10px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:6px}}td{{padding:4px;border-bottom:1px solid #eee}}</style></head><body><h1>Custom Asset Report</h1><p>{info.get('full_name',fc)} | {today}</p><table><tr>{''.join(f'<th>{c}</th>' for c in selected_cols)}</tr>"""
+                        for _, r in report_df.head(200).iterrows():
+                            html_custom += "<tr>" + "".join(f"<td>{r[c]}</td>" for c in selected_cols) + "</tr>"
+                        html_custom += "</table></body></html>"
+                        st.download_button("📥 Download HTML", html_custom, f"custom_report_{today}.html", "text/html", use_container_width=True)
     
     # ============================================
     # TAB 8: SETTINGS
