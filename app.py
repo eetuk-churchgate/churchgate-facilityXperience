@@ -6793,9 +6793,6 @@ def page_ppm_activities():
                 
                 st.markdown("---")
                 st.markdown("### 📝 Checklist Items")
-                
-                st.markdown("---")
-                st.markdown("### 📝 Checklist Items")
                 st.caption("Add items one by one. Set the answer type and threshold options for each.")
                 
                 # Initialize session state for builder items
