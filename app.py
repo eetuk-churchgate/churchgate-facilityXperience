@@ -6367,7 +6367,7 @@ def page_ppm_activities():
                                     "asset_id": selected_asset.get("id"),
                                     "executed_by_name": user_name,
                                     "execution_date": str(execution_date),
-                                    "execution_time": str(execution_time),
+                                   "execution_time": execution_time.strftime("%H:%M"),
                                     "building": str(selected_asset.get("location_building",""))[:100],
                                     "status": "submitted",
                                     "general_comments": execution_comments if execution_comments else None,
