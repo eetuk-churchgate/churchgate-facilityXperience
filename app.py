@@ -5917,6 +5917,19 @@ def page_cs():
                             "ppm_frequency": bulk_freq,
                             "checklist_template": bulk_template
                         })
+                        
+                        # Also create PPM schedule record for calendar
+                        supabase.table("ppm_schedules").insert({
+                            "facility_code": fc,
+                            "asset_id": asset.get("id"),
+                            "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                            "frequency": bulk_freq,
+                            "status": "scheduled",
+                            "assigned_team": asset.get("department", ""),
+                            "next_due_date": str(date.today()),
+                            "created_at": datetime.now().isoformat()
+                        }).execute()
+                        
                         count += 1
                     
                     msg = f"✅ {count} assets enrolled with {bulk_template}!"
