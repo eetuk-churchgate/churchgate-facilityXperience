@@ -7335,35 +7335,124 @@ def page_ppm_activities():
                         </div>
                         """, unsafe_allow_html=True)
                         
-                        with st.expander("✏️ Edit Schedule"):
-                            c1, c2, c3 = st.columns(3)
+                       # Toggle edit mode with a button instead of expander
+                        edit_key = f"edit_open_{sched['id']}"
+                        if edit_key not in st.session_state:
+                            st.session_state[edit_key] = False
+                        
+                        if not st.session_state[edit_key]:
+                            if st.button("✏️ EDIT SCHEDULE", key=f"btn_open_edit_{sched['id']}", use_container_width=True):
+                                st.session_state[edit_key] = True
+                                st.rerun()
+                        else:
+                            st.markdown(f"""
+                            <div style="background:#FFFBEB;border-left:5px solid #F59E0B;border-radius:8px;padding:1rem;margin:0.5rem 0;">
+                                <b>✏️ Editing:</b> {sched.get('title','N/A')[:100]}
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Get current dates
+                            current_dates_str = ""
+                            all_asset_schedules = supabase.table("ppm_schedules").select("next_due_date").eq("asset_id", sched.get("asset_id")).order("next_due_date").execute()
+                            if all_asset_schedules.data:
+                                current_dates = [d.get("next_due_date","")[:10] for d in all_asset_schedules.data if d.get("next_due_date")]
+                                current_dates_str = ",".join(current_dates)
+                            
+                            c1, c2 = st.columns(2)
                             with c1:
-                                new_date = st.date_input("New Due Date", 
-                                    value=datetime.strptime(str(sched.get('next_due_date',''))[:10], "%Y-%m-%d").date() if sched.get('next_due_date') else date.today(),
-                                    key=f"edit_date_{sched['id']}")
-                            with c2:
                                 new_freq = st.selectbox("Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"],
                                     index=["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"].index(sched.get("frequency","Monthly")) if sched.get("frequency","Monthly") in ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"] else 3,
                                     key=f"edit_freq_{sched['id']}")
-                            with c3:
+                            with c2:
                                 new_status = st.selectbox("Status", ["scheduled","completed","overdue"],
                                     index=["scheduled","completed","overdue"].index(sched.get("status","scheduled")) if sched.get("status","scheduled") in ["scheduled","completed","overdue"] else 0,
                                     key=f"edit_status_{sched['id']}")
                             
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                if st.button("💾 Update", key=f"btn_update_{sched['id']}", use_container_width=True):
-                                    supabase.table("ppm_schedules").update({
-                                        "next_due_date": str(new_date),
-                                        "frequency": new_freq,
-                                        "status": new_status
-                                    }).eq("id", sched["id"]).execute()
-                                    st.success("✅ Updated!")
+                            st.markdown("---")
+                            st.markdown("### 📅 Edit Schedule Dates")
+                            
+                            date_edit_mode = st.radio("Date Mode", ["📅 Manual Entry", "🔄 Auto-Generate"], horizontal=True, key=f"edit_dmode_{sched['id']}")
+                            
+                            if date_edit_mode == "📅 Manual Entry":
+                                edit_dates = st.text_area("Enter dates (comma-separated, YYYY-MM-DD)", 
+                                    value=current_dates_str, height=80, key=f"edit_dates_{sched['id']}",
+                                    placeholder="2026-06-29,2026-07-29,2026-08-29")
+                                new_dates_list = [d.strip() for d in edit_dates.split(",") if d.strip()]
+                            else:
+                                if f"edit_gen_{sched['id']}" not in st.session_state:
+                                    st.session_state[f"edit_gen_{sched['id']}"] = []
+                                
+                                c1, c2 = st.columns(2)
+                                with c1:
+                                    gen_start = st.date_input("Start Date", date.today(), key=f"gen_start_{sched['id']}")
+                                with c2:
+                                    gen_end = st.date_input("End Date", date.today() + timedelta(days=365), key=f"gen_end_{sched['id']}")
+                                
+                                if st.button("🔄 Generate Dates", key=f"gen_btn_{sched['id']}", use_container_width=True):
+                                    dates_list = []
+                                    current = gen_start
+                                    while current <= gen_end:
+                                        dates_list.append(current.strftime("%Y-%m-%d"))
+                                        if new_freq == "Monthly":
+                                            current = date(current.year, current.month+1, min(current.day,28)) if current.month < 12 else date(current.year+1,1,min(current.day,28))
+                                        elif new_freq == "Quarterly":
+                                            nm = current.month+3
+                                            current = date(current.year+1,nm-12,min(current.day,28)) if nm > 12 else date(current.year,nm,min(current.day,28))
+                                        elif new_freq == "Weekly":
+                                            current += timedelta(days=7)
+                                        elif new_freq == "Bi-Weekly":
+                                            current += timedelta(days=14)
+                                        elif new_freq == "Half-Yearly":
+                                            nm = current.month+6
+                                            current = date(current.year+1,nm-12,min(current.day,28)) if nm > 12 else date(current.year,nm,min(current.day,28))
+                                        elif new_freq == "Yearly":
+                                            current = date(current.year+1,current.month,min(current.day,28))
+                                        else:
+                                            current += timedelta(days=1)
+                                    st.session_state[f"edit_gen_{sched['id']}"] = dates_list
                                     st.rerun()
+                                
+                                if st.session_state[f"edit_gen_{sched['id']}"]:
+                                    selected = st.multiselect("Select Dates", st.session_state[f"edit_gen_{sched['id']}"], 
+                                        default=st.session_state[f"edit_gen_{sched['id']}"][:min(5, len(st.session_state[f"edit_gen_{sched['id']}"]))],
+                                        key=f"gen_sel_{sched['id']}")
+                                    new_dates_list = selected
+                                    st.caption(f"📅 {len(selected)} dates selected")
+                                else:
+                                    new_dates_list = []
+                            
+                            st.markdown("---")
+                            
+                            c1, c2, c3 = st.columns(3)
+                            with c1:
+                                if st.button("💾 UPDATE ALL", key=f"btn_update_{sched['id']}", use_container_width=True, type="primary"):
+                                    if new_dates_list:
+                                        supabase.table("ppm_schedules").delete().eq("asset_id", sched.get("asset_id")).execute()
+                                        for d in new_dates_list:
+                                            supabase.table("ppm_schedules").insert({
+                                                "facility_code": fc,
+                                                "asset_id": sched.get("asset_id"),
+                                                "title": sched.get("title",""),
+                                                "frequency": new_freq,
+                                                "status": new_status,
+                                                "assigned_team": sched.get("assigned_team",""),
+                                                "next_due_date": d,
+                                                "created_at": datetime.now().isoformat()
+                                            }).execute()
+                                        st.success(f"✅ Updated with {len(new_dates_list)} dates!")
+                                        st.session_state[edit_key] = False
+                                        st.rerun()
+                                    else:
+                                        st.error("⚠️ Select at least one date")
                             with c2:
-                                if st.button("🗑️ Delete", key=f"btn_delete_{sched['id']}", use_container_width=True):
-                                    supabase.table("ppm_schedules").delete().eq("id", sched["id"]).execute()
-                                    st.warning("🗑️ Deleted!")
+                                if st.button("🗑️ DELETE ALL", key=f"btn_delete_{sched['id']}", use_container_width=True):
+                                    supabase.table("ppm_schedules").delete().eq("asset_id", sched.get("asset_id")).execute()
+                                    st.warning(f"🗑️ All schedules deleted!")
+                                    st.session_state[edit_key] = False
+                                    st.rerun()
+                            with c3:
+                                if st.button("❌ CANCEL", key=f"btn_cancel_{sched['id']}", use_container_width=True):
+                                    st.session_state[edit_key] = False
                                     st.rerun()
             else:
                 st.info("No PPM schedules found.")
