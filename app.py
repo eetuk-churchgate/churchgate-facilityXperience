@@ -6362,7 +6362,7 @@ def page_ppm_activities():
                                 exec_data = {
                                     "facility_code": fc,
                                     "asset_id": selected_asset.get("id"),
-                                    "executed_by": user_name,
+                                    "ppm_schedule_id": None,
                                     "executed_by_name": user_name,
                                     "execution_date": str(execution_date),
                                     "execution_time": str(execution_time),
