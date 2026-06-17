@@ -6777,20 +6777,22 @@ def page_ppm_activities():
                                 elif selected_period == "Bi-Weekly":
                                     current += timedelta(days=14)
                                 elif selected_period == "Monthly":
-                                    if current.month == 12:
-                                        current = current.replace(year=current.year+1, month=1)
-                                    else:
-                                        current = current.replace(month=current.month+1)
-                                elif selected_period == "Quarterly":
-                                    if current.month > 9:
-                                        current = current.replace(year=current.year+1, month=((current.month+3)%12) or 12)
-                                    else:
-                                        current = current.replace(month=current.month+3)
-                                elif selected_period == "Half-Yearly":
-                                    if current.month > 6:
-                                        current = current.replace(year=current.year+1, month=current.month-6)
-                                    else:
-                                        current = current.replace(month=current.month+6)
+                                if current.month == 12:
+                                    current = date(current.year+1, 1, current.day)
+                                else:
+                                    current = date(current.year, current.month+1, min(current.day, 28))
+                            elif selected_period == "Quarterly":
+                                new_month = current.month + 3
+                                if new_month > 12:
+                                    current = date(current.year+1, new_month-12, min(current.day, 28))
+                                else:
+                                    current = date(current.year, new_month, min(current.day, 28))
+                            elif selected_period == "Half-Yearly":
+                                new_month = current.month + 6
+                                if new_month > 12:
+                                    current = date(current.year+1, new_month-12, min(current.day, 28))
+                                else:
+                                    current = date(current.year, new_month, min(current.day, 28))
                                 elif selected_period == "Yearly":
                                     current = current.replace(year=current.year+1)
                             st.session_state.generated_dates = dates_list
