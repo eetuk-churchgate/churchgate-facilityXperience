@@ -5657,29 +5657,32 @@ def page_cs():
     # ============================================
     st.markdown("### 🔍 Filter Assets")
     
+    # Create department — sub_division labels once
+    df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
+    
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        # Create department — sub_division labels
-        df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
         departments = ["All"] + sorted(df["dept_full"].dropna().unique().tolist())
         sel_dept = st.selectbox("Select Department", departments, key="cs_dept")
     with c2:
-        # Filter assets by department
+        # Filter assets by department FIRST
         if sel_dept != "All":
             dept_assets = df[df["dept_full"] == sel_dept]
         else:
-            dept_assets = df
+            dept_assets = df.copy()
         asset_list = ["All"] + sorted(dept_assets["name"].dropna().unique().tolist())
         sel_asset = st.selectbox("Select Asset", asset_list, key="cs_asset")
     with c3:
-        # Sub-asset (parent asset) — filtered by selected asset
+        # Sub-asset
         if sel_asset != "All":
-            asset_parent = dept_assets[dept_assets["name"] == sel_asset]["parent_asset"].dropna()
-            if len(asset_parent) > 0:
-                parent_val = asset_parent.iloc[0]
-                # Show all sub-assets under this parent
-                sub_assets = dept_assets[dept_assets["parent_asset"] == parent_val]["name"].dropna()
-                sub_list = ["All"] + sorted(sub_assets.unique().tolist())
+            asset_row = dept_assets[dept_assets["name"] == sel_asset]
+            if len(asset_row) > 0:
+                parent_val = asset_row["parent_asset"].iloc[0]
+                if pd.notna(parent_val):
+                    sub_assets = dept_assets[dept_assets["parent_asset"] == parent_val]["name"].dropna()
+                    sub_list = ["All"] + sorted(sub_assets.unique().tolist())
+                else:
+                    sub_list = ["All"]
             else:
                 sub_list = ["All"]
         else:
@@ -5691,11 +5694,20 @@ def page_cs():
     # Date range
     c1, c2 = st.columns(2)
     with c1:
-        from_date = st.date_input("From Date", date.today() - timedelta(days=30), key="cs_from")
+        from_date = st.date_input("From Date", today - timedelta(days=30), key="cs_from")
     with c2:
-        to_date = st.date_input("To Date", date.today(), key="cs_to")
+        to_date = st.date_input("To Date", today, key="cs_to")
     
-    st.markdown("---")
+    # Apply all filters
+    filtered = df.copy()
+    if sel_dept != "All": filtered = filtered[filtered["dept_full"] == sel_dept]
+    if sel_asset != "All": filtered = filtered[filtered["name"] == sel_asset]
+    if sel_sub != "All": filtered = filtered[filtered["name"] == sel_sub]
+    if sel_bldg != "All": filtered = filtered[filtered["location_building"] == sel_bldg]
+    
+    total_filtered = len(filtered)
+    enrolled_count = len(filtered[filtered["checklist"].notna() & (filtered["checklist"] != "") & (filtered["checklist"] != "NA")])
+    not_enrolled = total_filtered - enrolled_count
     
     # ============================================
     # CHECKLIST TYPE TABS
@@ -5979,8 +5991,12 @@ def page_cs():
             display_cons = display_cons[mask]
         
         # Counts
-        enrolled_total = len(display_cons[display_cons["Status"] == "Enrolled"])
-        pending_total = len(display_cons[display_cons["Status"] == "Pending"])
+        if len(display_cons) > 0:
+            enrolled_total = len(display_cons[display_cons["Status"] == "Enrolled"])
+            pending_total = len(display_cons[display_cons["Status"] == "Pending"])
+        else:
+            enrolled_total = 0
+            pending_total = 0
         
         c1, c2, c3 = st.columns(3)
         with c1: st.metric("📋 Total", len(display_cons))
