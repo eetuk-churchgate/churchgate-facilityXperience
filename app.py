@@ -5661,14 +5661,13 @@ def page_cs():
         # Create department — sub_division labels
         df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
         departments = ["All"] + sorted(df["dept_full"].dropna().unique().tolist())
-
         sel_dept = st.selectbox("Select Department", departments, key="cs_dept")
     with c2:
         # Filter assets by department
         if sel_dept != "All":
-        dept_assets = df[df["dept_full"] == sel_dept]
-    else:
-        dept_assets = df
+            dept_assets = df[df["dept_full"] == sel_dept]
+        else:
+            dept_assets = df
         asset_list = ["All"] + sorted(dept_assets["name"].dropna().unique().tolist())
         sel_asset = st.selectbox("Select Asset", asset_list, key="cs_asset")
     with c3:
