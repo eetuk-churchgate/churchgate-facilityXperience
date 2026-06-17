@@ -6475,23 +6475,20 @@ def page_ppm_activities():
             for ex in my_executions.data:
                 status = ex.get("status", "submitted")
                 sc = {"submitted": "#3B82F6", "confirmed": "#F59E0B", "approved": "#10B981", "rejected": "#EF4444"}.get(status, "#3B82F6")
+                icon = {"submitted": "📤", "confirmed": "✅", "approved": "🟢", "rejected": "❌"}.get(status, "📋")
+                ppm_type = ex.get("ppm_type", "Scheduled PPM")
                 
-                with st.expander(f"📋 {ex.get('execution_date','')} — {ex.get('ppm_type','PPM')} — {status.upper()}"):
-                    st.write(f"**Type:** {ex.get('ppm_type','Scheduled PPM')}")
-                    st.write(f"**Date:** {ex.get('execution_date','')} {ex.get('execution_time','')}")
-                    st.write(f"**Building:** {ex.get('building','')}")
-                    st.write(f"**Comments:** {ex.get('general_comments','N/A')}")
-                    if ex.get("is_early_execution"):
-                        st.warning(f"⚠️ Early Execution — {ex.get('early_execution_reason','')}")
-                    if ex.get("mitigation_plan"):
-                        st.error(f"🚨 Mitigation Required — Deadline: {ex.get('mitigation_deadline','')}")
-                    
-                    items = supabase.table("ppm_execution_items").select("*").eq("execution_id", ex["id"]).order("item_number").execute()
-                    if items.data:
-                        st.markdown("**Checklist Results:**")
-                        for item in items.data:
-                            icon = "✅" if item.get("result") in ["Pass","Yes","Clear","Good","Normal","Tight"] else "❌" if item.get("result") in ["Fail","No","Damage","Dirty","Abnormal","Loose"] else "📝"
-                            st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — {item.get('actual_value', item.get('result',''))}")
+                st.markdown(f"""
+                <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);cursor:pointer;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="font-size:1rem;font-weight:700;color:#1a1a1a;">{icon} {ex.get('execution_date','')} — {ppm_type}</div>
+                            <div style="font-size:0.75rem;color:#666;margin-top:0.2rem;">🏢 {ex.get('building','N/A')} | ⏰ {ex.get('execution_time','')}</div>
+                        </div>
+                        <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">{status.upper()}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
         else:
             st.info("No PPM submissions yet.")
     
@@ -6509,24 +6506,43 @@ def page_ppm_activities():
             if pending.data and len(pending.data) > 0:
                 for ex in pending.data:
                     status = ex.get("status", "submitted")
+                    sc = {"submitted": "#3B82F6", "confirmed": "#F59E0B"}.get(status, "#3B82F6")
+                    ppm_type = ex.get("ppm_type", "Scheduled PPM")
                     
-                    with st.expander(f"📋 {ex.get('execution_date','')} — {ex.get('ppm_type','PPM')} — by {ex.get('executed_by_name','')} — {status.upper()}"):
-                        st.write(f"**Type:** {ex.get('ppm_type','Scheduled PPM')}")
-                        st.write(f"**Date:** {ex.get('execution_date','')} {ex.get('execution_time','')}")
-                        st.write(f"**Executed by:** {ex.get('executed_by_name','')}")
-                        st.write(f"**Comments:** {ex.get('general_comments','N/A')}")
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <div style="font-size:1rem;font-weight:700;">📋 {ex.get('execution_date','')} — {ppm_type}</div>
+                                    <div style="font-size:0.75rem;color:#666;">👤 {ex.get('executed_by_name','')} | 🏢 {ex.get('building','N/A')}</div>
+                                </div>
+                                <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">{status.upper()}</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
+                        # Comments and notes
+                        if ex.get("general_comments"):
+                            st.caption(f"📝 {ex.get('general_comments','')}")
                         if ex.get("is_early_execution"):
                             st.warning(f"⚠️ Early Execution — {ex.get('early_execution_reason','')}")
                         if ex.get("mitigation_plan"):
-                            st.error(f"🚨 Mitigation: {ex.get('mitigation_plan','')} | Deadline: {ex.get('mitigation_deadline','')}")
+                            st.error(f"🚨 Mitigation: {ex.get('mitigation_plan','')}")
                         
+                        # Checklist items
                         items = supabase.table("ppm_execution_items").select("*").eq("execution_id", ex["id"]).order("item_number").execute()
                         if items.data:
-                            st.markdown("**Checklist Results:**")
-                            for item in items.data:
-                                icon = "✅" if item.get("result") in ["Pass","Yes","Clear","Good","Normal","Tight"] else "❌" if item.get("result") in ["Fail","No","Damage","Dirty","Abnormal","Loose"] else "📝"
-                                st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — {item.get('actual_value', item.get('result',''))}")
+                            with st.expander("📋 View Checklist Results"):
+                                for item in items.data:
+                                    res = item.get("result","")
+                                    if res in ["Pass","Yes","Clear","Good","Normal","Tight","Ok"]:
+                                        icon = "✅"
+                                    elif res in ["Fail","No","Damage","Dirty","Abnormal","Loose","Not Ok"]:
+                                        icon = "❌"
+                                    else:
+                                        icon = "📝"
+                                    st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — *{item.get('actual_value', res)}*")
                         
                         st.markdown("---")
                         c1, c2 = st.columns(2)
