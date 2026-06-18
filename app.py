@@ -683,10 +683,7 @@ def sidebar():
         </div>
         """, unsafe_allow_html=True)
         
-        # Refresh button
-        if st.button("🔄 Refresh Data", use_container_width=True, key="sidebar_refresh"):
-            st.cache_data.clear()
-            st.rerun()
+        
         
         st.markdown("---")
         
