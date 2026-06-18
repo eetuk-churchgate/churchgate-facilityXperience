@@ -621,7 +621,7 @@ def sidebar():
         <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0;margin-bottom:0.5rem;border-bottom:2px solid #CC0000;">
             {logo_html}
             <div style="display:flex;align-items:baseline;gap:0.3rem;">
-                <span style="font-weight:800;font-size:0.9rem;color:#1a1a1a;">facility<span style="color:#CC0000;">X</span>perience</span>
+                <span style="font-weight:800;font-size:0.9rem;color:#1a1a1a;">facility<span style="color:#CC0000 !important;">X</span>perience</span>
                 <span style="font-size:0.6rem;color:#888;">Churchgate Group</span>
             </div>
         </div>
