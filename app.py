@@ -1688,127 +1688,99 @@ def page_ar():
         
         st.markdown("---")
         
+         # ============================================
+        # 6-MONTH CALENDAR — HTML WITH QUERY PARAMS
         # ============================================
-        # 6-MONTH CALENDAR — BUTTON-BASED, RELIABLE
-        # ============================================
+        
+        # Handle click from query param
+        if "ppm_d" in st.query_params:
+            try:
+                st.session_state.selected_ppm_date = datetime.strptime(st.query_params["ppm_d"], "%Y-%m-%d").date()
+            except:
+                pass
+        
+        # Build calendar HTML
+        cal_html = """<style>
+            .cg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-family: 'Inter', sans-serif; }
+            .cm { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
+            .ch { padding: 6px 0; text-align: center; font-weight: 700; font-size: 13px; color: white; }
+            .ch.cur { background: #CC0000; }
+            .ch.reg { background: #1a1a1a; }
+            .ct { width: 100%; border-collapse: collapse; }
+            .ct th { padding: 3px 0; text-align: center; font-size: 0.6rem; font-weight: 800; border-bottom: 2px solid #e5e7eb; }
+            .ct td { text-align: center; padding: 0; height: 28px; cursor: pointer; border: 1px solid #f0f0f0; transition: all 0.1s; }
+            .ct td a { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; text-decoration: none; font-size: 11px; font-weight: 600; }
+            .ct td:hover { outline: 2px solid #CC0000; outline-offset: -2px; z-index: 5; transform: scale(1.05); }
+            .ct td.em { background: #fafafa; cursor: default; }
+            .ct td.em:hover { outline: none; transform: none; }
+            .ct td.td { background: #CC0000; } .ct td.td a { color: white; font-weight: 800; }
+            .ct td.ov { background: #FEF2F2; } .ct td.ov a { color: #DC2626; font-weight: 700; }
+            .ct td.up { background: #EFF6FF; } .ct td.up a { color: #2563EB; font-weight: 700; }
+            .ct td.cp { background: #ECFDF5; } .ct td.cp a { color: #059669; font-weight: 600; }
+            .ct td.pn { background: #F5F3FF; } .ct td.pn a { color: #7C3AED; font-weight: 700; }
+            .ct td.no { background: #fdfdfd; } .ct td.no a { color: #bbb; font-weight: 400; }
+            .badge { font-size: 8px; background: #CC0000; color: white; border-radius: 8px; padding: 0px 4px; min-width: 14px; text-align: center; line-height: 1.3; margin-top: 1px; }
+        </style><div class="cg">"""
+        
+        day_colors = ["#3B82F6","#10B981","#F59E0B","#8B5CF6","#EC4899","#EF4444","#6366F1"]
+        
         for row_idx in range(2):
-            month_cols = st.columns(3, gap="small")
             for col_idx in range(3):
                 mo = row_idx * 3 + col_idx
                 dm = ((block_start_month - 1 + mo) % 12) + 1
                 dy = block_start_year + ((block_start_month - 1 + mo) // 12)
                 
-                with month_cols[col_idx]:
-                    fd = date(dy, dm, 1)
-                    if dm == 12: ld = date(dy, 12, 31)
-                    else: ld = date(dy, dm + 1, 1) - timedelta(days=1)
-                    
-                    sw = fd.weekday()
-                    ic = (dm == today.month and dy == today.year)
-                    hdr_bg = "#CC0000" if ic else "#1a1a1a"
-                    
-                    # Month header
-                    st.markdown(f'<div style="background:{hdr_bg};color:white;padding:4px 0;border-radius:6px 6px 0 0;text-align:center;font-weight:700;font-size:0.75rem;">{months_short[dm-1]} {dy}</div>', unsafe_allow_html=True)
-                    
-                    # Day headers
-                    dh_cols = st.columns(7, gap="small")
-                    day_colors = ["#3B82F6","#10B981","#F59E0B","#8B5CF6","#EC4899","#EF4444","#6366F1"]
-                    for i, dh in enumerate(["M","T","W","T","F","S","S"]):
-                        with dh_cols[i]:
-                            st.markdown(f'<div style="text-align:center;font-size:0.6rem;color:{day_colors[i]};font-weight:800;padding:2px 0;background:#f0f0f0;border-radius:3px;">{dh}</div>', unsafe_allow_html=True)
-                    
-                    # Day grid
-                    dc = 1
-                    for w in range(6):
-                        if dc > ld.day: break
-                        day_cols = st.columns(7, gap="small")
-                        for wd in range(7):
-                            with day_cols[wd]:
-                                if (w == 0 and wd < sw) or dc > ld.day:
-                                    st.markdown('<div style="height:26px;"></div>', unsafe_allow_html=True)
-                                else:
-                                    cd = date(dy, dm, dc)
-                                    dk = cd.strftime("%Y-%m-%d")
-                                    it = dk == today.strftime("%Y-%m-%d")
-                                    pt = ppm_dates.get(dk, [])
-                                    pc = len(pt)
-                                    
-                                    # Determine button label and type
-                                    if pc > 0:
-                                        label = f"{dc}●"
-                                    else:
-                                        label = str(dc)
-                                    
-                                    # Determine colors
-                                    bg = "#fafafa"
-                                    tc = "#bbb"
-                                    fw = "400"
-                                    border = "#e5e5e5"
-                                    
-                                    if it:
-                                        bg = "#CC0000"
-                                        tc = "white"
-                                        fw = "800"
-                                        border = "#CC0000"
-                                    elif pc > 0:
-                                        has_ov = False
-                                        has_cp = False
-                                        has_pn = False
-                                        for p in pt:
-                                            sts = p.get("status", "scheduled")
-                                            due_dt = pd.to_datetime(p.get("next_due_date"), errors='coerce')
-                                            if sts == "completed":
-                                                has_cp = True
-                                            elif sts == "pending":
-                                                has_pn = True
-                                            elif pd.notna(due_dt) and due_dt.date() < today:
-                                                has_ov = True
-                                        
-                                        if has_ov:
-                                            bg = "#FEF2F2"
-                                            tc = "#DC2626"
-                                            fw = "700"
-                                            border = "#FECACA"
-                                        elif has_pn:
-                                            bg = "#F5F3FF"
-                                            tc = "#7C3AED"
-                                            fw = "700"
-                                            border = "#DDD6FE"
-                                        elif has_cp:
-                                            bg = "#ECFDF5"
-                                            tc = "#059669"
-                                            fw = "600"
-                                            border = "#A7F3D0"
-                                        else:
-                                            bg = "#EFF6FF"
-                                            tc = "#2563EB"
-                                            fw = "700"
-                                            border = "#BFDBFE"
-                                    
-                                    # Render styled button
-                                    if st.button(label, key=f"calday_{dk}", use_container_width=True, type="primary" if it else "secondary", help=f"{pc} PPMs" if pc > 0 else ""):
-                                        st.session_state.selected_ppm_date = cd
-                                        st.rerun()
-                                    
-                                    # Override with custom style via markdown after the button
-                                    st.markdown(f"""
-                                    <style>
-                                        div[data-testid="stVerticalBlock"]:has(button[key="calday_{dk}"]) button {{
-                                            background: {bg} !important;
-                                            color: {tc} !important;
-                                            font-weight: {fw} !important;
-                                            border: 2px solid {border} !important;
-                                            min-height: 26px !important;
-                                            height: 26px !important;
-                                            padding: 0px !important;
-                                            font-size: 0.65rem !important;
-                                            border-radius: 3px !important;
-                                        }}
-                                    </style>
-                                    """, unsafe_allow_html=True)
-                                    dc += 1
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
+                fd = date(dy, dm, 1)
+                if dm == 12: ld = date(dy, 12, 31)
+                else: ld = date(dy, dm + 1, 1) - timedelta(days=1)
+                
+                sw = fd.weekday()
+                ic = (dm == today.month and dy == today.year)
+                hc = "cur" if ic else "reg"
+                
+                cal_html += f'<div class="cm"><div class="ch {hc}">{months_short[dm-1]} {dy}</div><table class="ct"><tr>'
+                for i, dh in enumerate(["M","T","W","T","F","S","S"]):
+                    cal_html += f'<th style="color:{day_colors[i]};background:#f9fafb;">{dh}</th>'
+                cal_html += '</tr>'
+                
+                dc = 1
+                for w in range(6):
+                    cal_html += "<tr>"
+                    for wd in range(7):
+                        if (w == 0 and wd < sw) or dc > ld.day:
+                            cal_html += '<td class="em"></td>'
+                        else:
+                            cd = date(dy, dm, dc)
+                            dk = cd.strftime("%Y-%m-%d")
+                            it = dk == today.strftime("%Y-%m-%d")
+                            pt = ppm_dates.get(dk, [])
+                            pc = len(pt)
+                            
+                            if it: cls = "td"
+                            elif pc == 0: cls = "no"
+                            else:
+                                has_ov, has_cp, has_pn = False, False, False
+                                for p in pt:
+                                    sts = p.get("status", "scheduled")
+                                    due_dt = pd.to_datetime(p.get("next_due_date"), errors='coerce')
+                                    if sts == "completed": has_cp = True
+                                    elif sts == "pending": has_pn = True
+                                    elif pd.notna(due_dt) and due_dt.date() < today: has_ov = True
+                                
+                                if has_ov: cls = "ov"
+                                elif has_pn: cls = "pn"
+                                elif has_cp and not any(p.get("status","") not in ["completed","approved"] for p in pt): cls = "cp"
+                                else: cls = "up"
+                            
+                            badge = f'<span class="badge">{pc}</span>' if pc > 0 else ''
+                            cal_html += f'<td class="{cls}"><a href="?ppm_d={dk}">{dc}{badge}</a></td>'
+                            dc += 1
+                    cal_html += "</tr>"
+                    if dc > ld.day: break
+                cal_html += "</table></div>"
+        
+        cal_html += "</div>"
+        st.markdown(cal_html, unsafe_allow_html=True)
         
         st.markdown("---")
         
