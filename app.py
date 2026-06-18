@@ -675,19 +675,27 @@ def sidebar():
         # Quick Links
         st.markdown('<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.3rem 0 0.1rem 0;">🔗 Quick Links</p>', unsafe_allow_html=True)
         
+        # Get WTC logo base64
+        wtc_logo_html = '<span style="font-size:1.2rem;">🏢</span>'
+        wtc_logo_path = Path("WTC-logo.jpg")
+        if wtc_logo_path.exists():
+            with open(wtc_logo_path, "rb") as f:
+                wtc_b64 = base64.b64encode(f.read()).decode()
+            wtc_logo_html = f'<img src="data:image/jpeg;base64,{wtc_b64}" height="18px" style="object-fit:contain;">'
+        
         cg_logo = get_nav_logo()
         
         st.markdown(f"""
         <a href="https://www.churchgate.com" target="_blank" style="text-decoration:none;">
-            <div style="background:linear-gradient(135deg,#1a1a1a,#2a2a2a);border:1px solid #CC0000;border-radius:8px;padding:0.5rem 0.6rem;display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:6px;transition:all 0.2s;">
+            <div style="background:#c8c8c8;border:1px solid #aaa;border-radius:8px;padding:0.5rem 0.6rem;display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:6px;">
                 <div style="flex-shrink:0;">{cg_logo}</div>
-                <div style="font-size:0.65rem;font-weight:700;color:white;">Churchgate Group</div>
+                <div style="font-size:0.65rem;font-weight:700;color:#1a1a1a;">Churchgate Group</div>
             </div>
         </a>
         <a href="https://wtcabuja.com" target="_blank" style="text-decoration:none;">
-            <div style="background:linear-gradient(135deg,#CC0000,#aa0000);border:1px solid #CC0000;border-radius:8px;padding:0.5rem 0.6rem;display:flex;align-items:center;gap:0.5rem;cursor:pointer;transition:all 0.2s;">
-                <div style="font-size:1.2rem;flex-shrink:0;">🏗️</div>
-                <div style="font-size:0.65rem;font-weight:700;color:white;">WTC Abuja</div>
+            <div style="background:#c8c8c8;border:1px solid #aaa;border-radius:8px;padding:0.5rem 0.6rem;display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                <div style="flex-shrink:0;">{wtc_logo_html}</div>
+                <div style="font-size:0.65rem;font-weight:700;color:#1a1a1a;">WTC Abuja</div>
             </div>
         </a>
         """, unsafe_allow_html=True)
