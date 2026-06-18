@@ -1784,11 +1784,12 @@ def page_ar():
                     st.session_state.selected_ppm_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
                     st.rerun()
         
-        if cal_click and cal_click.strip() and cal_click != st.session_state.get("_last_cal_click", ""):
-            st.session_state._last_cal_click = cal_click
+        if cal_click and cal_click.strip():
             try:
-                st.session_state.selected_ppm_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
-                st.rerun()
+                new_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
+                if new_date != st.session_state.get("selected_ppm_date"):
+                    st.session_state.selected_ppm_date = new_date
+                    st.rerun()
             except:
                 pass
         
