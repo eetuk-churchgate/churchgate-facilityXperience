@@ -7860,7 +7860,7 @@ def main():
     # Sidebar toggle — placed on the right
     c1, c2 = st.columns([0.85, 0.15])
     with c2:
-        if st.button("◀ Hide" if not st.session_state.get("sidebar_hidden", False) else "▶ Show", key="sidebar_toggle_btn", use_container_width=True):
+        if st.button("◀ Hide Sidebar" if not st.session_state.get("sidebar_hidden", False) else "▶ Show", key="sidebar_toggle_btn", use_container_width=True):
             st.session_state.sidebar_hidden = not st.session_state.get("sidebar_hidden", False)
             st.rerun()
     
