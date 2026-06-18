@@ -1739,21 +1739,40 @@ def page_ar():
                                     else:
                                         label = str(dc)
                                     
-                                    # Determine button color based on PPM status
-                                    btn_type = "secondary"
+                                    # Determine button style based on PPM status
+                                    btn_style = ""
                                     if it:
-                                        btn_type = "primary"
-                                    elif pc > 0:
-                                        # Check status for coloring
-                                        has_ov = any(p.get("status") not in ["completed","approved"] and pd.to_datetime(p.get("next_due_date"),errors='coerce').date() < today for p in pt if pd.notna(pd.to_datetime(p.get("next_due_date"),errors='coerce')))
+                                        btn_style = "background:#CC0000 !important; color:white !important; font-weight:800 !important; border-color:#CC0000 !important;"
+                                    elif pc == 0:
+                                        btn_style = "background:#fafafa !important; color:#bbb !important; font-weight:400 !important; border-color:#e5e5e5 !important;"
+                                    else:
+                                        has_ov = False
+                                        has_cp = False
+                                        has_pn = False
+                                        for p in pt:
+                                            sts = p.get("status", "scheduled")
+                                            due_dt = pd.to_datetime(p.get("next_due_date"), errors='coerce')
+                                            if sts == "completed":
+                                                has_cp = True
+                                            elif sts == "pending":
+                                                has_pn = True
+                                            elif pd.notna(due_dt) and due_dt.date() < today:
+                                                has_ov = True
+                                        
                                         if has_ov:
-                                            btn_type = "primary"  # Red-ish
+                                            btn_style = "background:#FEF2F2 !important; color:#DC2626 !important; font-weight:700 !important; border-color:#FECACA !important;"
+                                        elif has_pn:
+                                            btn_style = "background:#F5F3FF !important; color:#7C3AED !important; font-weight:700 !important; border-color:#DDD6FE !important;"
+                                        elif has_cp:
+                                            btn_style = "background:#ECFDF5 !important; color:#059669 !important; font-weight:600 !important; border-color:#A7F3D0 !important;"
                                         else:
-                                            btn_type = "secondary"  # Will be styled by CSS
+                                            btn_style = "background:#EFF6FF !important; color:#2563EB !important; font-weight:700 !important; border-color:#BFDBFE !important;"
                                     
-                                    if st.button(label, key=f"calday_{dk}", use_container_width=True, 
-                                        type=btn_type,
-                                        help=f"{pc} PPMs" if pc > 0 else "No PPMs"):
+                                    # Inject CSS for this specific button
+                                    unique_id = f"calday_{dk}"
+                                    st.markdown(f'<style>button[kind="secondary"][id="{unique_id}"], button[kind="primary"][id="{unique_id}"] {{ {btn_style} }}</style>', unsafe_allow_html=True)
+                                    
+                                    if st.button(label, key=f"calday_{dk}", use_container_width=True, type="primary" if it else "secondary", help=f"{pc} PPMs" if pc > 0 else "No PPMs"):
                                         st.session_state.selected_ppm_date = cd
                                         st.rerun()
                                     dc += 1
