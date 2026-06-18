@@ -534,7 +534,7 @@ def topnav():
             </div>
             <span style="color:rgba(255,255,255,0.5);font-size:0.65rem;font-family:monospace;" id="lt"></span>
             <div style="display:flex;align-items:center;gap:0.5rem;">
-    <button onclick="var s=parent.document.querySelector('[data-testid=stSidebar]');if(s.style.display==='none'){s.style.display='block';this.innerHTML='◀';}else{s.style.display='none';this.innerHTML='▶';}" style="background:#CC0000;color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:0.7rem;font-weight:bold;margin-right:0.5rem;" title="Toggle Sidebar">◀</button>
+    <button onclick="var s=parent.document.querySelector('[data-testid=stSidebar]');if(s.style.display==='none'){{s.style.display='block';this.innerHTML='◀';}}else{{s.style.display='none';this.innerHTML='▶';}}" style="background:#CC0000;color:white;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:0.7rem;font-weight:bold;margin-right:0.5rem;" title="Toggle Sidebar">◀</button>
     <span style="color:rgba(255,255,255,0.7);font-size:0.7rem;">{st.session_state.get('user_name','User').split()[-1]}</span>
     <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;border:2px solid rgba(255,255,255,0.2);cursor:pointer;" title="Click to logout" onclick="logout()">{st.session_state.get('user_name','User')[:2].upper()}</div>
 </div>
