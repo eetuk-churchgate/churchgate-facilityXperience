@@ -1773,30 +1773,15 @@ def page_ar():
         
         st.components.v1.html(f"<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>{cal_html}</body></html>", height=480, scrolling=False)
         
-        # Date input with view button
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            cal_click = st.text_input("📅 Selected Date", value="", key="ppm_cal_click", placeholder="Click a day on the calendar or type a date (YYYY-MM-DD)")
-        with c2:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔍 VIEW PPMs", key="btn_view_ppms", use_container_width=True, type="primary"):
-                if cal_click and cal_click.strip():
-                    try:
-                        st.session_state.selected_ppm_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
-                        st.rerun()
-                    except:
-                        st.error("Invalid date format")
+        cal_click = st.text_input("📅 Selected Date", value="", key="ppm_cal_click", placeholder="Click a day on the calendar (auto-loads)")
         
-        # Auto-load when calendar fills the date
-        if cal_click and cal_click.strip() and cal_click != "":
+        if cal_click and cal_click.strip():
             try:
-                parsed = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
-                if "selected_ppm_date" not in st.session_state or st.session_state.selected_ppm_date != parsed:
-                    st.session_state.selected_ppm_date = parsed
-                    st.rerun()
+                parsed_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
+                st.session_state.selected_ppm_date = parsed_date
+                st.rerun()
             except:
                 pass
-
         
         st.markdown("---")
         
