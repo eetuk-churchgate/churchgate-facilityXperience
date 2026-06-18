@@ -1773,8 +1773,16 @@ def page_ar():
         
         st.components.v1.html(f"<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>{cal_html}</body></html>", height=480, scrolling=False)
         
-        # Use a simple text input that JavaScript can set
-        cal_click = st.text_input("Calendar Click", value="", key="ppm_cal_click", label_visibility="collapsed")
+        # Date input with view button
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            cal_click = st.text_input("📅 Selected Date", value="", key="ppm_cal_click", placeholder="Click a day on the calendar or type a date (YYYY-MM-DD)")
+        with c2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔍 VIEW PPMs", key="btn_view_ppms", use_container_width=True, type="primary"):
+                if cal_click and cal_click.strip():
+                    st.session_state.selected_ppm_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
+                    st.rerun()
         
         if cal_click and cal_click.strip() and cal_click != st.session_state.get("_last_cal_click", ""):
             st.session_state._last_cal_click = cal_click
