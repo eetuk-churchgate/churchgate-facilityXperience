@@ -201,6 +201,9 @@ def inject_css():
         [data-testid="collapsedControl"]:hover {{ background:#aa0000 !important; box-shadow:0 4px 20px rgba(204,0,0,0.6) !important; }}
         [data-testid="collapsedControl"] svg {{ fill:white !important; width:16px !important; height:16px !important; }}
         [data-testid="collapsedControl"] {{ display: none !important; }}
+        button[kind="header"] {{ display: none !important; }}
+        [data-testid="stSidebarCollapseButton"] {{ display: none !important; }}
+        .st-emotion-cache-1rtdyqp {{ display: none !important; }}
         .fx-topnav {{ background:linear-gradient(105deg,{CHURCHGATE_DARK},#2a2a2a,{CHURCHGATE_DARK}); padding:0.5rem 1.5rem; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:9998; border-bottom:2px solid {CHURCHGATE_RED}; }}
         .fx-brand {{ font-size:1.05rem; font-weight:700; color:white; }} .fx-brand span {{ color:{CHURCHGATE_RED}; font-weight:800; }}
         .churchgate-header {{ background:white; padding:1.5rem; border-radius:8px; margin-bottom:1rem; border-left:4px solid {CHURCHGATE_RED}; box-shadow:0 1px 3px rgba(0,0,0,0.06); }}
