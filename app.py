@@ -1763,7 +1763,7 @@ def page_ar():
                                 else: cls = "up"
                             
                             badge = f'<span class="badge">{pc}</span>' if pc > 0 else ''
-                            cal_html += f'<td class="{cls}" onclick="document.getElementById(\'ppm_click_val\').value=\'{dk}\';document.getElementById(\'ppm_click_btn\').click();">{dc}{badge}</td>'
+                            cal_html += f'<td class="{cls}" onclick="var inputs=window.parent.document.querySelectorAll(\'input[type=text]\');for(var i=0;i<inputs.length;i++){{if(inputs[i].getAttribute(\'aria-label\')===\'Calendar Click\'){{var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,\'value\').set;s.call(inputs[i],\'{dk}\');inputs[i].dispatchEvent(new Event(\'input\',{{bubbles:true}}));break;}}}}">{dc}{badge}</td>'
                             dc += 1
                     cal_html += "</tr>"
                     if dc > ld.day: break
@@ -1771,22 +1771,15 @@ def page_ar():
         
         cal_html += "</div>"
         
-        # Hidden form with button that JavaScript can click
-        cal_html += """
-        <input type="hidden" id="ppm_click_val" value="">
-        <button id="ppm_click_btn" style="display:none;"></button>
-        """
+       st.components.v1.html(f"<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>{cal_html}</body></html>", height=480, scrolling=False)
         
-        st.components.v1.html(f"<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>{cal_html}</body></html>", height=480, scrolling=False)
+        # Use a simple text input that JavaScript can set
+        cal_click = st.text_input("Calendar Click", value="", key="ppm_cal_click", label_visibility="collapsed")
         
-        # Use a form to capture the click
-        with st.form("ppm_cal_form", clear_on_submit=False):
-            cal_click = st.text_input("", key="ppm_cal_click", label_visibility="collapsed", placeholder="")
-        
-        if cal_click and cal_click != st.session_state.get("_last_cal_click", ""):
+        if cal_click and cal_click.strip() and cal_click != st.session_state.get("_last_cal_click", ""):
             st.session_state._last_cal_click = cal_click
             try:
-                st.session_state.selected_ppm_date = datetime.strptime(cal_click, "%Y-%m-%d").date()
+                st.session_state.selected_ppm_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
                 st.rerun()
             except:
                 pass
