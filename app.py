@@ -675,15 +675,22 @@ def sidebar():
         # Quick Links
         st.markdown('<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.3rem 0 0.1rem 0;">🔗 Quick Links</p>', unsafe_allow_html=True)
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("""
-            <a href="https://www.churchgate.com" target="_blank" style="text-decoration:none;">
-                <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:0.4rem;text-align:center;font-size:0.6rem;font-weight:600;color:#1a1a1a;cursor:pointer;">
-                    🏢 Churchgate<br>Website
-                </div>
-            </a>
-            """, unsafe_allow_html=True)
+        cg_logo = get_nav_logo()
+        
+        st.markdown(f"""
+        <a href="https://www.churchgate.com" target="_blank" style="text-decoration:none;">
+            <div style="background:linear-gradient(135deg,#1a1a1a,#2a2a2a);border:1px solid #CC0000;border-radius:8px;padding:0.5rem 0.6rem;display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:6px;transition:all 0.2s;">
+                <div style="flex-shrink:0;">{cg_logo}</div>
+                <div style="font-size:0.65rem;font-weight:700;color:white;">Churchgate Group</div>
+            </div>
+        </a>
+        <a href="https://wtcabuja.com" target="_blank" style="text-decoration:none;">
+            <div style="background:linear-gradient(135deg,#CC0000,#aa0000);border:1px solid #CC0000;border-radius:8px;padding:0.5rem 0.6rem;display:flex;align-items:center;gap:0.5rem;cursor:pointer;transition:all 0.2s;">
+                <div style="font-size:1.2rem;flex-shrink:0;">🏗️</div>
+                <div style="font-size:0.65rem;font-weight:700;color:white;">WTC Abuja</div>
+            </div>
+        </a>
+        """, unsafe_allow_html=True)
         with c2:
             st.markdown("""
             <a href="https://wtcabuja.com" target="_blank" style="text-decoration:none;">
