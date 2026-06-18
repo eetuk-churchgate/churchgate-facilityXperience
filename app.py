@@ -225,7 +225,7 @@ def inject_css():
         .stTabs [aria-selected="true"] {{ background:{CHURCHGATE_RED} !important; color:white !important; }}
         
         /* Reduce top spacing */
-        .stApp {{ margin-top: -60px !important; }}
+        .stApp {{ margin-top: -80px !important; }}
         section[data-testid="stSidebar"] {{ margin-top: -30px !important; padding-top: 10px !important; }}
         section[data-testid="stSidebar"] > div:first-child {{ padding-top: 0.5rem !important; }}
         .main > div:first-child {{ padding-top: 0px !important; }}
