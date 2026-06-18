@@ -226,7 +226,7 @@ def inject_css():
         
         /* Reduce top spacing */
         .stApp {{ margin-top: -60px !important; }}
-        section[data-testid="stSidebar"] {{ margin-top: -60px !important; padding-top: 0px !important; }}
+        section[data-testid="stSidebar"] {{ margin-top: -30px !important; padding-top: 10px !important; }}
         section[data-testid="stSidebar"] > div:first-child {{ padding-top: 0.5rem !important; }}
         .main > div:first-child {{ padding-top: 0px !important; }}
         header[data-testid="stHeader"] {{ display: none !important; }}
