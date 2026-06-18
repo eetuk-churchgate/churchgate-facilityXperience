@@ -223,6 +223,13 @@ def inject_css():
         .stTabs [data-baseweb="tab-list"] {{ gap:0.5rem; }}
         .stTabs [data-baseweb="tab"] {{ background:white; border-radius:6px 6px 0 0; padding:0.5rem 1rem; font-weight:500; }}
         .stTabs [aria-selected="true"] {{ background:{CHURCHGATE_RED} !important; color:white !important; }}
+        
+        /* Reduce top spacing */
+        .stApp {{ margin-top: -60px !important; }}
+        section[data-testid="stSidebar"] {{ margin-top: -60px !important; padding-top: 0px !important; }}
+        section[data-testid="stSidebar"] > div:first-child {{ padding-top: 0.5rem !important; }}
+        .main > div:first-child {{ padding-top: 0px !important; }}
+        header[data-testid="stHeader"] {{ display: none !important; }}
     </style>
     """, unsafe_allow_html=True)
 
