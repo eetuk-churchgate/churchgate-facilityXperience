@@ -1795,26 +1795,51 @@ def page_ar():
         
         cal_html += "</div>"
         
-        # Use components.html with on_change callback
-        cal_result = st.components.v1.html(f"""
+        # Hidden input for JavaScript to write to
+        clicked_date = st.text_input("", key="ppm_hidden_input", label_visibility="collapsed")
+        
+        # Calendar HTML with JavaScript that writes to the hidden input
+        cal_html_full = f"""
         <!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>
         {cal_html}
         <script>
-            document.addEventListener('click', function(e) {{
-                var cell = e.target.closest('td[class]');
-                if (cell) {{
-                    var match = cell.outerHTML.match(/ppmClick',date:'([^']+)'/);
+            var cells = document.querySelectorAll('td[class]');
+            cells.forEach(function(cell) {{
+                cell.addEventListener('click', function() {{
+                    var match = this.outerHTML.match(/ppmClick',date:'([^']+)'/);
                     if (match) {{
-                        window.parent.postMessage({{type: 'streamlit:setComponentValue', value: match[1]}}, '*');
+                        var input = parent.document.querySelector('input[aria-label=""]');
+                        if (!input) {{
+                            var inputs = parent.document.querySelectorAll('input');
+                            for (var i = 0; i < inputs.length; i++) {{
+                                if (inputs[i].getAttribute('data-testid') === 'stTextInput') {{
+                                    input = inputs[i];
+                                    break;
+                                }}
+                            }}
+                        }}
+                        if (input) {{
+                            var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                            nativeInputValueSetter.call(input, match[1]);
+                            input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        }}
                     }}
-                }}
+                }});
             }});
         </script>
         </body></html>
-        """, height=480)
+        """
         
-        # Handle the returned value from the calendar click
-        if cal_result:
+        st.components.v1.html(cal_html_full, height=480)
+        
+        # Handle the click from hidden input
+        if clicked_date and clicked_date != st.session_state.get("last_ppm_click", ""):
+            st.session_state.last_ppm_click = clicked_date
+            try:
+                st.session_state.selected_ppm_date = datetime.strptime(str(clicked_date), "%Y-%m-%d").date()
+                st.rerun()
+            except:
+                pass
             try:
                 st.session_state.selected_ppm_date = datetime.strptime(str(cal_result), "%Y-%m-%d").date()
                 st.rerun()
