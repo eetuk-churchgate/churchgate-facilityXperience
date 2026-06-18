@@ -1712,9 +1712,10 @@ def page_ar():
                     
                     # Day headers
                     dh_cols = st.columns(7, gap="small")
+                    day_colors = ["#3B82F6","#10B981","#F59E0B","#8B5CF6","#EC4899","#EF4444","#6366F1"]
                     for i, dh in enumerate(["M","T","W","T","F","S","S"]):
                         with dh_cols[i]:
-                            st.markdown(f'<div style="text-align:center;font-size:0.5rem;color:#888;font-weight:700;padding:1px 0;">{dh}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="text-align:center;font-size:0.6rem;color:{day_colors[i]};font-weight:800;padding:2px 0;background:#f0f0f0;border-radius:3px;">{dh}</div>', unsafe_allow_html=True)
                     
                     # Day grid
                     dc = 1
@@ -1738,9 +1739,20 @@ def page_ar():
                                     else:
                                         label = str(dc)
                                     
-                                    # Click handler
+                                    # Determine button color based on PPM status
+                                    btn_type = "secondary"
+                                    if it:
+                                        btn_type = "primary"
+                                    elif pc > 0:
+                                        # Check status for coloring
+                                        has_ov = any(p.get("status") not in ["completed","approved"] and pd.to_datetime(p.get("next_due_date"),errors='coerce').date() < today for p in pt if pd.notna(pd.to_datetime(p.get("next_due_date"),errors='coerce')))
+                                        if has_ov:
+                                            btn_type = "primary"  # Red-ish
+                                        else:
+                                            btn_type = "secondary"  # Will be styled by CSS
+                                    
                                     if st.button(label, key=f"calday_{dk}", use_container_width=True, 
-                                        type="primary" if it else "secondary",
+                                        type=btn_type,
                                         help=f"{pc} PPMs" if pc > 0 else "No PPMs"):
                                         st.session_state.selected_ppm_date = cd
                                         st.rerun()
@@ -1777,6 +1789,9 @@ def page_ar():
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
+                    if st.button(f"🔧 EXECUTE THIS PPM", key=f"exec_ppm_{p.get('id',dk)}", use_container_width=True, type="primary"):
+                        st.session_state.page = "ppma"
+                        st.rerun()
             else:
                 st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled.")
             
