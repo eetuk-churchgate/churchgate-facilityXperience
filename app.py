@@ -1704,10 +1704,10 @@ def page_ar():
             .ct td.em { background: #fafafa; cursor: default; }
             .ct td.em:hover { outline: none; transform: none; }
             .ct td.td { background: #CC0000; } .ct td.td a { color: white; font-weight: 800; }
-            .ct td.ov { background: #FEF2F2; } .ct td.ov a { color: #DC2626; font-weight: 700; }
-            .ct td.up { background: #EFF6FF; } .ct td.up a { color: #2563EB; font-weight: 700; }
-            .ct td.cp { background: #ECFDF5; } .ct td.cp a { color: #059669; font-weight: 600; }
-            .ct td.pn { background: #F5F3FF; } .ct td.pn a { color: #7C3AED; font-weight: 700; }
+            .ct td.ov { background: #FEF2F2; border: 2px solid #EF4444; } .ct td.ov a { color: #DC2626; font-weight: 800; font-size: 12px; }
+            .ct td.up { background: #DBEAFE; border: 2px solid #3B82F6; } .ct td.up a { color: #1E40AF; font-weight: 800; font-size: 12px; }
+            .ct td.cp { background: #D1FAE5; border: 2px solid #10B981; } .ct td.cp a { color: #065F46; font-weight: 800; font-size: 12px; }
+            .ct td.pn { background: #EDE9FE; border: 2px solid #8B5CF6; } .ct td.pn a { color: #5B21B6; font-weight: 800; font-size: 12px; }
             .ct td.no { background: #fdfdfd; } .ct td.no a { color: #bbb; font-weight: 400; }
             .badge { font-size: 8px; background: #CC0000; color: white; border-radius: 8px; padding: 0px 4px; min-width: 14px; text-align: center; line-height: 1.3; margin-top: 1px; }
         </style><div class="cg">"""
