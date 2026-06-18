@@ -727,13 +727,18 @@ def sidebar():
         user_role_display = st.session_state.get('user_role','staff').upper()
         
         st.markdown(f"""
-        <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;">
-            <div style="width:28px;height:28px;border-radius:50%;background:#CC0000;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.65rem;">{user_name[:2].upper()}</div>
-            <div style="flex:1;">
-                <div style="font-size:0.65rem;font-weight:600;color:#1a1a1a;">{user_name}</div>
-                <div style="font-size:0.5rem;color:#888;">{user_role_display}</div>
+        <a href="https://www.churchgate.com" target="_blank" style="text-decoration:none;">
+            <div style="background:#d5d5d5;border:1px solid #bbb;border-radius:8px;padding:0.5rem 0.6rem;display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-bottom:6px;transition:all 0.2s;">
+                <div style="flex-shrink:0;">{cg_logo}</div>
+                <div style="font-size:0.65rem;font-weight:700;color:#1a1a1a;">Churchgate Group</div>
             </div>
-        </div>
+        </a>
+        <a href="https://wtcabuja.com" target="_blank" style="text-decoration:none;">
+            <div style="background:#d5d5d5;border:1px solid #bbb;border-radius:8px;padding:0.5rem 0.6rem;display:flex;align-items:center;gap:0.5rem;cursor:pointer;transition:all 0.2s;">
+                <div style="flex-shrink:0;">{cg_logo}</div>
+                <div style="font-size:0.65rem;font-weight:700;color:#1a1a1a;">WTC Abuja</div>
+            </div>
+        </a>
         """, unsafe_allow_html=True)
         
         if st.button("🚪 Log Out", use_container_width=True, type="primary"):
