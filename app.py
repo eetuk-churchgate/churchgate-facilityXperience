@@ -1582,56 +1582,10 @@ def page_ar():
                     st.error(f"PDF: {str(e)[:50]}")
     
     # ============================================
-    # TAB 5: PPM CALENDAR — FORTUNE 500 PRODUCTION GRADE
+    # TAB 5: PPM CALENDAR — RELIABLE BUTTON VERSION
     # ============================================
     with ar_tabs[5]:
-        st.markdown("### 📅 PPM Calendar — Financial Year Command Center")
-        
-        # Inject CSS for compact calendar buttons
-        st.markdown("""
-        <style>
-            /* Calendar button styling */
-            .cal-btn-row button {
-                padding: 2px 0 !important;
-                min-height: 28px !important;
-                height: 28px !important;
-                font-size: 0.7rem !important;
-                font-weight: 500 !important;
-                border-radius: 3px !important;
-                border: 1px solid #e5e7eb !important;
-                margin: 0 !important;
-                line-height: 1 !important;
-                width: 100% !important;
-                transition: all 0.1s !important;
-            }
-            .cal-btn-row button:hover {
-                outline: 2px solid #CC0000 !important;
-                outline-offset: -1px !important;
-                z-index: 10 !important;
-                position: relative !important;
-                transform: scale(1.05) !important;
-            }
-            /* Day name headers */
-            .cal-day-hdr {
-                text-align: center;
-                font-size: 0.55rem;
-                font-weight: 700;
-                color: #9ca3af;
-                padding: 2px 0;
-                background: #f9fafb;
-                border: 1px solid #e5e7eb;
-            }
-            /* Month header */
-            .cal-month-hdr {
-                padding: 6px 0;
-                text-align: center;
-                font-weight: 700;
-                font-size: 0.8rem;
-                color: white;
-                border-radius: 8px 8px 0 0;
-            }
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown("### 📅 PPM Calendar — Financial Year View")
         
         today = date.today()
         if today.month >= 4:
@@ -1650,31 +1604,53 @@ def page_ar():
         
         months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         
+        user_depts = safe_parse_permissions(st.session_state.get("user", {}).get("department_permissions", []))
+        user_role = st.session_state.get("user_role", "staff")
+        is_admin = user_role in ["admin", "approver"]
+        
+        # Filters
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
+            if is_admin:
+                dept_options = ["All"] + sorted(df["dept_full"].dropna().unique().tolist())
+            else:
+                dept_options = ["All"] + [d for d in sorted(df["dept_full"].dropna().unique().tolist()) if any(ud in d for ud in user_depts)] if user_depts else ["All"]
+            cal_dept = st.selectbox("Department", dept_options, key="cal_dept_filter")
+        with c2:
+            cal_asset = st.selectbox("Asset", ["All"] + sorted(df["parent_asset"].dropna().unique().tolist()), key="cal_asset_filter")
+        with c3:
+            cal_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cal_bldg_filter")
+        with c4:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("🔧 PPM ACTIVITIES", key="goto_ppma_top", use_container_width=True, type="primary"):
+                st.session_state.page = "ppma"
+                st.rerun()
+        
+        st.markdown("---")
+        
         # Navigation
         c1, c2, c3 = st.columns([1, 2, 1])
         with c1:
-            if st.button("◀ PREV 6 MONTHS", key="cal_prev6", use_container_width=True):
+            if st.button("◀ PREV", key="cal_prev6", use_container_width=True):
                 st.session_state.cal_offset -= 1
                 st.rerun()
         with c2:
             end_idx = ((block_start_month - 1 + 5) % 12)
-            st.markdown(f"#### 📅 FY {fy_start_year}/{fy_start_year+1} — {months_short[block_start_month-1]} to {months_short[end_idx]}")
+            st.markdown(f"#### FY {fy_start_year}/{fy_start_year+1} — {months_short[block_start_month-1]} to {months_short[end_idx]}")
         with c3:
-            if st.button("NEXT 6 MONTHS ▶", key="cal_next6", use_container_width=True):
+            if st.button("NEXT ▶", key="cal_next6", use_container_width=True):
                 st.session_state.cal_offset += 1
                 st.rerun()
         
         # Legend
-        st.markdown("""
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
-        <span style="background:#FEF2F2;color:#DC2626;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">🔴 Overdue</span>
-        <span style="background:#FFFBEB;color:#D97706;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">🟡 Due Today</span>
-        <span style="background:#EFF6FF;color:#2563EB;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">📆 Upcoming</span>
-        <span style="background:#ECFDF5;color:#059669;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">✅ Completed</span>
-        <span style="background:#F5F3FF;color:#7C3AED;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">⏳ Pending</span>
-        <span style="background:#F0FDF4;color:#059669;padding:4px 10px;border-radius:12px;font-size:0.65rem;font-weight:700;">🟢 Approved</span>
-        </div>
-        """, unsafe_allow_html=True)
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        with c1: st.markdown('<div style="background:#FEF2F2;color:#DC2626;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">🔴 Overdue</div>', unsafe_allow_html=True)
+        with c2: st.markdown('<div style="background:#CC0000;color:white;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📍 Today</div>', unsafe_allow_html=True)
+        with c3: st.markdown('<div style="background:#EFF6FF;color:#2563EB;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📆 Upcoming</div>', unsafe_allow_html=True)
+        with c4: st.markdown('<div style="background:#ECFDF5;color:#059669;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">✅ Done</div>', unsafe_allow_html=True)
+        with c5: st.markdown('<div style="background:#F5F3FF;color:#7C3AED;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⏳ Pending</div>', unsafe_allow_html=True)
+        with c6: st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -1685,7 +1661,9 @@ def page_ar():
         if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
             ppm_df["due_date_dt"] = pd.to_datetime(ppm_df["next_due_date"], errors='coerce')
         
-        # Build PPM lookup
+        if cal_dept != "All" and "assigned_team" in ppm_df.columns:
+            ppm_df = ppm_df[ppm_df["assigned_team"].str.contains(cal_dept.replace(" — "," "), case=False, na=False)]
+        
         ppm_dates = {}
         if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
             for _, row in ppm_df.iterrows():
@@ -1696,8 +1674,22 @@ def page_ar():
                         ppm_dates[dk] = []
                     ppm_dates[dk].append(row.to_dict())
         
+        # KPIs
+        total_ppm = len(ppm_df)
+        overdue_ppm = len(ppm_df[(ppm_df["due_date_dt"].dt.date < today) & (ppm_df["status"] != "completed")]) if len(ppm_df) > 0 else 0
+        today_ppm = len(ppm_df[ppm_df["due_date_dt"].dt.date == today]) if len(ppm_df) > 0 else 0
+        completed_ppm = len(ppm_df[ppm_df["status"] == "completed"]) if len(ppm_df) > 0 else 0
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.metric("📋 Total", total_ppm)
+        with c2: st.metric("🔴 Overdue", overdue_ppm)
+        with c3: st.metric("📍 Today", today_ppm)
+        with c4: st.metric("✅ Completed", completed_ppm)
+        
+        st.markdown("---")
+        
         # ============================================
-        # 6 MONTHS — 2 ROWS × 3 COLUMNS
+        # 6-MONTH CALENDAR — BUTTON-BASED, RELIABLE
         # ============================================
         for row_idx in range(2):
             month_cols = st.columns(3, gap="small")
@@ -1716,13 +1708,13 @@ def page_ar():
                     hdr_bg = "#CC0000" if ic else "#1a1a1a"
                     
                     # Month header
-                    st.markdown(f'<div class="cal-month-hdr" style="background:{hdr_bg};">{months_short[dm-1]} {dy}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="background:{hdr_bg};color:white;padding:4px 0;border-radius:6px 6px 0 0;text-align:center;font-weight:700;font-size:0.75rem;">{months_short[dm-1]} {dy}</div>', unsafe_allow_html=True)
                     
-                    # Day name headers
+                    # Day headers
                     dh_cols = st.columns(7, gap="small")
                     for i, dh in enumerate(["M","T","W","T","F","S","S"]):
                         with dh_cols[i]:
-                            st.markdown(f'<div class="cal-day-hdr">{dh}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div style="text-align:center;font-size:0.5rem;color:#888;font-weight:700;padding:1px 0;">{dh}</div>', unsafe_allow_html=True)
                     
                     # Day grid
                     dc = 1
@@ -1732,7 +1724,7 @@ def page_ar():
                         for wd in range(7):
                             with day_cols[wd]:
                                 if (w == 0 and wd < sw) or dc > ld.day:
-                                    st.markdown('<div style="height:28px;"></div>', unsafe_allow_html=True)
+                                    st.markdown('<div style="height:26px;"></div>', unsafe_allow_html=True)
                                 else:
                                     cd = date(dy, dm, dc)
                                     dk = cd.strftime("%Y-%m-%d")
@@ -1740,29 +1732,16 @@ def page_ar():
                                     pt = ppm_dates.get(dk, [])
                                     pc = len(pt)
                                     
-                                    # Determine CSS style for the button
-                                    if it:
-                                        btn_style = "background:#CC0000 !important; color:white !important; font-weight:800 !important; border-color:#CC0000 !important;"
-                                    elif pc == 0:
-                                        btn_style = "background:#fafafa !important; color:#bbb !important; font-weight:400 !important;"
+                                    # Determine button label and type
+                                    if pc > 0:
+                                        label = f"{dc}●"
                                     else:
-                                        ov = any(p.get("status") not in ["completed","approved"] for p in pt)
-                                        ad = all(p.get("status") in ["completed","approved"] for p in pt)
-                                        pn = any(p.get("status") == "pending" for p in pt)
-                                        if ov:
-                                            btn_style = "background:#FEF2F2 !important; color:#DC2626 !important; font-weight:700 !important; border-color:#FECACA !important;"
-                                        elif ad:
-                                            btn_style = "background:#ECFDF5 !important; color:#059669 !important; font-weight:600 !important; border-color:#A7F3D0 !important;"
-                                        elif pn:
-                                            btn_style = "background:#F5F3FF !important; color:#7C3AED !important; font-weight:700 !important; border-color:#DDD6FE !important;"
-                                        else:
-                                            btn_style = "background:#EFF6FF !important; color:#2563EB !important; font-weight:700 !important; border-color:#BFDBFE !important;"
+                                        label = str(dc)
                                     
-                                    # Inject per-button style
-                                    st.markdown(f'<style>div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"] button[kind="secondary"][id="calbtn_{dk}"] {{ {btn_style} }}</style>', unsafe_allow_html=True)
-                                    
-                                    label = f"{dc}●" if pc > 0 else str(dc)
-                                    if st.button(label, key=f"calbtn_{dk}", help=f"{pc} PPMs" if pc > 0 else "No PPMs", use_container_width=True):
+                                    # Click handler
+                                    if st.button(label, key=f"calday_{dk}", use_container_width=True, 
+                                        type="primary" if it else "secondary",
+                                        help=f"{pc} PPMs" if pc > 0 else "No PPMs"):
                                         st.session_state.selected_ppm_date = cd
                                         st.rerun()
                                     dc += 1
@@ -1772,7 +1751,7 @@ def page_ar():
         st.markdown("---")
         
         # ============================================
-        # SHOW PPM DETAILS
+        # PPM DETAILS
         # ============================================
         if st.session_state.selected_ppm_date:
             sel = st.session_state.selected_ppm_date
@@ -1781,25 +1760,33 @@ def page_ar():
             
             if pps:
                 st.markdown(f"### 📋 {len(pps)} PPMs — {sel.strftime('%d %B %Y')}")
+                
                 for p in pps:
                     sts = p.get('status','scheduled')
                     sc = {"completed":"#10B981","scheduled":"#3B82F6","pending":"#F59E0B","overdue":"#EF4444","approved":"#059669"}.get(sts,"#3B82F6")
                     ic = {"completed":"✅","scheduled":"📆","pending":"⏳","overdue":"🔴","approved":"🟢"}.get(sts,"📋")
-                    st.markdown(f"""<div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{ic} {p.get('title','N/A')}</b><br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 📅 {str(p.get('next_due_date',''))[:10]} | 🔄 {p.get('frequency','N/A')}</span></div><span style="background:{sc};color:white;padding:3px 14px;border-radius:15px;font-size:0.65rem;font-weight:700;">{sts.upper()}</span></div></div>""", unsafe_allow_html=True)
                     
-                    if st.button("🔧 EXECUTE THIS PPM", key=f"goto_ppm_{p.get('id',dk)}", use_container_width=True, type="primary"):
-                        st.session_state.page = "ppma"
-                        st.rerun()
-                else:
-                    st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled for this day.")
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <b>{ic} {p.get('title','N/A')[:80]}</b>
+                                <br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 🔄 {p.get('frequency','N/A')}</span>
+                            </div>
+                            <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;font-weight:700;">{sts.upper()}</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
-                st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled for this day.")
+                st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled.")
             
-            if st.button("❌ CLEAR SELECTION", key="clearppm", use_container_width=True):
+            if st.button("❌ CLEAR", key="clearppm", use_container_width=True):
                 st.session_state.selected_ppm_date = None
                 st.rerun()
         else:
-            st.info("👆 **Click any day** on the calendar above to view scheduled PPMs.")
+            st.info("👆 Click any day with a ● dot to view PPM details.")
+        
+        
     
     # ============================================
     # TAB 6: APPROVALS
@@ -6193,7 +6180,8 @@ def page_ppm_activities():
     # ============================================
     # MAIN TABS
     # ============================================
-    tabs = st.tabs(["🔧 Execute PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 My Submissions", "⏳ Pending Approval", "⚙️ Checklist Builder"])
+    tabs = st.tabs(["🔧 Execute PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 My Submissions", "⏳ Pending Approval", "⚙️ Checklist Builder", "📋 Manage Schedules"])
+
     
     # ============================================
     # TAB 0: EXECUTE PPM (SCHEDULED)
@@ -7261,6 +7249,200 @@ def page_ppm_activities():
                     st.session_state.page = "cs"
                     st.rerun()
 
+    # ============================================
+    # TAB 6: MANAGE ENROLLED PPM SCHEDULES (ADMIN ONLY)
+    # ============================================
+    with tabs[6]:
+        st.markdown("### 📋 Manage Enrolled PPM Schedules")
+        
+        if not is_admin:
+            st.error("⛔ Admin access only")
+        else:
+            all_schedules = supabase.table("ppm_schedules").select("*").eq("facility_code", fc).order("next_due_date", desc=False).execute()
+            
+            if all_schedules.data and len(all_schedules.data) > 0:
+                sched_df = pd.DataFrame(all_schedules.data)
+                
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    filter_status = st.selectbox("Status", ["All", "scheduled", "completed", "overdue"], key="mgmt_status")
+                with c2:
+                    filter_freq = st.selectbox("Frequency", ["All", "Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="mgmt_freq")
+                with c3:
+                    search_sched = st.text_input("🔍 Search by title", key="mgmt_search", placeholder="Asset name...")
+                
+                display_sched = sched_df.copy()
+                if filter_status != "All":
+                    display_sched = display_sched[display_sched["status"] == filter_status]
+                if filter_freq != "All":
+                    display_sched = display_sched[display_sched["frequency"] == filter_freq]
+                if search_sched:
+                    display_sched = display_sched[display_sched["title"].str.contains(search_sched, case=False, na=False)]
+                
+                st.caption(f"📋 Showing {len(display_sched)} of {len(sched_df)} schedules")
+                
+                page_size = 15
+                if "mgmt_page" not in st.session_state:
+                    st.session_state.mgmt_page = 1
+                
+                total_pages = max(1, (len(display_sched) + page_size - 1) // page_size)
+                start = (st.session_state.mgmt_page - 1) * page_size
+                end = min(start + page_size, len(display_sched))
+                
+                c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+                with c1:
+                    if st.button("◀◀", key="mgmt_first"): st.session_state.mgmt_page = 1; st.rerun()
+                with c2:
+                    if st.button("◀", key="mgmt_prev") and st.session_state.mgmt_page > 1:
+                        st.session_state.mgmt_page -= 1; st.rerun()
+                with c3:
+                    st.markdown(f"**Page {st.session_state.mgmt_page} of {total_pages}**")
+                with c4:
+                    if st.button("▶", key="mgmt_next") and st.session_state.mgmt_page < total_pages:
+                        st.session_state.mgmt_page += 1; st.rerun()
+                with c5:
+                    if st.button("▶▶", key="mgmt_last"): st.session_state.mgmt_page = total_pages; st.rerun()
+                
+                page_data = display_sched.iloc[start:end]
+                
+                for _, sched in page_data.iterrows():
+                    status = sched.get("status", "scheduled")
+                    sc = {"scheduled": "#3B82F6", "completed": "#10B981", "overdue": "#EF4444"}.get(status, "#3B82F6")
+                    
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="background:white;border-left:5px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <b>{sched.get('title','N/A')[:80]}</b>
+                                    <br><span style="font-size:0.7rem;color:#666;">📅 Due: {sched.get('next_due_date','')} | 🔄 {sched.get('frequency','')} | 👤 {sched.get('assigned_team','')}</span>
+                                </div>
+                                <span style="background:{sc};color:white;padding:3px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">{status.upper()}</span>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                       # Toggle edit mode with a button instead of expander
+                        edit_key = f"edit_open_{sched['id']}"
+                        if edit_key not in st.session_state:
+                            st.session_state[edit_key] = False
+                        
+                        if not st.session_state[edit_key]:
+                            if st.button("✏️ EDIT SCHEDULE", key=f"btn_open_edit_{sched['id']}", use_container_width=True):
+                                st.session_state[edit_key] = True
+                                st.rerun()
+                        else:
+                            st.markdown(f"""
+                            <div style="background:#FFFBEB;border-left:5px solid #F59E0B;border-radius:8px;padding:1rem;margin:0.5rem 0;">
+                                <b>✏️ Editing:</b> {sched.get('title','N/A')[:100]}
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            # Get current dates
+                            current_dates_str = ""
+                            all_asset_schedules = supabase.table("ppm_schedules").select("next_due_date").eq("asset_id", sched.get("asset_id")).order("next_due_date").execute()
+                            if all_asset_schedules.data:
+                                current_dates = [d.get("next_due_date","")[:10] for d in all_asset_schedules.data if d.get("next_due_date")]
+                                current_dates_str = ",".join(current_dates)
+                            
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                new_freq = st.selectbox("Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"],
+                                    index=["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"].index(sched.get("frequency","Monthly")) if sched.get("frequency","Monthly") in ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"] else 3,
+                                    key=f"edit_freq_{sched['id']}")
+                            with c2:
+                                new_status = st.selectbox("Status", ["scheduled","completed","overdue"],
+                                    index=["scheduled","completed","overdue"].index(sched.get("status","scheduled")) if sched.get("status","scheduled") in ["scheduled","completed","overdue"] else 0,
+                                    key=f"edit_status_{sched['id']}")
+                            
+                            st.markdown("---")
+                            st.markdown("### 📅 Edit Schedule Dates")
+                            
+                            date_edit_mode = st.radio("Date Mode", ["📅 Manual Entry", "🔄 Auto-Generate"], horizontal=True, key=f"edit_dmode_{sched['id']}")
+                            
+                            if date_edit_mode == "📅 Manual Entry":
+                                edit_dates = st.text_area("Enter dates (comma-separated, YYYY-MM-DD)", 
+                                    value=current_dates_str, height=80, key=f"edit_dates_{sched['id']}",
+                                    placeholder="2026-06-29,2026-07-29,2026-08-29")
+                                new_dates_list = [d.strip() for d in edit_dates.split(",") if d.strip()]
+                            else:
+                                if f"edit_gen_{sched['id']}" not in st.session_state:
+                                    st.session_state[f"edit_gen_{sched['id']}"] = []
+                                
+                                c1, c2 = st.columns(2)
+                                with c1:
+                                    gen_start = st.date_input("Start Date", date.today(), key=f"gen_start_{sched['id']}")
+                                with c2:
+                                    gen_end = st.date_input("End Date", date.today() + timedelta(days=365), key=f"gen_end_{sched['id']}")
+                                
+                                if st.button("🔄 Generate Dates", key=f"gen_btn_{sched['id']}", use_container_width=True):
+                                    dates_list = []
+                                    current = gen_start
+                                    while current <= gen_end:
+                                        dates_list.append(current.strftime("%Y-%m-%d"))
+                                        if new_freq == "Monthly":
+                                            current = date(current.year, current.month+1, min(current.day,28)) if current.month < 12 else date(current.year+1,1,min(current.day,28))
+                                        elif new_freq == "Quarterly":
+                                            nm = current.month+3
+                                            current = date(current.year+1,nm-12,min(current.day,28)) if nm > 12 else date(current.year,nm,min(current.day,28))
+                                        elif new_freq == "Weekly":
+                                            current += timedelta(days=7)
+                                        elif new_freq == "Bi-Weekly":
+                                            current += timedelta(days=14)
+                                        elif new_freq == "Half-Yearly":
+                                            nm = current.month+6
+                                            current = date(current.year+1,nm-12,min(current.day,28)) if nm > 12 else date(current.year,nm,min(current.day,28))
+                                        elif new_freq == "Yearly":
+                                            current = date(current.year+1,current.month,min(current.day,28))
+                                        else:
+                                            current += timedelta(days=1)
+                                    st.session_state[f"edit_gen_{sched['id']}"] = dates_list
+                                    st.rerun()
+                                
+                                if st.session_state[f"edit_gen_{sched['id']}"]:
+                                    selected = st.multiselect("Select Dates", st.session_state[f"edit_gen_{sched['id']}"], 
+                                        default=st.session_state[f"edit_gen_{sched['id']}"][:min(5, len(st.session_state[f"edit_gen_{sched['id']}"]))],
+                                        key=f"gen_sel_{sched['id']}")
+                                    new_dates_list = selected
+                                    st.caption(f"📅 {len(selected)} dates selected")
+                                else:
+                                    new_dates_list = []
+                            
+                            st.markdown("---")
+                            
+                            c1, c2, c3 = st.columns(3)
+                            with c1:
+                                if st.button("💾 UPDATE ALL", key=f"btn_update_{sched['id']}", use_container_width=True, type="primary"):
+                                    if new_dates_list:
+                                        supabase.table("ppm_schedules").delete().eq("asset_id", sched.get("asset_id")).execute()
+                                        for d in new_dates_list:
+                                            supabase.table("ppm_schedules").insert({
+                                                "facility_code": fc,
+                                                "asset_id": sched.get("asset_id"),
+                                                "title": sched.get("title",""),
+                                                "frequency": new_freq,
+                                                "status": new_status,
+                                                "assigned_team": sched.get("assigned_team",""),
+                                                "next_due_date": d,
+                                                "created_at": datetime.now().isoformat()
+                                            }).execute()
+                                        st.success(f"✅ Updated with {len(new_dates_list)} dates!")
+                                        st.session_state[edit_key] = False
+                                        st.rerun()
+                                    else:
+                                        st.error("⚠️ Select at least one date")
+                            with c2:
+                                if st.button("🗑️ DELETE ALL", key=f"btn_delete_{sched['id']}", use_container_width=True):
+                                    supabase.table("ppm_schedules").delete().eq("asset_id", sched.get("asset_id")).execute()
+                                    st.warning(f"🗑️ All schedules deleted!")
+                                    st.session_state[edit_key] = False
+                                    st.rerun()
+                            with c3:
+                                if st.button("❌ CANCEL", key=f"btn_cancel_{sched['id']}", use_container_width=True):
+                                    st.session_state[edit_key] = False
+                                    st.rerun()
+            else:
+                st.info("No PPM schedules found.")
 
 # ============================================
 # ROUTER
