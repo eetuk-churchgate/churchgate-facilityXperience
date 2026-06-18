@@ -1582,7 +1582,7 @@ def page_ar():
                     st.error(f"PDF: {str(e)[:50]}")
     
     # ============================================
-    # TAB 5: PPM CALENDAR — FINAL VERSION
+    # TAB 5: PPM CALENDAR — RELIABLE BUTTON VERSION
     # ============================================
     with ar_tabs[5]:
         st.markdown("### 📅 PPM Calendar — Financial Year View")
@@ -1603,14 +1603,12 @@ def page_ar():
         block_start_month = ((block_start_month - 1) % 12) + 1
         
         months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-        months_full = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
         
         user_depts = safe_parse_permissions(st.session_state.get("user", {}).get("department_permissions", []))
         user_role = st.session_state.get("user_role", "staff")
         is_admin = user_role in ["admin", "approver"]
         
         # Filters
-        st.markdown("### 🔍 Filters")
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
@@ -1625,36 +1623,34 @@ def page_ar():
             cal_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cal_bldg_filter")
         with c4:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("🔧 GO TO PPM ACTIVITIES", key="goto_ppma_top", use_container_width=True, type="primary"):
+            if st.button("🔧 PPM ACTIVITIES", key="goto_ppma_top", use_container_width=True, type="primary"):
                 st.session_state.page = "ppma"
                 st.rerun()
         
         st.markdown("---")
         
-        # Navigation & Legend
+        # Navigation
         c1, c2, c3 = st.columns([1, 2, 1])
         with c1:
-            if st.button("◀ PREV 6 MONTHS", key="cal_prev6", use_container_width=True):
+            if st.button("◀ PREV", key="cal_prev6", use_container_width=True):
                 st.session_state.cal_offset -= 1
                 st.rerun()
         with c2:
             end_idx = ((block_start_month - 1 + 5) % 12)
-            st.markdown(f"#### 📅 FY {fy_start_year}/{fy_start_year+1} — {months_short[block_start_month-1]} to {months_short[end_idx]}")
+            st.markdown(f"#### FY {fy_start_year}/{fy_start_year+1} — {months_short[block_start_month-1]} to {months_short[end_idx]}")
         with c3:
-            if st.button("NEXT 6 MONTHS ▶", key="cal_next6", use_container_width=True):
+            if st.button("NEXT ▶", key="cal_next6", use_container_width=True):
                 st.session_state.cal_offset += 1
                 st.rerun()
         
-        st.markdown("""
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
-        <span style="background:#FEF2F2;color:#DC2626;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">🔴 Overdue</span>
-        <span style="background:#CC0000;color:white;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">📍 Today</span>
-        <span style="background:#EFF6FF;color:#2563EB;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">📆 Upcoming</span>
-        <span style="background:#ECFDF5;color:#059669;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">✅ Completed</span>
-        <span style="background:#F5F3FF;color:#7C3AED;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">⏳ Pending</span>
-        <span style="background:#FAFAFA;color:#999;padding:4px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">⬜ No PPM</span>
-        </div>
-        """, unsafe_allow_html=True)
+        # Legend
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
+        with c1: st.markdown('<div style="background:#FEF2F2;color:#DC2626;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">🔴 Overdue</div>', unsafe_allow_html=True)
+        with c2: st.markdown('<div style="background:#CC0000;color:white;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📍 Today</div>', unsafe_allow_html=True)
+        with c3: st.markdown('<div style="background:#EFF6FF;color:#2563EB;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📆 Upcoming</div>', unsafe_allow_html=True)
+        with c4: st.markdown('<div style="background:#ECFDF5;color:#059669;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">✅ Done</div>', unsafe_allow_html=True)
+        with c5: st.markdown('<div style="background:#F5F3FF;color:#7C3AED;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⏳ Pending</div>', unsafe_allow_html=True)
+        with c6: st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -1693,163 +1689,69 @@ def page_ar():
         st.markdown("---")
         
         # ============================================
-        # CALENDAR WITH HIDDEN INPUT + JS CALLBACK
+        # 6-MONTH CALENDAR — BUTTON-BASED, RELIABLE
         # ============================================
-        
-        # Build calendar HTML
-        cal_html = """<style>
-            .cal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-family: 'Inter', sans-serif; }
-            .cal-month { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
-            .cal-hdr { padding: 8px 0; text-align: center; font-weight: 700; font-size: 14px; color: white; }
-            .cal-hdr.cur { background: #CC0000; }
-            .cal-hdr.reg { background: #1a1a1a; }
-            .cal-tbl { width: 100%; border-collapse: collapse; }
-            .cal-tbl th { background: #f9fafb; padding: 4px 0; text-align: center; font-size: 10px; color: #9ca3af; font-weight: 700; border-bottom: 2px solid #e5e7eb; }
-            .cal-tbl td { text-align: center; padding: 0; height: 32px; cursor: pointer; border: 1px solid #f0f0f0; transition: all 0.1s; }
-            .cal-tbl td span { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; font-size: 11px; font-weight: 600; color: #374151; }
-            .cal-tbl td:hover { outline: 2px solid #CC0000; outline-offset: -2px; z-index: 5; transform: scale(1.05); }
-            .cal-tbl td.em { background: #fafafa; cursor: default; }
-            .cal-tbl td.em:hover { outline: none; transform: none; }
-            .cal-tbl td.td { background: #CC0000; }
-            .cal-tbl td.td span { color: white; font-weight: 800; }
-            .cal-tbl td.ov { background: #FEF2F2; }
-            .cal-tbl td.ov span { color: #DC2626; font-weight: 700; }
-            .cal-tbl td.up { background: #EFF6FF; }
-            .cal-tbl td.up span { color: #2563EB; font-weight: 700; }
-            .cal-tbl td.cp { background: #ECFDF5; }
-            .cal-tbl td.cp span { color: #059669; font-weight: 600; }
-            .cal-tbl td.pn { background: #F5F3FF; }
-            .cal-tbl td.pn span { color: #7C3AED; font-weight: 700; }
-            .cal-tbl td.no { background: #fdfdfd; }
-            .cal-tbl td.no span { color: #bbb; font-weight: 400; }
-            .cal-badge { font-size: 8px; background: #CC0000; color: white; border-radius: 10px; padding: 0px 4px; min-width: 14px; text-align: center; line-height: 1.3; margin-top: 1px; }
-        </style><div class="cal-grid">"""
-        
         for row_idx in range(2):
+            month_cols = st.columns(3, gap="small")
             for col_idx in range(3):
                 mo = row_idx * 3 + col_idx
                 dm = ((block_start_month - 1 + mo) % 12) + 1
                 dy = block_start_year + ((block_start_month - 1 + mo) // 12)
                 
-                fd = date(dy, dm, 1)
-                if dm == 12: ld = date(dy, 12, 31)
-                else: ld = date(dy, dm + 1, 1) - timedelta(days=1)
-                
-                sw = fd.weekday()
-                ic = (dm == today.month and dy == today.year)
-                hc = "cur" if ic else "reg"
-                
-                cal_html += f'<div class="cal-month"><div class="cal-hdr {hc}">{months_short[dm-1]} {dy}</div><table class="cal-tbl"><tr><th>M</th><th>T</th><th>W</th><th>T</th><th>F</th><th>S</th><th>S</th></tr>'
-                
-                dc = 1
-                for w in range(6):
-                    cal_html += "<tr>"
-                    for wd in range(7):
-                        if (w == 0 and wd < sw) or dc > ld.day:
-                            cal_html += '<td class="em"><span></span></td>'
-                        else:
-                            cd = date(dy, dm, dc)
-                            dk = cd.strftime("%Y-%m-%d")
-                            it = dk == today.strftime("%Y-%m-%d")
-                            pt = ppm_dates.get(dk, [])
-                            pc = len(pt)
-                            
-                            if it: 
-                                cls = "td"
-                            elif pc == 0: 
-                                cls = "no"
-                            else:
-                                has_overdue = False
-                                has_completed = False
-                                has_pending = False
-                                has_upcoming = False
-                                
-                                for p in pt:
-                                    sts = p.get("status", "scheduled")
-                                    due_dt = pd.to_datetime(p.get("next_due_date"), errors='coerce')
-                                    
-                                    if sts == "completed":
-                                        has_completed = True
-                                    elif sts == "pending":
-                                        has_pending = True
-                                    elif pd.notna(due_dt) and due_dt.date() < today:
-                                        has_overdue = True
-                                    else:
-                                        has_upcoming = True
-                                
-                                if has_overdue:
-                                    cls = "ov"
-                                elif has_pending:
-                                    cls = "pn"
-                                elif has_completed and not has_upcoming:
-                                    cls = "cp"
+                with month_cols[col_idx]:
+                    fd = date(dy, dm, 1)
+                    if dm == 12: ld = date(dy, 12, 31)
+                    else: ld = date(dy, dm + 1, 1) - timedelta(days=1)
+                    
+                    sw = fd.weekday()
+                    ic = (dm == today.month and dy == today.year)
+                    hdr_bg = "#CC0000" if ic else "#1a1a1a"
+                    
+                    # Month header
+                    st.markdown(f'<div style="background:{hdr_bg};color:white;padding:4px 0;border-radius:6px 6px 0 0;text-align:center;font-weight:700;font-size:0.75rem;">{months_short[dm-1]} {dy}</div>', unsafe_allow_html=True)
+                    
+                    # Day headers
+                    dh_cols = st.columns(7, gap="small")
+                    for i, dh in enumerate(["M","T","W","T","F","S","S"]):
+                        with dh_cols[i]:
+                            st.markdown(f'<div style="text-align:center;font-size:0.5rem;color:#888;font-weight:700;padding:1px 0;">{dh}</div>', unsafe_allow_html=True)
+                    
+                    # Day grid
+                    dc = 1
+                    for w in range(6):
+                        if dc > ld.day: break
+                        day_cols = st.columns(7, gap="small")
+                        for wd in range(7):
+                            with day_cols[wd]:
+                                if (w == 0 and wd < sw) or dc > ld.day:
+                                    st.markdown('<div style="height:26px;"></div>', unsafe_allow_html=True)
                                 else:
-                                    cls = "up"
-                            
-                            badge = f'<span class="cal-badge">{pc}</span>' if pc > 0 else ''
-                            cal_html += f'<td class="{cls}" onclick="parent.postMessage({{type:\'ppmClick\',date:\'{dk}\'}},\'*\')"><span>{dc}{badge}</span></td>'
-                            dc += 1
-                    cal_html += "</tr>"
-                    if dc > ld.day: break
-                cal_html += "</table></div>"
-        
-        cal_html += "</div>"
-        
-        # Hidden input for JavaScript to write to
-        clicked_date = st.text_input("", key="ppm_hidden_input", label_visibility="collapsed")
-        
-        # Calendar HTML with JavaScript that writes to the hidden input
-        cal_html_full = f"""
-        <!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>
-        {cal_html}
-        <script>
-            var cells = document.querySelectorAll('td[class]');
-            cells.forEach(function(cell) {{
-                cell.addEventListener('click', function() {{
-                    var match = this.outerHTML.match(/ppmClick',date:'([^']+)'/);
-                    if (match) {{
-                        var input = parent.document.querySelector('input[aria-label=""]');
-                        if (!input) {{
-                            var inputs = parent.document.querySelectorAll('input');
-                            for (var i = 0; i < inputs.length; i++) {{
-                                if (inputs[i].getAttribute('data-testid') === 'stTextInput') {{
-                                    input = inputs[i];
-                                    break;
-                                }}
-                            }}
-                        }}
-                        if (input) {{
-                            var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                            nativeInputValueSetter.call(input, match[1]);
-                            input.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                        }}
-                    }}
-                }});
-            }});
-        </script>
-        </body></html>
-        """
-        
-        st.components.v1.html(cal_html_full, height=480)
-        
-        # Handle the click from hidden input
-        if clicked_date and clicked_date != st.session_state.get("last_ppm_click", ""):
-            st.session_state.last_ppm_click = clicked_date
-            try:
-                st.session_state.selected_ppm_date = datetime.strptime(str(clicked_date), "%Y-%m-%d").date()
-                st.rerun()
-            except:
-                pass
-            try:
-                st.session_state.selected_ppm_date = datetime.strptime(str(cal_result), "%Y-%m-%d").date()
-                st.rerun()
-            except:
-                pass
+                                    cd = date(dy, dm, dc)
+                                    dk = cd.strftime("%Y-%m-%d")
+                                    it = dk == today.strftime("%Y-%m-%d")
+                                    pt = ppm_dates.get(dk, [])
+                                    pc = len(pt)
+                                    
+                                    # Determine button label and type
+                                    if pc > 0:
+                                        label = f"{dc}●"
+                                    else:
+                                        label = str(dc)
+                                    
+                                    # Click handler
+                                    if st.button(label, key=f"calday_{dk}", use_container_width=True, 
+                                        type="primary" if it else "secondary",
+                                        help=f"{pc} PPMs" if pc > 0 else "No PPMs"):
+                                        st.session_state.selected_ppm_date = cd
+                                        st.rerun()
+                                    dc += 1
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
         
         st.markdown("---")
         
         # ============================================
-        # PPM DETAILS FOR SELECTED DAY
+        # PPM DETAILS
         # ============================================
         if st.session_state.selected_ppm_date:
             sel = st.session_state.selected_ppm_date
@@ -1859,42 +1761,30 @@ def page_ar():
             if pps:
                 st.markdown(f"### 📋 {len(pps)} PPMs — {sel.strftime('%d %B %Y')}")
                 
-                c1, c2 = st.columns(2)
-                with c1:
-                    day_dept = st.selectbox("Quick Filter", ["All"] + list(set(p.get("assigned_team","") for p in pps)), key="day_dept_filter")
-                with c2:
-                    if st.button("🔧 EXECUTE PPMs", key="goto_ppma_cal", use_container_width=True, type="primary"):
-                        st.session_state.page = "ppma"
-                        st.rerun()
-                
-                display_pps = pps
-                if day_dept != "All":
-                    display_pps = [p for p in pps if p.get("assigned_team","") == day_dept]
-                
-                for p in display_pps:
+                for p in pps:
                     sts = p.get('status','scheduled')
                     sc = {"completed":"#10B981","scheduled":"#3B82F6","pending":"#F59E0B","overdue":"#EF4444","approved":"#059669"}.get(sts,"#3B82F6")
                     ic = {"completed":"✅","scheduled":"📆","pending":"⏳","overdue":"🔴","approved":"🟢"}.get(sts,"📋")
                     
                     st.markdown(f"""
-                    <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
                             <div>
                                 <b>{ic} {p.get('title','N/A')[:80]}</b>
                                 <br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 🔄 {p.get('frequency','N/A')}</span>
                             </div>
-                            <span style="background:{sc};color:white;padding:3px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;">{sts.upper()}</span>
+                            <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;font-weight:700;">{sts.upper()}</span>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
             else:
                 st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled.")
             
-            if st.button("❌ CLEAR SELECTION", key="clearppm", use_container_width=True):
+            if st.button("❌ CLEAR", key="clearppm", use_container_width=True):
                 st.session_state.selected_ppm_date = None
                 st.rerun()
         else:
-            st.info("👆 **Click any day** on the calendar to view scheduled PPMs.")
+            st.info("👆 Click any day with a ● dot to view PPM details.")
         
         
     
