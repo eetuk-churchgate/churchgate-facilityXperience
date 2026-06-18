@@ -1787,6 +1787,7 @@ def page_ar():
         if "ppm_d" in params:
             try:
                 st.session_state.selected_ppm_date = datetime.strptime(params["ppm_d"], "%Y-%m-%d").date()
+                # Don't clear params - let the page reload naturally
             except:
                 pass
         
@@ -1842,110 +1843,7 @@ def page_ar():
         else:
             st.info("👆 **Click any day** on the calendar to view scheduled PPMs.")
         
-        # ============================================
-        # 6 MONTHS — 2 ROWS × 3 COLUMNS
-        # ============================================
-        for row_idx in range(2):
-            month_cols = st.columns(3, gap="small")
-            for col_idx in range(3):
-                mo = row_idx * 3 + col_idx
-                dm = ((block_start_month - 1 + mo) % 12) + 1
-                dy = block_start_year + ((block_start_month - 1 + mo) // 12)
-                
-                with month_cols[col_idx]:
-                    fd = date(dy, dm, 1)
-                    if dm == 12: ld = date(dy, 12, 31)
-                    else: ld = date(dy, dm + 1, 1) - timedelta(days=1)
-                    
-                    sw = fd.weekday()
-                    ic = (dm == today.month and dy == today.year)
-                    hdr_bg = "#CC0000" if ic else "#1a1a1a"
-                    
-                    # Month header
-                    st.markdown(f'<div class="cal-month-hdr" style="background:{hdr_bg};">{months_short[dm-1]} {dy}</div>', unsafe_allow_html=True)
-                    
-                    # Day name headers
-                    dh_cols = st.columns(7, gap="small")
-                    for i, dh in enumerate(["M","T","W","T","F","S","S"]):
-                        with dh_cols[i]:
-                            st.markdown(f'<div class="cal-day-hdr">{dh}</div>', unsafe_allow_html=True)
-                    
-                    # Day grid
-                    dc = 1
-                    for w in range(6):
-                        if dc > ld.day: break
-                        day_cols = st.columns(7, gap="small")
-                        for wd in range(7):
-                            with day_cols[wd]:
-                                if (w == 0 and wd < sw) or dc > ld.day:
-                                    st.markdown('<div style="height:28px;"></div>', unsafe_allow_html=True)
-                                else:
-                                    cd = date(dy, dm, dc)
-                                    dk = cd.strftime("%Y-%m-%d")
-                                    it = dk == today.strftime("%Y-%m-%d")
-                                    pt = ppm_dates.get(dk, [])
-                                    pc = len(pt)
-                                    
-                                    # Determine CSS style for the button
-                                    if it:
-                                        btn_style = "background:#CC0000 !important; color:white !important; font-weight:800 !important; border-color:#CC0000 !important;"
-                                    elif pc == 0:
-                                        btn_style = "background:#fafafa !important; color:#bbb !important; font-weight:400 !important;"
-                                    else:
-                                        ov = any(p.get("status") not in ["completed","approved"] for p in pt)
-                                        ad = all(p.get("status") in ["completed","approved"] for p in pt)
-                                        pn = any(p.get("status") == "pending" for p in pt)
-                                        if ov:
-                                            btn_style = "background:#FEF2F2 !important; color:#DC2626 !important; font-weight:700 !important; border-color:#FECACA !important;"
-                                        elif ad:
-                                            btn_style = "background:#ECFDF5 !important; color:#059669 !important; font-weight:600 !important; border-color:#A7F3D0 !important;"
-                                        elif pn:
-                                            btn_style = "background:#F5F3FF !important; color:#7C3AED !important; font-weight:700 !important; border-color:#DDD6FE !important;"
-                                        else:
-                                            btn_style = "background:#EFF6FF !important; color:#2563EB !important; font-weight:700 !important; border-color:#BFDBFE !important;"
-                                    
-                                    # Inject per-button style
-                                    st.markdown(f'<style>div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"] button[kind="secondary"][id="calbtn_{dk}"] {{ {btn_style} }}</style>', unsafe_allow_html=True)
-                                    
-                                    label = f"{dc}●" if pc > 0 else str(dc)
-                                    if st.button(label, key=f"calbtn_{dk}", help=f"{pc} PPMs" if pc > 0 else "No PPMs", use_container_width=True):
-                                        st.session_state.selected_ppm_date = cd
-                                        st.rerun()
-                                    dc += 1
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
         
-        st.markdown("---")
-        
-        # ============================================
-        # SHOW PPM DETAILS
-        # ============================================
-        if st.session_state.selected_ppm_date:
-            sel = st.session_state.selected_ppm_date
-            dks = sel.strftime("%Y-%m-%d")
-            pps = ppm_dates.get(dks, [])
-            
-            if pps:
-                st.markdown(f"### 📋 {len(pps)} PPMs — {sel.strftime('%d %B %Y')}")
-                for p in pps:
-                    sts = p.get('status','scheduled')
-                    sc = {"completed":"#10B981","scheduled":"#3B82F6","pending":"#F59E0B","overdue":"#EF4444","approved":"#059669"}.get(sts,"#3B82F6")
-                    ic = {"completed":"✅","scheduled":"📆","pending":"⏳","overdue":"🔴","approved":"🟢"}.get(sts,"📋")
-                    st.markdown(f"""<div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{ic} {p.get('title','N/A')}</b><br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 📅 {str(p.get('next_due_date',''))[:10]} | 🔄 {p.get('frequency','N/A')}</span></div><span style="background:{sc};color:white;padding:3px 14px;border-radius:15px;font-size:0.65rem;font-weight:700;">{sts.upper()}</span></div></div>""", unsafe_allow_html=True)
-                    
-                    if st.button("🔧 EXECUTE THIS PPM", key=f"goto_ppm_{p.get('id',dk)}", use_container_width=True, type="primary"):
-                        st.session_state.page = "ppma"
-                        st.rerun()
-                else:
-                    st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled for this day.")
-            else:
-                st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled for this day.")
-            
-            if st.button("❌ CLEAR SELECTION", key="clearppm", use_container_width=True):
-                st.session_state.selected_ppm_date = None
-                st.rerun()
-        else:
-            st.info("👆 **Click any day** on the calendar above to view scheduled PPMs.")
     
     # ============================================
     # TAB 6: APPROVALS
