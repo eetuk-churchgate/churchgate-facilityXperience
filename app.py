@@ -1763,7 +1763,7 @@ def page_ar():
                                 else: cls = "up"
                             
                             badge = f'<span class="badge">{pc}</span>' if pc > 0 else ''
-                            cal_html += f'<td class="{cls}" onclick="var inputs=window.parent.document.querySelectorAll(\'input[type=text]\');for(var i=0;i<inputs.length;i++){{if(inputs[i].getAttribute(\'aria-label\')===\'Calendar Click\'){{var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,\'value\').set;s.call(inputs[i],\'{dk}\');inputs[i].dispatchEvent(new Event(\'input\',{{bubbles:true}}));break;}}}}">{dc}{badge}</td>'
+                            cal_html += f'<td class="{cls}" onclick="var inputs=window.parent.document.querySelectorAll(\'input[type=text]\');for(var i=0;i<inputs.length;i++){{if(inputs[i].getAttribute(\'aria-label\')===\'📅 Selected Date\'){{var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,\'value\').set;s.call(inputs[i],\'{dk}\');inputs[i].dispatchEvent(new Event(\'input\',{{bubbles:true}}));break;}}}}">{dc}{badge}</td>'
                             dc += 1
                     cal_html += "</tr>"
                     if dc > ld.day: break
