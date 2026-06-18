@@ -227,10 +227,11 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 # ============================================
-# DATA ENGINE
+# DATA ENGINE — WITH CACHING
 # ============================================
 class DB:
     @staticmethod
+    @st.cache_data(ttl=300)
     def get_kpis(fc):
         try:
             wo=supabase.table("work_orders").select("id",count="exact").eq("facility_code",fc).eq("status","open").execute()
@@ -244,6 +245,7 @@ class DB:
         except: return {"open_wo":0,"visitors":0,"open_inc":0,"open_tix":0,"assets":0,"ppm_due":0,"pending_permits":0}
 
     @staticmethod
+    @st.cache_data(ttl=300)
     def get_all(table, fc, limit=500):
         try:
             res=supabase.table(table).select("*").eq("facility_code",fc).order("created_at",desc=True).limit(limit).execute()
@@ -251,28 +253,18 @@ class DB:
         except: return []
 
     @staticmethod
+    @st.cache_data(ttl=300)
     def get_assets(fc, limit=50000):
         try:
-            all_data = []
-            page_size = 1000
-            offset = 0
-            
-            while offset < limit:
-                res = supabase.table("assets").select("*").eq("facility_code", fc).range(offset, offset + page_size - 1).execute()
-                if res.data and len(res.data) > 0:
-                    all_data.extend(res.data)
-                    offset += page_size
-                    if len(res.data) < page_size:
-                        break
-                else:
-                    break
-            
-            return all_data if all_data else []
+            res = supabase.table("assets").select("*").eq("facility_code", fc).limit(limit).execute()
+            if res.data:
+                return res.data
+            return []
         except Exception as e:
-            st.error(f"Asset fetch error: {str(e)[:100]}")
             return []
 
     @staticmethod
+    @st.cache_data(ttl=300)
     def get_categories():
         try:
             res=supabase.table("asset_categories").select("*").order("name").execute()
@@ -293,10 +285,14 @@ class DB:
     @staticmethod
     def update(table, id_val, data):
         try:
-            supabase.table(table).update(data).eq("id",id_val).execute(); return True
+            supabase.table(table).update(data).eq("id",id_val).execute()
+            # Clear cache for this table
+            st.cache_data.clear()
+            return True
         except: return False
 
     @staticmethod
+    @st.cache_data(ttl=300)
     def get_users():
         try:
             res=supabase.table("app_users").select("*").order("name").limit(200).execute()
@@ -304,6 +300,7 @@ class DB:
         except: return []
 
     @staticmethod
+    @st.cache_data(ttl=300)
     def get_locations(fc):
         try:
             res=supabase.table("helpdesk_locations").select("*").eq("facility_code",fc).order("location_name").execute()
@@ -311,6 +308,7 @@ class DB:
         except: return []
 
     @staticmethod
+    @st.cache_data(ttl=300)
     def get_sub_locations(loc_id):
         try:
             res=supabase.table("helpdesk_sub_locations").select("*").eq("location_id",loc_id).order("sub_location_name").execute()
@@ -318,6 +316,7 @@ class DB:
         except: return []
 
     @staticmethod
+    @st.cache_data(ttl=300)
     def get_helpdesk_categories():
         try:
             res = supabase.table("helpdesk_categories").select("*").eq("is_active", True).order("category_name").execute()
@@ -325,6 +324,7 @@ class DB:
         except: return []
 
     @staticmethod
+    @st.cache_data(ttl=120)
     def get_tickets_filtered(fc, status=None, category=None, search=None, limit=100):
         try:
             query = supabase.table("tickets").select("*").eq("facility_code", fc)
@@ -339,12 +339,12 @@ class DB:
         except: return []
 
     @staticmethod
+    @st.cache_data(ttl=120)
     def get_ticket_comments(ticket_id):
         try:
             res = supabase.table("ticket_comments").select("*").eq("ticket_id", ticket_id).order("created_at").execute()
             return res.data if res.data else []
         except: return []
-
 # ============================================
 # HELPERS
 # ============================================
