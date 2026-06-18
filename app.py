@@ -1771,7 +1771,7 @@ def page_ar():
         
         cal_html += "</div>"
         
-       st.components.v1.html(f"<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>{cal_html}</body></html>", height=480, scrolling=False)
+        st.components.v1.html(f"<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>{cal_html}</body></html>", height=480, scrolling=False)
         
         # Use a simple text input that JavaScript can set
         cal_click = st.text_input("Calendar Click", value="", key="ppm_cal_click", label_visibility="collapsed")
