@@ -1582,7 +1582,7 @@ def page_ar():
                     st.error(f"PDF: {str(e)[:50]}")
     
     # ============================================
-    # TAB 5: PPM CALENDAR — RELIABLE BUTTON VERSION
+    # TAB 5: PPM CALENDAR — FINAL WORKING VERSION
     # ============================================
     with ar_tabs[5]:
         st.markdown("### 📅 PPM Calendar — Financial Year View")
@@ -1603,12 +1603,14 @@ def page_ar():
         block_start_month = ((block_start_month - 1) % 12) + 1
         
         months_short = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        months_full = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
         
         user_depts = safe_parse_permissions(st.session_state.get("user", {}).get("department_permissions", []))
         user_role = st.session_state.get("user_role", "staff")
         is_admin = user_role in ["admin", "approver"]
         
         # Filters
+        st.markdown("### 🔍 Filters")
         c1, c2, c3, c4 = st.columns(4)
         with c1:
             df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
@@ -1629,26 +1631,25 @@ def page_ar():
         
         st.markdown("---")
         
-        # Navigation
+        # Navigation & Legend
         c1, c2, c3 = st.columns([1, 2, 1])
         with c1:
-            if st.button("◀ PREV", key="cal_prev6", use_container_width=True):
+            if st.button("◀ PREV 6 MONTHS", key="cal_prev6", use_container_width=True):
                 st.session_state.cal_offset -= 1
                 st.rerun()
         with c2:
             end_idx = ((block_start_month - 1 + 5) % 12)
             st.markdown(f"#### FY {fy_start_year}/{fy_start_year+1} — {months_short[block_start_month-1]} to {months_short[end_idx]}")
         with c3:
-            if st.button("NEXT ▶", key="cal_next6", use_container_width=True):
+            if st.button("NEXT 6 MONTHS ▶", key="cal_next6", use_container_width=True):
                 st.session_state.cal_offset += 1
                 st.rerun()
         
-        # Legend
         c1, c2, c3, c4, c5, c6 = st.columns(6)
         with c1: st.markdown('<div style="background:#FEF2F2;color:#DC2626;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">🔴 Overdue</div>', unsafe_allow_html=True)
         with c2: st.markdown('<div style="background:#CC0000;color:white;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📍 Today</div>', unsafe_allow_html=True)
         with c3: st.markdown('<div style="background:#EFF6FF;color:#2563EB;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📆 Upcoming</div>', unsafe_allow_html=True)
-        with c4: st.markdown('<div style="background:#ECFDF5;color:#059669;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">✅ Done</div>', unsafe_allow_html=True)
+        with c4: st.markdown('<div style="background:#ECFDF5;color:#059669;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">✅ Completed</div>', unsafe_allow_html=True)
         with c5: st.markdown('<div style="background:#F5F3FF;color:#7C3AED;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⏳ Pending</div>', unsafe_allow_html=True)
         with c6: st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
         
@@ -1687,17 +1688,6 @@ def page_ar():
         with c4: st.metric("✅ Completed", completed_ppm)
         
         st.markdown("---")
-        
-         # ============================================
-        # 6-MONTH CALENDAR — HTML WITH QUERY PARAMS
-        # ============================================
-        
-        # Handle click from query param
-        if "ppm_d" in st.query_params:
-            try:
-                st.session_state.selected_ppm_date = datetime.strptime(st.query_params["ppm_d"], "%Y-%m-%d").date()
-            except:
-                pass
         
         # Build calendar HTML
         cal_html = """<style>
@@ -1780,12 +1770,55 @@ def page_ar():
                 cal_html += "</table></div>"
         
         cal_html += "</div>"
-        st.markdown(cal_html, unsafe_allow_html=True)
+        
+        # JavaScript to capture clicks without page reload
+        cal_html += """
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var cells = document.querySelectorAll('.ct td:not(.em)');
+            cells.forEach(function(cell) {
+                cell.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var link = this.querySelector('a');
+                    if (link) {
+                        var url = link.getAttribute('href');
+                        var match = url.match(/ppm_d=([^&]+)/);
+                        if (match) {
+                            var inputs = window.parent.document.querySelectorAll('input[type="text"]');
+                            for (var i = 0; i < inputs.length; i++) {
+                                if (inputs[i].closest('[data-testid="stTextInput"]')) {
+                                    var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                                    setter.call(inputs[i], match[1]);
+                                    inputs[i].dispatchEvent(new Event('input', { bubbles: true }));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    return false;
+                });
+            });
+        });
+        </script>
+        """
+        
+        st.components.v1.html(f"<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>{cal_html}</body></html>", height=480, scrolling=False)
+        
+        # Hidden input to capture calendar clicks
+        cal_click = st.text_input("", key="ppm_cal_click", label_visibility="collapsed", placeholder="")
+        
+        if cal_click and cal_click != st.session_state.get("_last_cal_click", ""):
+            st.session_state._last_cal_click = cal_click
+            try:
+                st.session_state.selected_ppm_date = datetime.strptime(cal_click, "%Y-%m-%d").date()
+                st.rerun()
+            except:
+                pass
         
         st.markdown("---")
         
         # ============================================
-        # PPM DETAILS
+        # PPM DETAILS FOR SELECTED DAY
         # ============================================
         if st.session_state.selected_ppm_date:
             sel = st.session_state.selected_ppm_date
@@ -1795,7 +1828,19 @@ def page_ar():
             if pps:
                 st.markdown(f"### 📋 {len(pps)} PPMs — {sel.strftime('%d %B %Y')}")
                 
-                for p in pps:
+                c1, c2 = st.columns(2)
+                with c1:
+                    day_dept = st.selectbox("Quick Filter", ["All"] + list(set(p.get("assigned_team","") for p in pps)), key="day_dept_filter")
+                with c2:
+                    if st.button("🔧 EXECUTE PPMs", key="goto_ppma_cal", use_container_width=True, type="primary"):
+                        st.session_state.page = "ppma"
+                        st.rerun()
+                
+                display_pps = pps
+                if day_dept != "All":
+                    display_pps = [p for p in pps if p.get("assigned_team","") == day_dept]
+                
+                for p in display_pps:
                     sts = p.get('status','scheduled')
                     sc = {"completed":"#10B981","scheduled":"#3B82F6","pending":"#F59E0B","overdue":"#EF4444","approved":"#059669"}.get(sts,"#3B82F6")
                     ic = {"completed":"✅","scheduled":"📆","pending":"⏳","overdue":"🔴","approved":"🟢"}.get(sts,"📋")
@@ -1811,17 +1856,18 @@ def page_ar():
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
+                    
                     if st.button(f"🔧 EXECUTE THIS PPM", key=f"exec_ppm_{p.get('id',dk)}", use_container_width=True, type="primary"):
                         st.session_state.page = "ppma"
                         st.rerun()
             else:
                 st.info(f"📅 **{sel.strftime('%d %B %Y')}** — No PPMs scheduled.")
             
-            if st.button("❌ CLEAR", key="clearppm", use_container_width=True):
+            if st.button("❌ CLEAR SELECTION", key="clearppm", use_container_width=True):
                 st.session_state.selected_ppm_date = None
                 st.rerun()
         else:
-            st.info("👆 Click any day with a ● dot to view PPM details.")
+            st.info("👆 **Click any day** on the calendar to view scheduled PPMs.")
         
         
     
