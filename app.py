@@ -4924,7 +4924,7 @@ def page_users():
         with c1:
             filter_type = st.selectbox("Type", ["All", "staff", "tenant", "contractor", "vendor"], key="usr_type")
         with c2:
-            filter_role = st.selectbox("Role", ["All", "super_admin", "admin", "approver", "manager", "team_lead", "team_member", "tenant_admin", "tenant_user", "contractor", "vendor"], key="usr_role")
+            filter_role = st.selectbox("Role", ["All", "super_admin", "admin", "sr_management", "sr_manager", "manager", "team_lead", "team_member", "tenant_admin", "tenant_user", "contractor", "vendor"], key="usr_role")
         with c3:
             filter_status = st.selectbox("Status", ["All", "Active", "Inactive", "Locked"], key="usr_status")
         with c4:
@@ -5026,7 +5026,7 @@ def page_users():
                 <div style="flex:1;">
                     <div style="display:flex;align-items:center;gap:0.5rem;">
                         <b style="font-size:0.9rem;">{name}</b>
-                        <span style="background:{role_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{role.upper()}</span>
+                        <span style="background:{role_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{role.replace('_', ' ').title().replace(' ', '.')}</span>
                         <span style="background:{type_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{user_type.upper()}</span>
                     </div>
                     <div style="font-size:0.7rem;color:#666;">📧 {email} | 🆔 {emp_id} | 👔 {designation}</div>
@@ -5087,8 +5087,16 @@ def page_users():
                 with c3:
                     new_designation = st.selectbox("Designation Level*", ["Team Member", "Team Lead", "Manager", "Sr. Manager", "HOD", "Sr. Management", "Admin", "Super Admin"], key="add_desig")
                 
-                new_role = st.selectbox("System Role*", ["team_member", "team_lead", "manager", "approver", "admin", "super_admin"],
-                    format_func=lambda x: {"team_member":"👤 Team Member","team_lead":"🔐 Team Lead","manager":"👔 Manager","approver":"🟢 Approver","admin":"🔴 Admin","super_admin":"👑 Super Admin"}[x], key="add_role")
+                new_role = st.selectbox("System Role*", ["team_member", "team_lead", "manager", "sr_manager", "sr_management", "admin", "super_admin"],
+                    format_func=lambda x: {
+                        "team_member":"👤 Team Member",
+                        "team_lead":"🔐 Team Lead",
+                        "manager":"👔 Manager",
+                        "sr_manager":"💼 Sr. Manager",
+                        "sr_management":"🏢 Sr. Management",
+                        "admin":"🔴 Admin",
+                        "super_admin":"👑 Super Admin"
+                    }[x], key="add_role")
                 
                 new_facility = st.selectbox("Home Facility", ["WTC", "AGVL", "FCPL", "RBPL", "VDL", "WAREHOUSES"], key="add_fac")
                 
@@ -5272,7 +5280,7 @@ def page_users():
                     edit_emp = st.text_input("Employee ID", value=user.get("employee_id","") or "")
                     edit_mobile = st.text_input("Mobile", value=user.get("mobile","") or "")
                 with c3:
-                    roles = ["team_member","team_lead","manager","approver","admin","super_admin","tenant_admin","tenant_user","contractor","vendor"]
+                    roles = ["team_member","team_lead","manager","sr_manager","sr_management","admin","super_admin","tenant_admin","tenant_user","contractor","vendor"]
                     cr = user.get("role","staff")
                     edit_role = st.selectbox("Role", roles, index=roles.index(cr) if cr in roles else 0)
                 
