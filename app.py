@@ -534,10 +534,10 @@ def topnav():
             </div>
             <span style="color:rgba(255,255,255,0.5);font-size:0.65rem;font-family:monospace;" id="lt"></span>
             <div style="display:flex;align-items:center;gap:0.5rem;">
-    
-    <span style="color:rgba(255,255,255,0.7);font-size:0.7rem;">{st.session_state.get('user_name','User').split()[-1]}</span>
-    <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;border:2px solid rgba(255,255,255,0.2);cursor:pointer;" title="Click to logout" onclick="logout()">{st.session_state.get('user_name','User')[:2].upper()}</div>
-</div>
+                <span style="color:rgba(255,255,255,0.7);font-size:0.7rem;">{st.session_state.get('user_name','User').split()[-1]}</span>
+                <div style="width:32px;height:32px;border-radius:50%;background:{CHURCHGATE_RED};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;border:2px solid rgba(255,255,255,0.2);cursor:pointer;" title="Click to logout" onclick="logout()">{st.session_state.get('user_name','User')[:2].upper()}</div>
+            </div>
+        </div>
     </div>
     <script>function t(){{var d=new Date();var wat=new Date(d.getTime()+3600000);document.getElementById('lt').textContent=wat.toLocaleTimeString('en-US',{{hour12:false}});}}t();setInterval(t,1000);</script>
     <style>@keyframes fxPulse{{0%,100%{{opacity:1}}50%{{opacity:0.4}}}}</style>
@@ -7838,12 +7838,10 @@ def main():
     check_auto_escalation(fc)
     topnav()
     
-    # Sidebar toggle button
-    c1, c2 = st.columns([0.98, 0.02])
-    with c2:
-        if st.button("◀" if not st.session_state.get("sidebar_hidden", False) else "▶", key="sidebar_toggle_btn", help="Toggle Sidebar"):
-            st.session_state.sidebar_hidden = not st.session_state.get("sidebar_hidden", False)
-            st.rerun()
+    # Sidebar toggle
+    if st.button("◀ Hide Sidebar" if not st.session_state.get("sidebar_hidden", False) else "▶ Show Sidebar", key="sidebar_toggle_btn"):
+        st.session_state.sidebar_hidden = not st.session_state.get("sidebar_hidden", False)
+        st.rerun()
     
     # Greeting
     user = st.session_state.get("user", {})
