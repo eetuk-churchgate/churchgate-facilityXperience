@@ -1781,17 +1781,22 @@ def page_ar():
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🔍 VIEW PPMs", key="btn_view_ppms", use_container_width=True, type="primary"):
                 if cal_click and cal_click.strip():
-                    st.session_state.selected_ppm_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
-                    st.rerun()
+                    try:
+                        st.session_state.selected_ppm_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
+                        st.rerun()
+                    except:
+                        st.error("Invalid date format")
         
-        if cal_click and cal_click.strip():
+        # Auto-load when calendar fills the date
+        if cal_click and cal_click.strip() and cal_click != "":
             try:
-                new_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
-                if new_date != st.session_state.get("selected_ppm_date"):
-                    st.session_state.selected_ppm_date = new_date
+                parsed = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
+                if "selected_ppm_date" not in st.session_state or st.session_state.selected_ppm_date != parsed:
+                    st.session_state.selected_ppm_date = parsed
                     st.rerun()
             except:
                 pass
+
         
         st.markdown("---")
         
