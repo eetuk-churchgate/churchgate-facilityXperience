@@ -263,10 +263,21 @@ class DB:
     @st.cache_data(ttl=300)
     def get_assets(fc, limit=50000):
         try:
-            res = supabase.table("assets").select("*").eq("facility_code", fc).limit(limit).execute()
-            if res.data:
-                return res.data
-            return []
+            all_data = []
+            page_size = 1000
+            offset = 0
+            
+            while offset < limit:
+                res = supabase.table("assets").select("*").eq("facility_code", fc).range(offset, offset + page_size - 1).execute()
+                if res.data and len(res.data) > 0:
+                    all_data.extend(res.data)
+                    offset += page_size
+                    if len(res.data) < page_size:
+                        break
+                else:
+                    break
+            
+            return all_data if all_data else []
         except Exception as e:
             return []
 
