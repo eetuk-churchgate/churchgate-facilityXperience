@@ -1739,13 +1739,18 @@ def page_ar():
                                     else:
                                         label = str(dc)
                                     
-                                    # Determine button style based on PPM status
-                                    btn_style = ""
+                                    # Determine colors
+                                    bg = "#fafafa"
+                                    tc = "#bbb"
+                                    fw = "400"
+                                    border = "#e5e5e5"
+                                    
                                     if it:
-                                        btn_style = "background:#CC0000 !important; color:white !important; font-weight:800 !important; border-color:#CC0000 !important;"
-                                    elif pc == 0:
-                                        btn_style = "background:#fafafa !important; color:#bbb !important; font-weight:400 !important; border-color:#e5e5e5 !important;"
-                                    else:
+                                        bg = "#CC0000"
+                                        tc = "white"
+                                        fw = "800"
+                                        border = "#CC0000"
+                                    elif pc > 0:
                                         has_ov = False
                                         has_cp = False
                                         has_pn = False
@@ -1760,21 +1765,47 @@ def page_ar():
                                                 has_ov = True
                                         
                                         if has_ov:
-                                            btn_style = "background:#FEF2F2 !important; color:#DC2626 !important; font-weight:700 !important; border-color:#FECACA !important;"
+                                            bg = "#FEF2F2"
+                                            tc = "#DC2626"
+                                            fw = "700"
+                                            border = "#FECACA"
                                         elif has_pn:
-                                            btn_style = "background:#F5F3FF !important; color:#7C3AED !important; font-weight:700 !important; border-color:#DDD6FE !important;"
+                                            bg = "#F5F3FF"
+                                            tc = "#7C3AED"
+                                            fw = "700"
+                                            border = "#DDD6FE"
                                         elif has_cp:
-                                            btn_style = "background:#ECFDF5 !important; color:#059669 !important; font-weight:600 !important; border-color:#A7F3D0 !important;"
+                                            bg = "#ECFDF5"
+                                            tc = "#059669"
+                                            fw = "600"
+                                            border = "#A7F3D0"
                                         else:
-                                            btn_style = "background:#EFF6FF !important; color:#2563EB !important; font-weight:700 !important; border-color:#BFDBFE !important;"
+                                            bg = "#EFF6FF"
+                                            tc = "#2563EB"
+                                            fw = "700"
+                                            border = "#BFDBFE"
                                     
-                                    # Inject CSS for this specific button
-                                    unique_id = f"calday_{dk}"
-                                    st.markdown(f'<style>button[kind="secondary"][id="{unique_id}"], button[kind="primary"][id="{unique_id}"] {{ {btn_style} }}</style>', unsafe_allow_html=True)
-                                    
-                                    if st.button(label, key=f"calday_{dk}", use_container_width=True, type="primary" if it else "secondary", help=f"{pc} PPMs" if pc > 0 else "No PPMs"):
+                                    # Render styled button
+                                    if st.button(label, key=f"calday_{dk}", use_container_width=True, type="primary" if it else "secondary", help=f"{pc} PPMs" if pc > 0 else ""):
                                         st.session_state.selected_ppm_date = cd
                                         st.rerun()
+                                    
+                                    # Override with custom style via markdown after the button
+                                    st.markdown(f"""
+                                    <style>
+                                        div[data-testid="stVerticalBlock"]:has(button[key="calday_{dk}"]) button {{
+                                            background: {bg} !important;
+                                            color: {tc} !important;
+                                            font-weight: {fw} !important;
+                                            border: 2px solid {border} !important;
+                                            min-height: 26px !important;
+                                            height: 26px !important;
+                                            padding: 0px !important;
+                                            font-size: 0.65rem !important;
+                                            border-radius: 3px !important;
+                                        }}
+                                    </style>
+                                    """, unsafe_allow_html=True)
                                     dc += 1
                     
                     st.markdown("<br>", unsafe_allow_html=True)
