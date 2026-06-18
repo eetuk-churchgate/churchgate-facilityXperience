@@ -4866,237 +4866,471 @@ def page_visitor():
                 st.download_button("📥 CSV", csv, f"visitors_{rpt_month}_{rpt_year}.csv", "text/csv", use_container_width=True)
 
 # ============================================
-# USER MANAGEMENT — FULL ADMIN MODULE (FULL)
+# USER MANAGEMENT — FORTUNE 500 COMMAND CENTER
 # ============================================
 def page_users():
-    st.markdown("## 👥 User Management")
+    fc = st.session_state.get("facility", "WTC")
+    user_role = st.session_state.get("user_role", "staff")
+    is_admin = user_role in ["admin", "approver", "super_admin"]
+    is_super = user_role == "super_admin"
     
-    tabs = st.tabs(["📋 User Directory", "➕ Add User", "✏️ Edit User"])
+    st.markdown(f'## 👥 User Management Command Center')
     
+    all_users = DB.get_users()
+    
+    if not all_users:
+        st.info("No users found.")
+        return
+    
+    df = pd.DataFrame(all_users)
+    
+    # ============================================
+    # KPIs
+    # ============================================
+    total_users = len(df)
+    active_users = len(df[df["is_active"] == True]) if "is_active" in df.columns else 0
+    staff_count = len(df[df["user_type"] == "staff"]) if "user_type" in df.columns else 0
+    tenant_count = len(df[df["user_type"] == "tenant"]) if "user_type" in df.columns else 0
+    contractor_count = len(df[df["user_type"].isin(["contractor","vendor"])]) if "user_type" in df.columns else 0
+    locked_count = len(df[df["account_locked"] == True]) if "account_locked" in df.columns else 0
+    
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Total Users</div><div style="font-size:1.5rem;font-weight:800;">{total_users}</div></div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Active</div><div style="font-size:1.5rem;font-weight:800;color:#10B981;">{active_users}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Staff</div><div style="font-size:1.5rem;font-weight:800;color:#3B82F6;">{staff_count}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Tenants</div><div style="font-size:1.5rem;font-weight:800;color:#8B5CF6;">{tenant_count}</div></div>""", unsafe_allow_html=True)
+    with c5:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Contractors</div><div style="font-size:1.5rem;font-weight:800;color:#F59E0B;">{contractor_count}</div></div>""", unsafe_allow_html=True)
+    with c6:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #EF4444;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Locked</div><div style="font-size:1.5rem;font-weight:800;color:#EF4444;">{locked_count}</div></div>""", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TABS
+    # ============================================
+    tabs = st.tabs(["📋 User Directory", "➕ Add User", "🏢 Tenants", "🔧 Contractors", "📊 Activity Log"])
+    
+    # ============================================
+    # TAB 0: USER DIRECTORY
+    # ============================================
     with tabs[0]:
-        users = DB.get_users()
-        if users:
-            df = pd.DataFrame(users)
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                role_filter = st.selectbox("Filter by Role", ["All", "admin", "approver", "confirmer", "authorizer", "staff", "tenant", "contractor", "vendor"], key="user_role_filter")
-            with c2:
-                search = st.text_input("Search by name or email", key="user_search")
-            with c3:
-                st.metric("Total Users", len(df))
+        # Filters
+        c1, c2, c3, c4, c5 = st.columns(5)
+        with c1:
+            filter_type = st.selectbox("Type", ["All", "staff", "tenant", "contractor", "vendor"], key="usr_type")
+        with c2:
+            filter_role = st.selectbox("Role", ["All", "super_admin", "admin", "approver", "manager", "team_lead", "team_member", "tenant_admin", "tenant_user", "contractor", "vendor"], key="usr_role")
+        with c3:
+            filter_status = st.selectbox("Status", ["All", "Active", "Inactive", "Locked"], key="usr_status")
+        with c4:
+            search_user = st.text_input("🔍 Search", key="usr_search", placeholder="Name, email, ID...")
+        with c5:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("➕ ADD USER", key="btn_add_user_top", use_container_width=True, type="primary"):
+                st.session_state.user_tab = 1
+                st.rerun()
+        
+        # Apply filters
+        display_df = df.copy()
+        if filter_type != "All" and "user_type" in display_df.columns:
+            display_df = display_df[display_df["user_type"] == filter_type]
+        if filter_role != "All" and "role" in display_df.columns:
+            display_df = display_df[display_df["role"] == filter_role]
+        if filter_status == "Active":
+            display_df = display_df[display_df["is_active"] == True]
+        elif filter_status == "Inactive":
+            display_df = display_df[display_df["is_active"] == False]
+        elif filter_status == "Locked":
+            display_df = display_df[display_df["account_locked"] == True]
+        if search_user:
+            mask = False
+            for col in ["name", "email", "employee_id", "designation"]:
+                if col in display_df.columns:
+                    mask = mask | display_df[col].astype(str).str.contains(search_user, case=False, na=False)
+            display_df = display_df[mask]
+        
+        st.caption(f"📋 Showing {len(display_df)} of {total_users} users")
+        
+        # Pagination
+        page_size = 12
+        if "usr_page" not in st.session_state:
+            st.session_state.usr_page = 1
+        
+        total_pages = max(1, (len(display_df) + page_size - 1) // page_size)
+        start = (st.session_state.usr_page - 1) * page_size
+        end = min(start + page_size, len(display_df))
+        
+        c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+        with c1:
+            if st.button("◀◀", key="usr_first"): st.session_state.usr_page = 1; st.rerun()
+        with c2:
+            if st.button("◀", key="usr_prev") and st.session_state.usr_page > 1:
+                st.session_state.usr_page -= 1; st.rerun()
+        with c3:
+            st.markdown(f"**Page {st.session_state.usr_page} of {total_pages}**")
+        with c4:
+            if st.button("▶", key="usr_next") and st.session_state.usr_page < total_pages:
+                st.session_state.usr_page += 1; st.rerun()
+        with c5:
+            if st.button("▶▶", key="usr_last"): st.session_state.usr_page = total_pages; st.rerun()
+        
+        # User Cards
+        for _, user in display_df.iloc[start:end].iterrows():
+            name = user.get("name", "N/A")
+            email = user.get("email", "N/A")
+            emp_id = user.get("employee_id", "N/A")
+            role = user.get("role", "staff")
+            user_type = user.get("user_type", "staff")
+            is_active = user.get("is_active", True)
+            is_locked = user.get("account_locked", False)
+            designation = user.get("designation", user.get("designation_level", "N/A"))
+            last_login = str(user.get("last_login", "Never"))[:16] if user.get("last_login") else "Never"
+            depts = safe_parse_permissions(user.get("department_permissions", []))
+            profile_pic = user.get("profile_picture", "")
             
-            if role_filter != "All" and "role" in df.columns:
-                df = df[df["role"] == role_filter]
-            if search:
-                df = df[df["name"].str.contains(search, case=False) | df["email"].str.contains(search, case=False)]
+            # Status & Colors
+            if not is_active:
+                status_badge = "⚫ Inactive"
+                status_color = "#6B7280"
+            elif is_locked:
+                status_badge = "🔒 Locked"
+                status_color = "#EF4444"
+            else:
+                status_badge = "🟢 Active"
+                status_color = "#10B981"
+            
+            role_colors = {
+                "super_admin": "#991B1B", "admin": "#CC0000", "approver": "#059669",
+                "manager": "#2563EB", "team_lead": "#7C3AED", "team_member": "#3B82F6",
+                "tenant_admin": "#8B5CF6", "tenant_user": "#6366F1",
+                "contractor": "#F59E0B", "vendor": "#D97706"
+            }
+            role_color = role_colors.get(role, "#3B82F6")
+            type_color = {"staff": "#3B82F6", "tenant": "#8B5CF6", "contractor": "#F59E0B", "vendor": "#D97706"}.get(user_type, "#888")
+            
+            # Avatar
+            if profile_pic:
+                avatar_html = f'<img src="{profile_pic}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">'
+            else:
+                initials = name[:2].upper()
+                avatar_html = f'<div style="width:40px;height:40px;border-radius:50%;background:{role_color};display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.9rem;">{initials}</div>'
+            
+            st.markdown(f"""
+            <div style="background:white;border-radius:10px;padding:0.8rem;margin:0.4rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;align-items:center;gap:1rem;border-left:4px solid {status_color};">
+                <div style="flex-shrink:0;">{avatar_html}</div>
+                <div style="flex:1;">
+                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                        <b style="font-size:0.9rem;">{name}</b>
+                        <span style="background:{role_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{role.upper()}</span>
+                        <span style="background:{type_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{user_type.upper()}</span>
+                    </div>
+                    <div style="font-size:0.7rem;color:#666;">📧 {email} | 🆔 {emp_id} | 👔 {designation}</div>
+                    <div style="font-size:0.6rem;color:#888;">🕐 Last Login: {last_login} | 🏷️ {', '.join(depts) if depts else 'All Depts'}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0;">
+                    <span style="background:{status_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{status_badge}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Quick action buttons
+            c1, c2, c3, c4, c5 = st.columns(5)
+            with c1:
+                if st.button("✏️ Edit", key=f"qedit_{user['id']}", use_container_width=True):
+                    st.session_state.edit_user_id = user["id"]
+                    st.rerun()
+            with c2:
+                if st.button("🔑 Reset PW", key=f"qreset_{user['id']}", use_container_width=True):
+                    st.session_state.reset_user_id = user["id"]
+                    st.rerun()
+            with c3:
+                lock_label = "🔓 Unlock" if is_locked else "🔒 Lock"
+                if st.button(lock_label, key=f"qlock_{user['id']}", use_container_width=True):
+                    DB.update("app_users", user["id"], {"account_locked": not is_locked, "failed_login_attempts": 0})
+                    st.rerun()
+            with c4:
+                act_label = "⚫ Deactivate" if is_active else "🟢 Activate"
+                if st.button(act_label, key=f"qact_{user['id']}", use_container_width=True):
+                    DB.update("app_users", user["id"], {"is_active": not is_active})
+                    st.rerun()
+            with c5:
+                if st.button("🗑️ Delete", key=f"qdel_{user['id']}", use_container_width=True):
+                    supabase.table("app_users").delete().eq("id", user["id"]).execute()
+                    st.warning("🗑️ Deleted!")
+                    st.rerun()
             
             st.markdown("---")
-            
-            for i, row in df.iterrows():
-                role = row.get("role", "staff")
-                badges = {"admin":"🔴 Admin","approver":"🟢 Approver","confirmer":"✅ Confirmer","authorizer":"🔐 Authorizer","staff":"👤 Staff","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}
-                badge = badges.get(role, "👤 User")
-                
-                with st.expander(f"{row.get('name','N/A')} — {row.get('email','')} — {badge}"):
-                    c1, c2 = st.columns([3, 1])
-                    with c1:
-                        st.write(f"**Employee ID:** {row.get('employee_id','N/A')}")
-                        st.write(f"**Designation:** {row.get('designation','N/A')}")
-                        st.write(f"**Level:** {row.get('level_hierarchy','N/A')} | **Reports to:** {row.get('reporting_to','N/A')}")
-                        st.write(f"**Mobile:** {row.get('mobile','N/A')}")
-                        depts = safe_parse_permissions(row.get("department_permissions", []))
-                        st.write(f"**Departments:** {', '.join(depts) if depts else 'All'}")
-                        perms = safe_parse_permissions(row.get("extra_permissions", []))
-                        st.write(f"**Module Permissions:** {', '.join(perms) if perms else 'None'}")
-                    with c2:
-                        if st.button("✏️ Edit", key=f"edit_usr_{row['id']}", use_container_width=True):
-                            st.session_state.edit_user_id = row["id"]
-                            st.rerun()
-                        if st.button("🔄 Reset PW", key=f"reset_pw_{row['id']}", use_container_width=True):
-                            st.session_state.reset_user_id = row["id"]
-                            st.rerun()
-                        if role != "admin":
-                            if st.button("🗑️ Deactivate", key=f"deact_{row['id']}", use_container_width=True):
-                                DB.update("app_users", row["id"], {"is_active": False})
-                                st.warning("User deactivated")
-                                st.rerun()
-        else:
-            st.info("No users found")
     
+    # ============================================
+    # TAB 1: ADD USER
+    # ============================================
     with tabs[1]:
-        with st.form("add_user_form"):
-            st.markdown("### ➕ Add New User")
-            st.markdown("**👤 Personal Details**")
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                new_name = st.text_input("Full Name*", key="add_name")
-                new_emp_id = st.text_input("Employee ID*", key="add_emp")
-            with c2:
-                new_email = st.text_input("Email*", key="add_email")
-                new_mobile = st.text_input("Mobile Number", key="add_mob")
-            with c3:
-                new_designation = st.text_input("Designation*", key="add_desig")
-                new_level = st.selectbox("Level/Hierarchy", ["L1", "L2", "L3", "L4", "L5", "L6"], key="add_level")
-            new_reporting = st.text_input("Reporting To", key="add_report")
-            
-            st.markdown("---")
-            st.markdown("**🔐 Role & Permissions**")
-            c1, c2 = st.columns(2)
-            with c1:
-                new_role = st.selectbox("Role*", ["staff","authorizer","confirmer","approver","admin","tenant","contractor","vendor"],
-                    format_func=lambda x: {"staff":"👤 Staff","authorizer":"🔐 Authorizer","confirmer":"✅ Confirmer","approver":"🟢 Approver","admin":"🔴 Admin","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}[x], key="add_role")
+        st.markdown("### ➕ Add New User")
+        
+        user_type_add = st.selectbox("User Type*", ["👤 Staff (Internal)", "🏢 Tenant/Occupant", "🔧 Contractor/Vendor"], key="add_user_type")
+        
+        with st.form("add_user_form", clear_on_submit=True):
+            if user_type_add == "👤 Staff (Internal)":
+                st.markdown("#### 👤 Staff Details")
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    new_name = st.text_input("Full Name*", key="add_name")
+                    new_email = st.text_input("Email*", key="add_email")
+                with c2:
+                    new_emp_id = st.text_input("Employee ID*", key="add_emp")
+                    new_mobile = st.text_input("Mobile Number", key="add_mob")
+                with c3:
+                    new_designation = st.selectbox("Designation Level*", ["Team Member", "Team Lead", "Manager", "Sr. Manager", "HOD", "Sr. Management", "Admin", "Super Admin"], key="add_desig")
+                
+                new_role = st.selectbox("System Role*", ["team_member", "team_lead", "manager", "approver", "admin", "super_admin"],
+                    format_func=lambda x: {"team_member":"👤 Team Member","team_lead":"🔐 Team Lead","manager":"👔 Manager","approver":"🟢 Approver","admin":"🔴 Admin","super_admin":"👑 Super Admin"}[x], key="add_role")
+                
                 new_facility = st.selectbox("Home Facility", ["WTC", "AGVL", "FCPL", "RBPL", "VDL", "WAREHOUSES"], key="add_fac")
-            with c2:
+                
+                st.markdown("---")
+                st.markdown("**📋 Module Permissions**")
+                module_groups = {
+                    "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
+                    "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"],
+                    "People": ["Visitor Management", "User Management"],
+                    "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
+                    "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
+                }
+                selected_perms = []
+                for group, modules in module_groups.items():
+                    with st.expander(f"📁 {group}"):
+                        for mod in modules:
+                            if st.checkbox(mod, key=f"add_mod_{mod}"):
+                                selected_perms.append(mod)
+                
+                st.markdown("---")
+                st.markdown("**🏢 Department Access**")
+                all_depts = sorted(df["dept_full"].dropna().unique().tolist()) if "dept_full" in df.columns else []
+                new_depts = st.multiselect("Departments (leave empty for All)", all_depts, key="add_depts")
+                
                 new_password = st.text_input("Password*", type="password", key="add_pw")
-                new_alias = st.text_input("Alias (optional)", key="add_alias")
+                
+                # Password strength indicator
+                if new_password:
+                    strength = 0
+                    if len(new_password) >= 12: strength += 1
+                    if any(c.isupper() for c in new_password): strength += 1
+                    if any(c.isdigit() for c in new_password): strength += 1
+                    if any(c in "!@#$%^&*()" for c in new_password): strength += 1
+                    colors = ["#EF4444","#F59E0B","#3B82F6","#10B981"]
+                    labels = ["Weak","Fair","Good","Strong"]
+                    st.progress(strength/4, text=f"Password Strength: {labels[min(strength,3)]}")
             
-            st.markdown("---")
-            st.markdown("**🏢 Department Permissions**")
-            all_depts_add = [
-                "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
-                "Engineering — Vertical Transportation (Lifts)", "Engineering — Fire Fighting",
-                "Facility Management — Hard Services", "Facility Management — Soft Services (Housekeeping)",
-                "Facility Management — FM Operations & Helpdesk", "Facility Management — Fitout Works",
-                "Facility Management — HSSE Safety & Compliance",
-                "Technology Group — Network & Connectivity", "Technology Group — Building Technology",
-                "Technology Group — IT Service Desk", "Technology Group — Cybersecurity",
-                "Security — Man Guarding Operations",
-                "Contractor — Clyde Engineering", "Contractor — Gates and Shield"
-            ]
-            new_depts = st.multiselect("Select Departments (leave empty for All)", all_depts_add, key="add_depts")
+            elif user_type_add == "🏢 Tenant/Occupant":
+                st.markdown("#### 🏢 Tenant Details")
+                c1, c2 = st.columns(2)
+                with c1:
+                    new_name = st.text_input("Contact Name*", key="add_tname")
+                    new_email = st.text_input("Email*", key="add_temail")
+                    new_company = st.text_input("Company/Organization*", key="add_tcompany")
+                with c2:
+                    new_mobile = st.text_input("Mobile Number", key="add_tmob")
+                    new_facility = st.selectbox("Assigned Facility", ["WTC", "AGVL", "FCPL", "RBPL", "VDL"], key="add_tfac")
+                    new_role = st.selectbox("Role", ["tenant_admin", "tenant_user"], key="add_trole")
+                new_password = st.text_input("Password*", type="password", key="add_tpw")
             
-            submitted = st.form_submit_button("➕ Create User", use_container_width=True, type="primary")
+            else:
+                st.markdown("#### 🔧 Contractor/Vendor Details")
+                c1, c2 = st.columns(2)
+                with c1:
+                    new_name = st.text_input("Contact Name*", key="add_cname")
+                    new_email = st.text_input("Email*", key="add_cemail")
+                    new_company = st.text_input("Company Name*", key="add_ccompany")
+                with c2:
+                    new_mobile = st.text_input("Mobile Number", key="add_cmob")
+                    new_facility = st.selectbox("Assigned Facility", ["WTC", "AGVL", "FCPL", "RBPL", "VDL"], key="add_cfac")
+                    contractor_dept = st.selectbox("Assigned Department*", sorted(df["dept_full"].dropna().unique().tolist()) if "dept_full" in df.columns else [], key="add_cdept")
+                new_role = st.selectbox("Type", ["contractor", "vendor"], key="add_crole")
+                contract_expiry = st.date_input("Contract Expiry Date", date.today() + timedelta(days=365), key="add_cexpiry")
+                new_password = st.text_input("Password*", type="password", key="add_cpw")
+            
+            # Profile picture
+            profile_pic = st.file_uploader("Profile Picture", type=["png","jpg","jpeg"], key="add_pic")
+            
+            submitted = st.form_submit_button("➕ CREATE USER", use_container_width=True, type="primary")
+            
             if submitted:
-                if new_name and new_emp_id and new_email and new_designation and new_password:
+                if new_name and new_email and new_password:
                     pw_valid, pw_msg = validate_password_strength(new_password)
                     if not pw_valid:
                         st.error(f"⚠️ {pw_msg}")
-                        st.stop()
-                    
-                    pw_hash = hash_password(new_password)
-                    DB.insert("app_users", {
-                        "name": new_name, "employee_id": new_emp_id, "email": new_email,
-                        "mobile": new_mobile, "designation": new_designation,
-                        "level_hierarchy": new_level, "reporting_to": new_reporting,
-                        "role": new_role, "department_permissions": new_depts if new_depts else ["All"],
-                        "password_hash": pw_hash, "alias_name": new_alias,
-                        "home_facility": new_facility, "is_active": True
-                    })
-                    st.success(f"✅ User {new_name} created!")
-                    st.balloons()
-                    st.rerun()
+                    else:
+                        pw_hash = hash_password(new_password)
+                        
+                        # Map user type
+                        ut = "staff" if "Staff" in user_type_add else ("tenant" if "Tenant" in user_type_add else "contractor")
+                        
+                        user_data = {
+                            "name": new_name,
+                            "email": new_email,
+                            "password_hash": pw_hash,
+                            "role": new_role,
+                            "user_type": ut,
+                            "is_active": True,
+                            "home_facility": new_facility,
+                            "mobile": new_mobile,
+                            "created_by": st.session_state.get("user_name",""),
+                            "created_at": datetime.now().isoformat()
+                        }
+                        
+                        if ut == "staff":
+                            user_data["employee_id"] = new_emp_id
+                            user_data["designation"] = new_designation
+                            user_data["designation_level"] = new_designation
+                            user_data["extra_permissions"] = selected_perms
+                            user_data["department_permissions"] = new_depts if new_depts else ["All"]
+                        
+                        if ut == "tenant":
+                            user_data["organization_name"] = new_company
+                        
+                        if ut in ["contractor", "vendor"]:
+                            user_data["organization_name"] = new_company
+                            user_data["contractor_department"] = contractor_dept
+                            user_data["contract_expiry"] = str(contract_expiry)
+                        
+                        # Handle profile picture
+                        if profile_pic:
+                            pic_b64 = base64.b64encode(profile_pic.read()).decode()
+                            user_data["profile_picture"] = f"data:image/{profile_pic.type.split('/')[-1]};base64,{pic_b64}"
+                        
+                        result = DB.insert("app_users", user_data)
+                        if result:
+                            st.success(f"✅ User {new_name} created!")
+                            st.balloons()
+                            st.rerun()
                 else:
-                    st.error("⚠️ Please fill all required fields")
+                    st.error("⚠️ Name, Email, and Password are required")
     
+    # ============================================
+    # TAB 2-4: TENANTS, CONTRACTORS, ACTIVITY LOG
+    # ============================================
     with tabs[2]:
-        user_id = st.session_state.get("edit_user_id")
-        reset_id = st.session_state.get("reset_user_id")
+        st.markdown("### 🏢 Tenant Management")
+        tenant_users = df[df["user_type"] == "tenant"] if "user_type" in df.columns else pd.DataFrame()
+        if len(tenant_users) > 0:
+            for _, t in tenant_users.iterrows():
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid #8B5CF6;border-radius:8px;padding:0.7rem;margin:0.3rem 0;">
+                    <b>{t.get('name','N/A')}</b> — {t.get('organization_name', t.get('company','N/A'))}
+                    <br><span style="font-size:0.7rem;color:#666;">📧 {t.get('email','')} | 🏢 {t.get('home_facility','')} | 🟢 {'Active' if t.get('is_active') else 'Inactive'}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No tenant users registered.")
+    
+    with tabs[3]:
+        st.markdown("### 🔧 Contractor/Vendor Management")
+        contractor_users = df[df["user_type"].isin(["contractor","vendor"])] if "user_type" in df.columns else pd.DataFrame()
+        if len(contractor_users) > 0:
+            for _, c in contractor_users.iterrows():
+                expiry = str(c.get("contract_expiry","N/A"))[:10]
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid #F59E0B;border-radius:8px;padding:0.7rem;margin:0.3rem 0;">
+                    <b>{c.get('name','N/A')}</b> — {c.get('organization_name', c.get('company','N/A'))}
+                    <br><span style="font-size:0.7rem;color:#666;">📧 {c.get('email','')} | 🏢 {c.get('home_facility','')} | 🏷️ {c.get('contractor_department','N/A')} | 📅 Expires: {expiry}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No contractor/vendor users registered.")
+    
+    with tabs[4]:
+        st.markdown("### 📊 User Activity Log")
+        recent_logs = supabase.table("activity_logs").select("*").order("created_at", desc=True).limit(50).execute()
+        if recent_logs.data and len(recent_logs.data) > 0:
+            for log in recent_logs.data:
+                st.markdown(f"🕐 {str(log.get('created_at',''))[:16]} | 👤 {log.get('user_id','')} | {log.get('action','')}")
+        else:
+            st.info("No activity recorded yet.")
+    
+    # ============================================
+    # EDIT USER MODAL (triggered by session state)
+    # ============================================
+    if "edit_user_id" in st.session_state and st.session_state.edit_user_id:
+        user_id = st.session_state.edit_user_id
+        user = next((u for u in all_users if u["id"] == user_id), None)
         
-        if reset_id:
-            st.markdown("### 🔄 Reset Password")
+        if user:
+            st.markdown("---")
+            st.markdown(f"### ✏️ Edit User: {user.get('name','')}")
+            
+            with st.form("edit_user_form"):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    edit_name = st.text_input("Name*", value=user.get("name",""))
+                    edit_email = st.text_input("Email*", value=user.get("email",""))
+                with c2:
+                    edit_emp = st.text_input("Employee ID", value=user.get("employee_id","") or "")
+                    edit_mobile = st.text_input("Mobile", value=user.get("mobile","") or "")
+                with c3:
+                    roles = ["team_member","team_lead","manager","approver","admin","super_admin","tenant_admin","tenant_user","contractor","vendor"]
+                    cr = user.get("role","staff")
+                    edit_role = st.selectbox("Role", roles, index=roles.index(cr) if cr in roles else 0)
+                
+                # Profile picture change
+                new_pic = st.file_uploader("Change Profile Picture", type=["png","jpg","jpeg"], key="edit_pic")
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.form_submit_button("💾 SAVE", use_container_width=True, type="primary"):
+                        update_data = {
+                            "name": edit_name, "email": edit_email,
+                            "employee_id": edit_emp, "mobile": edit_mobile, "role": edit_role,
+                            "updated_by": st.session_state.get("user_name",""),
+                            "updated_at": datetime.now().isoformat()
+                        }
+                        if new_pic:
+                            pic_b64 = base64.b64encode(new_pic.read()).decode()
+                            update_data["profile_picture"] = f"data:image/{new_pic.type.split('/')[-1]};base64,{pic_b64}"
+                        
+                        DB.update("app_users", user_id, update_data)
+                        st.success("✅ Updated!")
+                        st.session_state.edit_user_id = None
+                        st.rerun()
+                with c2:
+                    if st.form_submit_button("❌ CANCEL", use_container_width=True):
+                        st.session_state.edit_user_id = None
+                        st.rerun()
+    
+    # Reset Password
+    if "reset_user_id" in st.session_state and st.session_state.reset_user_id:
+        user_id = st.session_state.reset_user_id
+        user = next((u for u in all_users if u["id"] == user_id), None)
+        
+        if user:
+            st.markdown("---")
+            st.markdown(f"### 🔑 Reset Password: {user.get('name','')}")
+            
             with st.form("reset_pw_form"):
                 new_pw = st.text_input("New Password*", type="password")
                 confirm_pw = st.text_input("Confirm Password*", type="password")
                 c1, c2 = st.columns(2)
                 with c1:
-                    if st.form_submit_button("✅ Reset", use_container_width=True, type="primary"):
+                    if st.form_submit_button("✅ RESET", use_container_width=True, type="primary"):
                         if new_pw and new_pw == confirm_pw:
-                            pw_valid, pw_msg = validate_password_strength(new_pw)
-                            if not pw_valid:
-                                st.error(f"⚠️ {pw_msg}")
-                            else:
-                                pw_hash = hash_password(new_pw)
-                                DB.update("app_users", reset_id, {"password_hash": pw_hash})
-                                st.success("Password reset!")
+                            pw_valid, _ = validate_password_strength(new_pw)
+                            if pw_valid:
+                                DB.update("app_users", user_id, {"password_hash": hash_password(new_pw)})
+                                st.success("✅ Password reset!")
                                 st.session_state.reset_user_id = None
                                 st.rerun()
+                            else:
+                                st.error("⚠️ Password too weak")
+                        else:
+                            st.error("⚠️ Passwords don't match")
                 with c2:
-                    if st.form_submit_button("❌ Cancel", use_container_width=True):
+                    if st.form_submit_button("❌ CANCEL", use_container_width=True):
                         st.session_state.reset_user_id = None
                         st.rerun()
-        
-        elif user_id:
-            users = DB.get_users()
-            user = next((u for u in users if u["id"] == user_id), None)
-            
-            if user:
-                st.markdown(f"### ✏️ Edit: {user.get('name','')}")
-                
-                with st.form("edit_user_form"):
-                    c1, c2, c3 = st.columns(3)
-                    with c1:
-                        edit_name = st.text_input("Full Name*", value=user.get("name",""))
-                        edit_emp = st.text_input("Employee ID*", value=user.get("employee_id",""))
-                    with c2:
-                        edit_email = st.text_input("Email*", value=user.get("email",""))
-                        edit_mobile = st.text_input("Mobile", value=user.get("mobile","") or "")
-                    with c3:
-                        edit_desig = st.text_input("Designation*", value=user.get("designation",""))
-                        levels = ["L1","L2","L3","L4","L5","L6"]
-                        cl = user.get("level_hierarchy","L2")
-                        edit_level = st.selectbox("Level", levels, index=levels.index(cl) if cl in levels else 1)
-                    
-                    edit_report = st.text_input("Reporting To", value=user.get("reporting_to","") or "")
-                    
-                    cr = user.get("role","staff")
-                    roles = ["staff","authorizer","confirmer","approver","admin","tenant","contractor","vendor"]
-                    rn = {"staff":"👤 Staff","authorizer":"🔐 Authorizer","confirmer":"✅ Confirmer","approver":"🟢 Approver","admin":"🔴 Admin","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}
-                    edit_role = st.selectbox("Role*", roles, format_func=lambda x: rn[x], index=roles.index(cr) if cr in roles else 0)
-                    
-                    st.markdown("---")
-                    st.markdown("**📋 Module Permissions**")
-                    
-                    module_groups = {
-                        "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
-                        "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"],
-                        "People": ["Visitor Management", "User Management"],
-                        "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
-                        "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
-                        "Utility": ["Utility Dashboard"],
-                    }
-                    
-                    existing_perms = safe_parse_permissions(user.get("extra_permissions", []))
-                    
-                    for group, modules in module_groups.items():
-                        with st.expander(f"📁 {group}"):
-                            cols = st.columns(2)
-                            for i, mod in enumerate(modules):
-                                with cols[i % 2]:
-                                    checked = mod in existing_perms
-                                    st.checkbox(mod, value=checked, key=f"edit_mod_{group}_{mod}")
-                    
-                    st.markdown("---")
-                    
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        if st.form_submit_button("💾 Save Changes", use_container_width=True, type="primary"):
-                            selected = []
-                            for group, modules in module_groups.items():
-                                for mod in modules:
-                                    if st.session_state.get(f"edit_mod_{group}_{mod}", False):
-                                        selected.append(mod)
-                            DB.update("app_users", user_id, {
-                                "name": edit_name, "employee_id": edit_emp, "email": edit_email,
-                                "mobile": edit_mobile, "designation": edit_desig,
-                                "level_hierarchy": edit_level, "reporting_to": edit_report,
-                                "role": edit_role,
-                                "extra_permissions": selected
-                            })
-                            st.success("✅ User updated!")
-                            st.balloons()
-                            st.session_state.edit_user_id = None
-                            st.rerun()
-                    with c2:
-                        if st.form_submit_button("❌ Cancel", use_container_width=True):
-                            st.session_state.edit_user_id = None
-                            st.rerun()
-            else:
-                st.error("User not found")
-                if st.button("🔙 Back"):
-                    st.session_state.edit_user_id = None
-                    st.rerun()
-        else:
-            st.info("👆 Click ✏️ Edit on a user in the Directory tab to edit them here")
 
 # ============================================
 # FACILITY OPERATIONS DASHBOARD (FULL)
