@@ -544,38 +544,151 @@ def topnav():
 
 
 # ============================================
-# SIDEBAR
+# SIDEBAR — REDESIGNED WITH CUSTOM COLLAPSE
 # ============================================
 def sidebar():
+    # Inject custom collapse button + hide default
+    st.markdown("""
+    <style>
+        [data-testid="collapsedControl"] { display: none !important; }
+        .fx-collapse-btn {
+            position: fixed;
+            top: 80px;
+            left: 291px;
+            z-index: 99999;
+            background: #CC0000;
+            color: white;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            padding: 10px 6px;
+            cursor: pointer;
+            font-size: 14px;
+            box-shadow: 0 2px 10px rgba(204,0,0,0.4);
+            transition: all 0.3s;
+            width: 22px;
+            text-align: center;
+        }
+        .fx-collapse-btn:hover {
+            background: #aa0000;
+            box-shadow: 0 4px 20px rgba(204,0,0,0.6);
+        }
+    </style>
+    <script>
+        (function() {
+            var btn = document.createElement('button');
+            btn.className = 'fx-collapse-btn';
+            btn.innerHTML = '◀';
+            btn.title = 'Toggle Sidebar';
+            btn.onclick = function() {
+                var sidebar = parent.document.querySelector('[data-testid="stSidebar"]');
+                if (sidebar) {
+                    if (sidebar.style.display === 'none') {
+                        sidebar.style.display = 'block';
+                        btn.innerHTML = '◀';
+                        btn.style.left = '291px';
+                    } else {
+                        sidebar.style.display = 'none';
+                        btn.innerHTML = '▶';
+                        btn.style.left = '0px';
+                    }
+                }
+            };
+            parent.document.body.appendChild(btn);
+        })();
+    </script>
+    """, unsafe_allow_html=True)
+    
     with st.sidebar:
-        user_perms = safe_parse_permissions(st.session_state.get("user", {}).get("extra_permissions", []))
-        user_role = st.session_state.get("user_role", "staff")
-        is_admin = user_role in ["admin", "approver"]
-        user_home_facility = st.session_state.get("user", {}).get("home_facility", "WTC")
+        # Logo + Brand Header
+        logo_html = get_nav_logo()
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem 0;margin-bottom:0.5rem;border-bottom:2px solid #CC0000;">
+            {logo_html}
+            <div>
+                <div style="font-weight:800;font-size:0.9rem;color:#1a1a1a;">facility<span style="color:#CC0000;">X</span>perience</div>
+                <div style="font-size:0.5rem;color:#888;">Churchgate Group</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # One View — Facility Selector
+        st.markdown('<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.5rem 0 0.2rem 0;">📍 One View</p>', unsafe_allow_html=True)
         
         sel = st.session_state.get("facility", "WTC")
         
-        if is_admin:
-            allowed_facilities = list(FACILITY_INFO.keys())
-        else:
-            allowed_facilities = [user_home_facility]
+        facility_options = {
+            "WTC": "🏢 World Trade Center — Abuja",
+            "AGVL": "🏗️ Agroline Ventures Limited — Abuja",
+            "FCPL": "🏭 First Continental Properties — Lagos",
+            "RBPL": "🏬 RB Properties Limited — Lagos",
+            "VDL": "🌊 Ocean Terrace — Lagos",
+            "WAREHOUSES": "📦 Warehouse Network — Lagos",
+        }
         
-        cols = st.columns(3)
-        for i, (k, v) in enumerate(FACILITY_INFO.items()):
-            if k in allowed_facilities:
-                with cols[i % 3]:
-                    if st.button(k, key=f"f_{k}", use_container_width=True, type="primary" if k == sel else "secondary"):
-                        st.session_state.facility = k
-                        st.rerun()
+        new_sel = st.selectbox(
+            "Select Facility",
+            list(facility_options.keys()),
+            format_func=lambda x: facility_options[x],
+            index=list(facility_options.keys()).index(sel) if sel in facility_options else 0,
+            key="facility_selector",
+            label_visibility="collapsed"
+        )
         
+        if new_sel != sel:
+            st.session_state.facility = new_sel
+            st.cache_data.clear()
+            st.rerun()
+        
+        # Facility info card
         info = FACILITY_INFO.get(sel, {})
-        st.markdown(f'<div style="background:{info.get("clight","#fce8e8")};border-left:3px solid {info.get("color",CHURCHGATE_RED)};border-radius:6px;padding:0.7rem;margin:0.7rem 0;font-size:0.7rem;"><b>{info.get("full_name",sel)}</b><br>📍 {info.get("city","")}</div>',unsafe_allow_html=True)
+        st.markdown(f"""
+        <div style="background:{info.get('clight','#fce8e8')};border-left:3px solid {info.get('color',CHURCHGATE_RED)};border-radius:6px;padding:0.5rem;margin:0.3rem 0;font-size:0.65rem;">
+            <b>{info.get('full_name',sel)}</b><br>
+            📍 {info.get('city','')}<br>
+            <span style="font-size:0.55rem;color:#888;">{info.get('desc','')[:60]}...</span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Refresh button
+        if st.button("🔄 Refresh Data", use_container_width=True, key="sidebar_refresh"):
+            st.cache_data.clear()
+            st.rerun()
+        
+        st.markdown("---")
+        
+        # Quick Links
+        st.markdown('<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.3rem 0 0.1rem 0;">🔗 Quick Links</p>', unsafe_allow_html=True)
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("""
+            <a href="https://www.churchgate.com" target="_blank" style="text-decoration:none;">
+                <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:0.4rem;text-align:center;font-size:0.6rem;font-weight:600;color:#1a1a1a;cursor:pointer;">
+                    🏢 Churchgate<br>Website
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+        with c2:
+            st.markdown("""
+            <a href="https://wtcabuja.com" target="_blank" style="text-decoration:none;">
+                <div style="background:white;border:1px solid #ddd;border-radius:6px;padding:0.4rem;text-align:center;font-size:0.6rem;font-weight:600;color:#1a1a1a;cursor:pointer;">
+                    🏗️ WTC<br>Abuja
+                </div>
+            </a>
+            """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Navigation — Role-based
+        user_perms = safe_parse_permissions(st.session_state.get("user", {}).get("extra_permissions", []))
+        user_role = st.session_state.get("user_role", "staff")
+        is_admin = user_role in ["admin", "approver"]
         
         all_nav = [
             ("🏠 COMMAND", [("🌐 Command Center", "cc"), ("📊 PPM Dashboard", "ppm")], ["Command Center", "PPM Dashboard"]),
-            ("🏗️ ASSETS & PPM", [("📋 Asset Register", "ar"), ("🔧 PPM Activities", "ppma"), ("📅 52-Week Calendar", "cal"), ("✅ Checklist Status", "cs")], ["Asset Register", "PPM Activities", "52-Week Calendar", "Checklist Status"]),
+            ("🏗️ ASSETS & PPM", [("📋 Asset Register", "ar"), ("🔧 PPM Activities", "ppma"), ("✅ Checklist Status", "cs")], ["Asset Register", "PPM Activities", "Checklist Status"]),
             ("🔧 MAINTENANCE", [("📋 Work Orders", "wo"), ("🛡️ Work Permits", "wp")], ["Work Orders", "Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"]),
-            ("🏢 FACILITY OPERATIONS", [("📊 Operations Dashboard", "fo"), ("✅ Observations/Alerts", "oa")], ["Facility Operations"]),
+            ("🏢 FACILITY OPS", [("📊 Operations Dashboard", "fo"), ("✅ Observations/Alerts", "oa")], ["Facility Operations"]),
             ("👥 PEOPLE", [("🛂 Visitor Management", "vm"), ("👤 User Management", "up")], ["Visitor Management", "User Management"]),
             ("💬 SERVICES", [("🎫 Raise a Ticket", "rt"), ("💬 Helpdesk", "hd"), ("⭐ Feedback", "fb")], ["Raise Ticket", "Helpdesk", "Feedback"]),
             ("✅ COMPLIANCE", [("✅ Audit Checklist", "ac"), ("🚨 Incident Check", "ic"), ("🔄 HOTO Check", "hot")], ["Audit Checklist", "Incident Report", "HOTO Check"]),
@@ -586,13 +699,28 @@ def sidebar():
         for section, items, required_perms in all_nav:
             can_see = is_admin or any(p in user_perms for p in required_perms) or len(user_perms) == 0
             if can_see:
-                st.markdown(f'<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.5rem 0 0.1rem 0;">{section}</p>',unsafe_allow_html=True)
+                st.markdown(f'<p style="font-size:0.45rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.4rem 0 0.1rem 0;">{section}</p>', unsafe_allow_html=True)
                 for label, page_id in items:
                     if st.button(label, key=page_id, use_container_width=True):
                         st.session_state.page = page_id
                         st.rerun()
         
         st.markdown("---")
+        
+        # User info + Logout
+        user_name = st.session_state.get('user_name','User')
+        user_role_display = st.session_state.get('user_role','staff').upper()
+        
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;">
+            <div style="width:28px;height:28px;border-radius:50%;background:#CC0000;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.65rem;">{user_name[:2].upper()}</div>
+            <div style="flex:1;">
+                <div style="font-size:0.65rem;font-weight:600;color:#1a1a1a;">{user_name}</div>
+                <div style="font-size:0.5rem;color:#888;">{user_role_display}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
         if st.button("🚪 Log Out", use_container_width=True, type="primary"):
             st.session_state.authenticated = False
             st.session_state.user = None
