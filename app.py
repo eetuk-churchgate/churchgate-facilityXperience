@@ -6827,7 +6827,7 @@ def page_uc():
                 </div>
                 """, unsafe_allow_html=True)
         
-       st.markdown("### 📝 Record Diesel Tank Reading")
+        st.markdown("### 📝 Record Diesel Tank Reading")
         
         with st.form("diesel_reading_form"):
             c1, c2, c3 = st.columns(3)
