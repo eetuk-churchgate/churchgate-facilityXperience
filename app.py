@@ -5605,12 +5605,26 @@ def page_feedback():
                     
                     if submitted:
                         errors = []
-                        if not resp_name: errors.append("Full Name")
-                        if not resp_company: errors.append("Company Name")
-                        if not resp_email: errors.append("Email Address")
+                        if not resp_name or resp_name.strip() == "": errors.append("Full Name")
+                        if not resp_company or resp_company.strip() == "": errors.append("Company Name")
+                        if not resp_email or resp_email.strip() == "": errors.append("Email Address")
+                        
+                        unanswered = []
+                        for q in questions.data:
+                            qid = q["id"]
+                            qnum = q.get("question_number", "?")
+                            qtype = q.get("question_type", "rating")
+                            if qtype == "rating":
+                                if qid not in scores or scores[qid].get("score") is None:
+                                    unanswered.append(f"Q{qnum}")
+                            else:
+                                if qid not in scores or not scores[qid].get("text", "").strip():
+                                    unanswered.append(f"Q{qnum}")
                         
                         if errors:
-                            st.error(f"⚠️ Please fill all required fields: {', '.join(errors)}")
+                            st.error(f"⚠️ Required fields missing: {', '.join(errors)}")
+                        elif unanswered:
+                            st.error(f"⚠️ Please answer all questions. Unanswered: {', '.join(unanswered)}")
                         else:
                             res = supabase.table("feedback_responses").insert({
                                 "survey_id": s["id"],
