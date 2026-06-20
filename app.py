@@ -6731,9 +6731,22 @@ def page_uc():
         for i in range(3):
             with [c1, c2, c3][i]:
                 tank_reading = diesel_readings[diesel_readings["meter_id"] == f"Tank{i+1}"] if len(diesel_readings) > 0 else pd.DataFrame()
-                current_level = tank_reading["reading_value"].iloc[0] if len(tank_reading) > 0 else 33000
-                fill_pct = round((current_level / 33000) * 100)
-                color = "#10B981" if fill_pct > 70 else "#F59E0B" if fill_pct > 30 else "#EF4444"
+                current_level = tank_reading["reading_value"].iloc[0] if len(tank_reading) > 0 else 20000
+                
+                # Thresholds based on 20,000L operational max
+                fill_pct = round((current_level / 20000) * 100)  # % of operational max
+                abs_pct = round((current_level / 33000) * 100)   # % of absolute capacity
+                
+                # Color: Green > 50% operational, Amber 25-50%, Red < 25%
+                if fill_pct > 50:
+                    color = "#10B981"
+                    status = "Healthy"
+                elif fill_pct > 25:
+                    color = "#F59E0B"
+                    status = "Order Fuel"
+                else:
+                    color = "#EF4444"
+                    status = "Critical"
                 
                 st.markdown(f"""
                 <div style="background:white;border-radius:12px;padding:1.2rem;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:2px solid #e5e7eb;">
@@ -6741,17 +6754,18 @@ def page_uc():
                     <div style="font-size:0.6rem;color:#888;margin-bottom:8px;">Underground Diesel Storage</div>
                     <div style="position:relative;width:100%;height:80px;margin:10px 0;">
                         <div style="position:absolute;top:0;left:0;width:100%;height:80px;border:3px solid #374151;border-radius:40px;background:linear-gradient(180deg,#e5e7eb 0%,#d1d5db 100%);overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);">
-                            <div style="position:absolute;bottom:0;left:0;width:100%;height:{fill_pct}%;background:linear-gradient(180deg,{color}dd,{color});border-radius:0 0 37px 37px;transition:height 0.5s ease;box-shadow:inset 0 2px 4px rgba(255,255,255,0.3);"></div>
-                            <div style="position:absolute;top:20%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.1);"></div>
+                            <div style="position:absolute;bottom:0;left:0;width:100%;height:{min(fill_pct, 100)}%;background:linear-gradient(180deg,{color}dd,{color});border-radius:0 0 37px 37px;transition:height 0.5s ease;box-shadow:inset 0 2px 4px rgba(255,255,255,0.3);"></div>
                             <div style="position:absolute;top:50%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.15);"></div>
-                            <div style="position:absolute;top:80%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.1);"></div>
+                            <div style="position:absolute;top:25%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.1);"></div>
+                            <div style="position:absolute;top:75%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.1);"></div>
                         </div>
                         <div style="position:absolute;top:5px;left:-6px;width:12px;height:70px;border:3px solid #374151;border-radius:50% 0 0 50%;background:linear-gradient(90deg,#9ca3af,#d1d5db);"></div>
                         <div style="position:absolute;top:5px;right:-6px;width:12px;height:70px;border:3px solid #374151;border-radius:0 50% 50% 0;background:linear-gradient(270deg,#9ca3af,#d1d5db);"></div>
                         <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:6px;height:18px;background:#374151;border-radius:3px 3px 0 0;"></div>
                     </div>
                     <div style="font-size:1.5rem;font-weight:800;color:{color};">{current_level:,.0f} L</div>
-                    <div style="font-size:0.65rem;color:#888;">{fill_pct}% Full | {(33000 - current_level):,.0f} L Ullage</div>
+                    <div style="font-size:0.65rem;color:#888;">{fill_pct}% of Operating Max (20,000L) | {abs_pct}% of Absolute (33,000L)</div>
+                    <span style="background:{color};color:white;padding:3px 12px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status}</span>
                 </div>
                 """, unsafe_allow_html=True)
         
