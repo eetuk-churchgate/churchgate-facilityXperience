@@ -5508,50 +5508,117 @@ def page_feedback():
         survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).eq("is_active", True).execute()
         
         if not survey.data or len(survey.data) == 0:
-            st.info("📝 No active survey at this time.")
+            st.markdown("""
+            <div style="background:white;border-radius:12px;padding:2rem;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                <div style="font-size:3rem;">📝</div>
+                <h3>No Active Survey</h3>
+                <p style="color:#888;">There is no survey available at this time. Please check back during the survey period.</p>
+            </div>
+            """, unsafe_allow_html=True)
         else:
             s = survey.data[0]
-            st.markdown(f"### 📝 {s.get('title','')}")
-            st.caption(s.get('description',''))
+            
+            # Determine quarter from survey title or dates
+            survey_title = s.get('title','Tenant Satisfaction Survey')
+            start_date = s.get('start_date', '')
+            end_date = s.get('end_date', '')
+            
+            # Try to extract quarter from title
+            quarter_display = ""
+            if "Q1" in survey_title:
+                quarter_display = "Q1 (April – June)"
+            elif "Q2" in survey_title:
+                quarter_display = "Q2 (July – September)"
+            elif "Q3" in survey_title:
+                quarter_display = "Q3 (October – December)"
+            elif "Q4" in survey_title:
+                quarter_display = "Q4 (January – March)"
+            else:
+                quarter_display = f"FY {date.today().year}"
+            
+            # Stylish header
+            st.markdown(f"""
+            <div style="background:linear-gradient(135deg,#1a1a1a,#2a2a2a);border-radius:12px;padding:1.5rem;color:white;margin-bottom:1rem;text-align:center;">
+                <h2 style="margin:0;font-weight:800;">📝 Tenant Satisfaction Survey</h2>
+                <p style="margin:5px 0 0 0;font-size:1rem;opacity:0.9;">{quarter_display}</p>
+                <p style="margin:10px 0 0 0;font-size:0.8rem;opacity:0.7;">We value your feedback. This survey takes less than 5 minutes.</p>
+            </div>
+            """, unsafe_allow_html=True)
             
             questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
             
             if questions.data:
                 with st.form("feedback_form"):
-                    c1, c2 = st.columns(2)
+                    st.markdown("### 👤 Your Details")
+                    
+                    c1, c2, c3 = st.columns(3)
                     with c1:
-                        resp_name = st.text_input("Your Name", value=st.session_state.get("user_name",""))
-                        resp_company = st.text_input("Company")
+                        resp_name = st.text_input("Full Name*", placeholder="Enter your full name")
                     with c2:
-                        resp_email = st.text_input("Your Email", value=st.session_state.get("user",{}).get("email",""))
-                        anon = st.checkbox("Submit anonymously")
+                        resp_company = st.text_input("Company Name*", placeholder="Your organization")
+                    with c3:
+                        resp_email = st.text_input("Email Address*", placeholder="your@email.com")
                     
                     st.markdown("---")
-                    st.markdown("### Rate Your Experience")
+                    st.markdown("### ⭐ Rate Your Experience")
                     st.caption("4 = Excellent | 3 = Good | 2 = Average | 1 = Below Average")
                     
                     scores = {}
                     for q in questions.data:
                         qnum = q.get("question_number")
                         qtype = q.get("question_type","rating")
+                        qtext = q.get("question_text","")
+                        qcat = q.get("category","")
                         
                         if qtype == "rating":
-                            st.markdown(f"**{qnum}. {q.get('question_text','')}**")
-                            st.caption(f"Category: {q.get('category','')}")
-                            score = st.select_slider(f"Q{qnum}", options=[1,2,3,4], value=3, format_func=lambda x: f"{'⭐'*x}", key=f"q_{q['id']}")
+                            st.markdown(f"""
+                            <div style="background:#f9fafb;border-radius:8px;padding:0.8rem;margin:0.3rem 0;border:1px solid #e5e7eb;">
+                                <b style="font-size:0.85rem;">{qnum}. {qtext}</b>
+                                <span style="font-size:0.65rem;color:#888;margin-left:0.5rem;">({qcat})</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
+                            score = st.select_slider(
+                                f"Rating for Q{qnum}",
+                                options=[1, 2, 3, 4],
+                                value=3,
+                                format_func=lambda x: f"{'⭐'*x} {'Poor' if x==1 else 'Average' if x==2 else 'Good' if x==3 else 'Excellent'}",
+                                key=f"q_{q['id']}",
+                                label_visibility="collapsed"
+                            )
                             scores[q["id"]] = {"score": score}
                         else:
-                            st.markdown(f"**{qnum}. {q.get('question_text','')}**")
-                            text_answer = st.text_area(f"Q{qnum}", key=f"q_{q['id']}", height=80)
+                            st.markdown(f"""
+                            <div style="background:#f9fafb;border-radius:8px;padding:0.8rem;margin:0.3rem 0;border:1px solid #e5e7eb;">
+                                <b style="font-size:0.85rem;">{qnum}. {qtext}</b>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            text_answer = st.text_area(f"Your answer for Q{qnum}", key=f"q_{q['id']}", height=80, label_visibility="collapsed", placeholder="Type your response here...")
                             scores[q["id"]] = {"text": text_answer}
-                        st.markdown("---")
                     
-                    if st.form_submit_button("📩 Submit Feedback", use_container_width=True, type="primary"):
-                        if resp_email or anon:
+                    st.markdown("---")
+                    
+                    # Anonymity option
+                    anon = st.checkbox("Submit anonymously (your name won't be shared)")
+                    
+                    submitted = st.form_submit_button("📩 SUBMIT FEEDBACK", use_container_width=True, type="primary")
+                    
+                    if submitted:
+                        errors = []
+                        if not resp_name: errors.append("Full Name")
+                        if not resp_company: errors.append("Company Name")
+                        if not resp_email: errors.append("Email Address")
+                        
+                        if errors:
+                            st.error(f"⚠️ Please fill all required fields: {', '.join(errors)}")
+                        else:
                             res = supabase.table("feedback_responses").insert({
-                                "survey_id": s["id"], "respondent_email": resp_email if not anon else None,
+                                "survey_id": s["id"],
+                                "respondent_email": resp_email if not anon else None,
                                 "respondent_name": resp_name if not anon else "Anonymous",
-                                "company": resp_company, "facility_code": fc, "is_anonymous": anon,
+                                "company": resp_company,
+                                "facility_code": fc,
+                                "is_anonymous": anon,
                                 "submitted_at": datetime.now().isoformat()
                             }).execute()
                             
@@ -5559,14 +5626,15 @@ def page_feedback():
                                 resp_id = res.data[0]["id"]
                                 for qid, data in scores.items():
                                     supabase.table("feedback_scores").insert({
-                                        "response_id": resp_id, "question_id": qid,
-                                        "score": data.get("score"), "text_answer": data.get("text")
+                                        "response_id": resp_id,
+                                        "question_id": qid,
+                                        "score": data.get("score"),
+                                        "text_answer": data.get("text")
                                     }).execute()
-                                st.success("✅ Thank you! Your feedback has been recorded.")
+                                
+                                st.success("✅ Thank you for your feedback! Your responses have been recorded.")
                                 st.balloons()
                                 st.rerun()
-                        else:
-                            st.error("Please enter your email or submit anonymously")
     
     # ============================================
     # TAB 1: FEEDBACK DASHBOARD
