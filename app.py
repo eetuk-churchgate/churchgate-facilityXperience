@@ -5904,11 +5904,52 @@ def page_feedback():
                 with c1:
                     if st.button("📄 Generate HTML Report", key="gen_html_report", use_container_width=True):
                         logo_b64 = get_logo_base64()
-                        html_report = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px;color:#1a1a1a}}h1{{color:#CC0000}}.kpi{{display:flex;gap:10px;margin:15px 0}}.kpi div{{flex:1;background:#f5f5f5;padding:15px;border-radius:8px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:24px;font-weight:800}}.card{{background:white;border-left:4px solid #3B82F6;padding:10px;margin:8px 0;border-radius:6px}}</style></head><body><h1>Tenant Satisfaction Report</h1><p>{info.get('full_name',fc)} | {date.today().strftime('%d %B %Y')}</p><div class="kpi"><div><div class="val">{tss}/100</div>TSS</div><div><div class="val">{nps_score}</div>NPS</div><div><div class="val">{churn_risk}%</div>Churn Risk</div><div><div class="val">{total_responses}</div>Responses</div></div><h2>Respondents</h2>"""
+                        logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
+                        
+                        # Build category scores table
+                        cat_rows = ""
+                        for cat, score in sorted(cat_scores.items(), key=lambda x: x[1]):
+                            color = "#EF4444" if score < 2.5 else "#F59E0B" if score < 3.5 else "#10B981"
+                            stars = "★" * round(score) + "☆" * (4 - round(score))
+                            cat_rows += f"<tr><td>{cat}</td><td>{stars}</td><td style='color:{color};font-weight:700;'>{score}/4</td></tr>"
+                        
+                        # Build respondent rows
+                        resp_rows = ""
                         for r in (responses.data or []):
-                            html_report += f'<div class="card"><b>{r.get("respondent_name","?")}</b> — {r.get("company","?")}<br><small>{str(r.get("submitted_at",""))[:10]}</small></div>'
-                        html_report += "</body></html>"
-                        st.download_button("📥 Download HTML", html_report, f"tenant_report_{date.today()}.html", "text/html", use_container_width=True)
+                            resp_rows += f"<tr><td>{r.get('respondent_name','?')}</td><td>{r.get('company','?')}</td><td>{str(r.get('submitted_at',''))[:10]}</td></tr>"
+                        
+                        html_report = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Tenant Satisfaction Report</title>
+<style>
+body{{font-family:'Segoe UI',Arial,sans-serif;margin:30px;color:#1a1a1a;background:#f5f5f5}}
+.container{{max-width:900px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}
+.header{{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}
+.header h1{{color:#CC0000;margin:0;font-size:24px}}
+.header p{{color:#888;margin:5px 0 0 0;font-size:12px}}
+.kpi-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}}
+.kpi{{background:linear-gradient(135deg,#f9fafb,#fff);border-radius:10px;padding:15px;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 6px rgba(0,0,0,0.04)}}
+.kpi .val{{font-size:28px;font-weight:800;color:#CC0000}}
+.kpi .lbl{{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:1px}}
+h2{{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:25px}}
+table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:13px}}
+th{{background:#CC0000;color:white;padding:10px;text-align:left;font-size:11px;text-transform:uppercase}}
+td{{padding:8px 10px;border-bottom:1px solid #eee}}
+tr:hover{{background:#f9fafb}}
+.footer{{text-align:center;font-size:10px;color:#999;margin-top:25px;border-top:1px solid #eee;padding-top:15px}}
+.stars{{color:#F59E0B;font-size:16px}}
+</style></head><body><div class="container">
+<div class="header"><div>{logo_img}<h1>Tenant Satisfaction Report</h1><p>{info.get('full_name',fc)} | {date.today().strftime('%d %B %Y')} | {total_responses} Responses</p></div></div>
+<div class="kpi-row">
+<div class="kpi"><div class="val">{tss}/100</div><div class="lbl">Tenant Sentiment Score</div></div>
+<div class="kpi"><div class="val">{nps_score}</div><div class="lbl">NPS Score</div></div>
+<div class="kpi"><div class="val">{churn_risk}%</div><div class="lbl">Silent Churn Risk</div></div>
+<div class="kpi"><div class="val">{total_responses}</div><div class="lbl">Total Responses</div></div>
+</div>
+<h2>Category Performance</h2><table><tr><th>Category</th><th>Rating</th><th>Score</th></tr>{cat_rows}</table>
+<h2>Respondent Details</h2><table><tr><th>Name</th><th>Company</th><th>Date</th></tr>{resp_rows}</table>
+<div class="footer">Churchgate Group | facilityXperience | Confidential | Generated {date.today().strftime('%d %B %Y')}</div>
+</div></body></html>"""
+                        st.download_button("📥 Download HTML Report", html_report, f"tenant_satisfaction_report_{date.today()}.html", "text/html", use_container_width=True)
                 with c2:
                     if st.button("📕 Generate PDF Report", key="gen_pdf_report", use_container_width=True):
                         try:
@@ -5917,23 +5958,34 @@ def page_feedback():
                             pdf.add_page()
                             pdf.set_font('Helvetica','B',16)
                             pdf.set_text_color(204,0,0)
-                            pdf.cell(0,10,'Tenant Satisfaction Report',0,1)
+                            pdf.cell(0,10,safe_text('Tenant Satisfaction Report'),0,1)
                             pdf.set_font('Helvetica','',10)
                             pdf.set_text_color(0,0,0)
-                            pdf.cell(0,6,f'{info.get("full_name",fc)} | {date.today().strftime("%d %B %Y")}',0,1)
+                            pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {date.today().strftime("%d %B %Y")}'),0,1)
+                            pdf.ln(3)
+                            pdf.set_font('Helvetica','B',11)
+                            pdf.cell(0,6,f'TSS: {tss}/100 | NPS: {nps_score} | Churn Risk: {churn_risk}% | Responses: {total_responses}',0,1)
                             pdf.ln(5)
+                            pdf.set_font('Helvetica','B',10)
+                            pdf.set_fill_color(204,0,0)
+                            pdf.set_text_color(255,255,255)
+                            pdf.cell(90,6,'Respondent',1,0,'C',True)
+                            pdf.cell(60,6,'Company',1,0,'C',True)
+                            pdf.cell(30,6,'Date',1,0,'C',True)
+                            pdf.ln()
+                            pdf.set_font('Helvetica','',9)
+                            pdf.set_text_color(0,0,0)
                             for r in (responses.data or []):
-                                pdf.set_font('Helvetica','B',11)
-                                pdf.cell(0,6,f'{r.get("respondent_name","?")} — {r.get("company","?")}',0,1)
-                                pdf.set_font('Helvetica','',9)
-                                pdf.cell(0,5,f'Submitted: {str(r.get("submitted_at",""))[:10]}',0,1)
-                                pdf.ln(2)
+                                pdf.cell(90,5,safe_text(r.get('respondent_name','?')[:35]),1,0)
+                                pdf.cell(60,5,safe_text(r.get('company','?')[:25]),1,0)
+                                pdf.cell(30,5,str(r.get('submitted_at',''))[:10],1,0)
+                                pdf.ln()
                             pdf_file = f"/tmp/tenant_report_{date.today()}.pdf"
                             pdf.output(pdf_file)
                             with open(pdf_file,"rb") as f:
-                                st.download_button("📥 Download PDF", f.read(), f"tenant_report_{date.today()}.pdf", "application/pdf", use_container_width=True)
+                                st.download_button("📥 Download PDF Report", f.read(), f"tenant_satisfaction_report_{date.today()}.pdf", "application/pdf", use_container_width=True)
                         except Exception as e:
-                            st.error(f"PDF: {str(e)[:50]}")
+                            st.error(f"PDF generation error: {str(e)[:80]}")
                 
                 if responses.data:
                     for r in list(responses.data)[resp_start:resp_end]:
@@ -6215,13 +6267,92 @@ def page_feedback():
                 c1, c2 = st.columns(2)
                 with c1:
                     logo_b64 = get_logo_base64()
-                    html_export = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}.kpi{{display:flex;gap:10px}}.kpi div{{flex:1;background:#f5f5f5;padding:10px;border-radius:8px;text-align:center;border-top:3px solid #CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:6px}}td{{padding:4px;border-bottom:1px solid #eee}}</style></head><body><h1>AI Tenant Health Report</h1><p>{info.get('full_name',fc)} | {date.today()}</p><div class="kpi"><div><b>TSS</b><br>{tss}/100</div><div><b>NPS</b><br>{nps_score}</div><div><b>Churn Risk</b><br>{churn_risk}%</div><div><b>Responses</b><br>{len(tenant_list)}</div></div><h2>Tenant Health Scores</h2><table><tr><th>Tenant</th><th>Health</th><th>Risk</th></tr>"""
-                    for t in tenant_health:
-                        html_export += f"<tr><td>{t['Tenant']}</td><td>{t['Health']}</td><td>{t['Risk']}</td></tr>"
-                    html_export += "</table></body></html>"
-                    st.download_button("📥 Download HTML Report", html_export, f"ai_tenant_report_{date.today()}.html", "text/html", use_container_width=True)
+                    logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="30">' if logo_b64 else ''
+                    
+                    health_rows = ""
+                    for t in sorted(tenant_health, key=lambda x: x["Health"]):
+                        rc = "#10B981" if t["Risk"]=="Low" else "#F59E0B" if t["Risk"]=="Medium" else "#EF4444"
+                        health_rows += f"<tr><td>{t['Tenant']}</td><td style='color:{rc};font-weight:700;'>{t['Health']}</td><td style='color:{rc};'>{t['Risk']}</td></tr>"
+                    
+                    cat_rows_ai = ""
+                    for cat, score in sorted(cat_scores.items(), key=lambda x: x[1]):
+                        color = "#EF4444" if score < 2.5 else "#F59E0B" if score < 3.5 else "#10B981"
+                        cat_rows_ai += f"<tr><td>{cat}</td><td style='color:{color};font-weight:700;'>{score}/4</td></tr>"
+                    
+                    html_export = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>AI Tenant Health & Revenue Protection Report</title>
+<style>
+body{{font-family:'Segoe UI',Arial,sans-serif;margin:30px;color:#1a1a1a;background:#f5f5f5}}
+.container{{max-width:900px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}
+.header{{border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}
+.header h1{{color:#CC0000;margin:0}}
+.kpi-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:20px 0}}
+.kpi{{background:#f9fafb;border-radius:10px;padding:15px;text-align:center;border-top:3px solid #CC0000}}
+.kpi .val{{font-size:24px;font-weight:800;color:#CC0000}}
+.kpi .lbl{{font-size:10px;color:#888;text-transform:uppercase}}
+h2{{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:20px}}
+.alert{{padding:12px;border-radius:8px;margin:10px 0;font-size:13px}}
+.alert.red{{background:#FEF2F2;border-left:4px solid #EF4444}}
+.alert.green{{background:#ECFDF5;border-left:4px solid #10B981}}
+.alert.blue{{background:#EFF6FF;border-left:4px solid #3B82F6}}
+table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:12px}}
+th{{background:#CC0000;color:white;padding:10px;text-align:left;font-size:10px;text-transform:uppercase}}
+td{{padding:8px;border-bottom:1px solid #eee}}
+.footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #eee;padding-top:15px}}
+</style></head><body><div class="container">
+<div class="header">{logo_img}<h1>AI Tenant Health & Revenue Protection Report</h1><p>{info.get('full_name',fc)} | {date.today().strftime('%d %B %Y')}</p></div>
+<div class="kpi-row">
+<div class="kpi"><div class="val">{tss}/100</div><div class="lbl">Tenant Sentiment Score</div></div>
+<div class="kpi"><div class="val">{nps_score}</div><div class="lbl">NPS Score</div></div>
+<div class="kpi"><div class="val">{churn_risk}%</div><div class="lbl">Silent Churn Risk</div></div>
+<div class="kpi"><div class="val">{len(tenant_list)}</div><div class="lbl">Responses</div></div>
+</div>
+<div class="alert red"><b>Revenue Protection Advisory</b><br>High-risk tenants: {high_risk} | Estimated annual exposure: ${at_risk_revenue:,}</div>
+<h2>Tenant Health Scores</h2><table><tr><th>Tenant</th><th>Health Score</th><th>Risk Level</th></tr>{health_rows}</table>
+<h2>Category Performance</h2><table><tr><th>Category</th><th>Score</th></tr>{cat_rows_ai}</table>
+<div class="footer">Churchgate Group | facilityXperience | AI-Generated Report | {date.today().strftime('%d %B %Y')}</div>
+</div></body></html>"""
+                    st.download_button("📥 Download HTML Report", html_export, f"ai_tenant_health_report_{date.today()}.html", "text/html", use_container_width=True)
                 with c2:
-                    st.download_button("📥 Download CSV Data", pd.DataFrame(tenant_health).to_csv(index=False), f"tenant_health_{date.today()}.csv", "text/csv", use_container_width=True)
+                    st.download_button("📥 Download CSV Data", pd.DataFrame(tenant_health).to_csv(index=False), f"tenant_health_data_{date.today()}.csv", "text/csv", use_container_width=True)
+                    
+                    # PDF Export
+                    if st.button("📕 Generate PDF Report", key="ai_pdf_btn", use_container_width=True):
+                        try:
+                            from fpdf import FPDF
+                            pdf = FPDF()
+                            pdf.add_page()
+                            pdf.set_font('Helvetica','B',16)
+                            pdf.set_text_color(204,0,0)
+                            pdf.cell(0,10,safe_text('AI Tenant Health & Revenue Protection Report'),0,1)
+                            pdf.set_font('Helvetica','',10)
+                            pdf.set_text_color(0,0,0)
+                            pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {date.today().strftime("%d %B %Y")}'),0,1)
+                            pdf.ln(3)
+                            pdf.set_font('Helvetica','B',11)
+                            pdf.cell(0,6,f'TSS: {tss}/100 | NPS: {nps_score} | Churn Risk: {churn_risk}%',0,1)
+                            pdf.cell(0,6,f'High Risk Tenants: {high_risk} | Revenue Exposure: ${at_risk_revenue:,}',0,1)
+                            pdf.ln(5)
+                            pdf.set_font('Helvetica','B',10)
+                            pdf.set_fill_color(204,0,0)
+                            pdf.set_text_color(255,255,255)
+                            pdf.cell(60,6,'Tenant',1,0,'C',True)
+                            pdf.cell(30,6,'Health',1,0,'C',True)
+                            pdf.cell(30,6,'Risk',1,0,'C',True)
+                            pdf.ln()
+                            pdf.set_font('Helvetica','',9)
+                            pdf.set_text_color(0,0,0)
+                            for t in sorted(tenant_health, key=lambda x: x["Health"]):
+                                pdf.cell(60,5,safe_text(t['Tenant'][:25]),1,0)
+                                pdf.cell(30,5,str(t['Health']),1,0)
+                                pdf.cell(30,5,safe_text(t['Risk']),1,0)
+                                pdf.ln()
+                            pdf_file = f"/tmp/ai_tenant_report_{date.today()}.pdf"
+                            pdf.output(pdf_file)
+                            with open(pdf_file,"rb") as f:
+                                st.download_button("📥 Download PDF Report", f.read(), f"ai_tenant_health_report_{date.today()}.pdf", "application/pdf", use_container_width=True)
+                        except Exception as e:
+                            st.error(f"PDF error: {str(e)[:80]}")
     
     # ============================================
     # TAB 3: SURVEY ADMIN
