@@ -5691,7 +5691,7 @@ def page_feedback():
                                     except:
                                         pass  # Don't block submission if email fails
                                 
-                               st.success("✅ Thank you for your feedback! Your responses have been recorded. A confirmation has been sent to your email.")
+                                st.success("✅ Thank you for your feedback! Your responses have been recorded. A confirmation has been sent to your email.")
                                 st.balloons()
                                 time.sleep(2)
                                 st.rerun()
