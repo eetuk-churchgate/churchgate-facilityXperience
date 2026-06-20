@@ -6741,12 +6741,13 @@ def page_uc():
                     st.markdown(f"""
                     <div style="background:#EFF6FF;border-left:4px solid #06B6D4;border-radius:8px;padding:0.6rem;margin:0.3rem 0;">
                         <b>📝 Recording: {wm['name'][:60]}</b>
+                        <br><span style="font-size:0.7rem;color:#888;">Previous Reading: {last_val} ({last_date})</span>
                     </div>
                     """, unsafe_allow_html=True)
                     
                     c1, c2, c3 = st.columns(3)
                     with c1:
-                        wm_value = st.number_input(f"Value (Ltr)*", min_value=0.0, value=0.0, step=1.0, key=f"wm_val_{i}")
+                        wm_value = st.number_input(f"Value (Ltr)*", min_value=0.0, value=0.0, step=1.0, key=f"wm_val_{i}", help=f"Previous: {last_val}")
                     with c2:
                         wm_date = st.date_input(f"Date", wat_now.date(), key=f"wm_date_{i}")
                     with c3:
@@ -6770,7 +6771,7 @@ def page_uc():
                                 }).execute()
                                 
                                 try:
-                                    send_email_notification("eetuk@churchgate.com", f"💧 Water Reading — {wm['name']}", f"<h3>Water Meter Reading</h3><p><b>Meter:</b> {wm['name']}</p><p><b>Value:</b> {wm_value:,.0f} Ltr</p><p><b>Date:</b> {wm_date}</p>")
+                                    send_email_notification("eetuk@churchgate.com", f"💧 Water Reading — {wm['name']}", f"<h3>Water Meter Reading</h3><p><b>Meter:</b> {wm['name']}</p><p><b>Value:</b> {wm_value:,.0f} Ltr</p><p><b>Previous:</b> {last_val}</p><p><b>Consumption:</b> {consumption:,.0f} Ltr</p><p><b>Date:</b> {wm_date}</p>")
                                 except: pass
                                 
                                 st.success(f"✅ Reading recorded!")
