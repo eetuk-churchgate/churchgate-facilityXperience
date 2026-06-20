@@ -5278,7 +5278,7 @@ def page_users():
                     edit_name = st.text_input("Full Name*", value=user.get("name",""))
                     edit_email = st.text_input("Email*", value=user.get("email",""))
                 with c2:
-                    edit_emp = st.text_input("Employee ID", value=user.get("employee_id","") or "")
+                    edit_emp = st.text_input("Employee ID*", value=user.get("employee_id","") or "")
                     edit_mobile = st.text_input("Mobile Number", value=user.get("mobile","") or "")
                 with c3:
                     current_desig = user.get("designation_level", user.get("designation", "Team Member"))
@@ -5300,8 +5300,12 @@ def page_users():
                     current_type = user.get("user_type", "staff")
                     edit_type = st.selectbox("User Type", ["staff", "tenant", "contractor", "vendor"], index=["staff","tenant","contractor","vendor"].index(current_type) if current_type in ["staff","tenant","contractor","vendor"] else 0, format_func=lambda x: {"staff":"👤 Staff","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}[x])
                 with c3:
-                    current_fac = user.get("home_facility", "WTC")
-                    edit_facility = st.selectbox("Home Facility", ["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"], index=["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"].index(current_fac) if current_fac in ["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"] else 0)
+                    current_facs = safe_parse_permissions(user.get("home_facility", "WTC"))
+                    if isinstance(current_facs, str):
+                        current_facs = [current_facs]
+                    all_facilities = ["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"]
+                    valid_facs = [f for f in current_facs if f in all_facilities]
+                    edit_facilities = st.multiselect("Facility Access*", all_facilities, default=valid_facs if valid_facs else ["WTC"])
                 
                 if edit_type in ["contractor", "vendor"]:
                     c1, c2 = st.columns(2)
