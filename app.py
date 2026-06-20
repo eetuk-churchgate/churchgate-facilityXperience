@@ -5282,12 +5282,7 @@ def page_users():
                     edit_mobile = st.text_input("Mobile Number", value=user.get("mobile","") or "")
                 with c3:
                     current_desig = user.get("designation_level", user.get("designation", "Team Member"))
-                    designations = ["Team Member", "Team Lead", "Manager", "Sr. Manager", "HOD", "Sr. Management", "Admin", "Super Admin"]
-                    if current_desig in designations:
-                        desig_idx = designations.index(current_desig)
-                    else:
-                        desig_idx = 0
-                    edit_desig = st.selectbox("Designation Level*", designations, index=desig_idx)
+                    edit_desig = st.text_input("Designation/Title*", value=str(current_desig) if current_desig else "Team Member")
                 
                 st.markdown("---")
                 st.markdown("#### 🔐 Role & Access")
