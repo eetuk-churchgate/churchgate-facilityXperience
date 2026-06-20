@@ -5963,11 +5963,9 @@ def page_feedback():
             st.markdown("### 📧 Broadcast Survey to Tenants")
             
             # Get ALL tenants from organizations table
-            tenants = supabase.table("organizations").select("*").eq("is_active", True).order("name").execute()
-            
-            # Debug: also try without filter
+            tenants = supabase.table("organizations").select("*").eq("type", "tenant").eq("is_active", True).order("name").execute()
             if not tenants.data or len(tenants.data) == 0:
-                tenants = supabase.table("organizations").select("*").order("name").execute()
+                tenants = supabase.table("organizations").select("*").eq("type", "tenant").order("name").execute()
             
             if tenants.data and len(tenants.data) > 0:
                 st.caption(f"📋 {len(tenants.data)} tenants found")
