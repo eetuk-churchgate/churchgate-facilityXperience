@@ -6732,7 +6732,7 @@ def page_uc():
             with [c1, c2, c3][i]:
                 tank_reading = diesel_readings[diesel_readings["meter_id"] == f"Tank{i+1}"] if len(diesel_readings) > 0 else pd.DataFrame()
                 current_level = tank_reading["reading_value"].iloc[0] if len(tank_reading) > 0 else 33000
-                fill_pct = round((current_level / 33000 * 100)
+                fill_pct = round((current_level / 33000) * 100)
                 color = "#10B981" if fill_pct > 70 else "#F59E0B" if fill_pct > 30 else "#EF4444"
                 
                 st.markdown(f"""
