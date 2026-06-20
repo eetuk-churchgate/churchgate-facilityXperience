@@ -6995,8 +6995,10 @@ def page_uc():
             end_date = today
         else:
             c1, c2 = st.columns(2)
-            with c1: start_date = st.date_input("From", today - timedelta(days=30))
-            with c2: end_date = st.date_input("To", today)
+            with c1:
+                start_date = st.date_input("From", today - timedelta(days=30))
+            with c2:
+                end_date = st.date_input("To", today)
         
         period_readings = readings_df[(pd.to_datetime(readings_df["reading_date"]).dt.date >= start_date) & (pd.to_datetime(readings_df["reading_date"]).dt.date <= end_date)] if len(readings_df) > 0 else pd.DataFrame()
         
@@ -7015,7 +7017,7 @@ def page_uc():
                 st.metric("💧 Water", f"{p_water:,.0f} m³")
             with c4:
                 est_cost = (p_elec * 75) + (p_diesel * 400) + (p_water * 1250)
-st.metric("💰 Est. Cost", f"₦{est_cost:,.0f}")
+                st.metric("💰 Est. Cost", f"₦{est_cost:,.0f}")
         
         st.markdown("---")
         
@@ -7024,7 +7026,7 @@ st.metric("💰 Est. Cost", f"₦{est_cost:,.0f}")
             if st.button("📄 Generate HTML Report", key="util_html_btn", use_container_width=True, type="primary"):
                 logo_b64 = get_logo_base64()
                 logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="30">' if logo_b64 else ''
-                html_report = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Utility Intelligence Report</title><style>body{{font-family:'Segoe UI',Arial,sans-serif;margin:20px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:960px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}.header{{border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}h1{{color:#CC0000;margin:0}}.kpi-row{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:15px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:22px;font-weight:800;color:#CC0000}}.kpi .lbl{{font-size:10px;color:#888;text-transform:uppercase}}table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:11px}}th{{background:#CC0000;color:white;padding:10px}}td{{padding:8px;border-bottom:1px solid #eee}}.footer{{text-align:center;font-size:9px;color:#999;margin-top:20px;border-top:1px solid #eee;padding-top:15px}}</style></head><body><div class="container"><div class="header">{logo_img}<h1>Utility Intelligence Report</h1><p>{info.get('full_name',fc)} | {today.strftime('%d %B %Y')} | {report_period}</p></div><div class="kpi-row"><div class="kpi"><div class="val">{energy_meter_count}</div><div class="lbl">Energy Meters</div></div><div class="kpi"><div class="val">3</div><div class="lbl">Diesel Tanks</div></div><div class="kpi"><div class="val">6</div><div class="lbl">Water Meters</div></div><div class="kpi"><div class="val">{len(period_readings)}</div><div class="lbl">Readings</div></div><div class="kpi"><div class="val">${est_cost:,.0f}</div><div class="lbl">Est. Cost</div></div></div><h2>Period Readings ({start_date} to {end_date})</h2><table><tr><th>Date</th><th>Type</th><th>Meter</th><th>Value</th><th>Unit</th></tr>"""
+                html_report = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Utility Intelligence Report</title><style>body{{font-family:'Segoe UI',Arial,sans-serif;margin:20px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:960px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}.header{{border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}h1{{color:#CC0000;margin:0}}.kpi-row{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:15px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:22px;font-weight:800;color:#CC0000}}.kpi .lbl{{font-size:10px;color:#888;text-transform:uppercase}}table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:11px}}th{{background:#CC0000;color:white;padding:10px}}td{{padding:8px;border-bottom:1px solid #eee}}.footer{{text-align:center;font-size:9px;color:#999;margin-top:20px;border-top:1px solid #eee;padding-top:15px}}</style></head><body><div class="container"><div class="header">{logo_img}<h1>Utility Intelligence Report</h1><p>{info.get('full_name',fc)} | {today.strftime('%d %B %Y')} | {report_period}</p></div><div class="kpi-row"><div class="kpi"><div class="val">{energy_meter_count}</div><div class="lbl">Energy Meters</div></div><div class="kpi"><div class="val">3</div><div class="lbl">Diesel Tanks</div></div><div class="kpi"><div class="val">6</div><div class="lbl">Water Meters</div></div><div class="kpi"><div class="val">{len(period_readings)}</div><div class="lbl">Readings</div></div><div class="kpi"><div class="val">₦{est_cost:,.0f}</div><div class="lbl">Est. Cost</div></div></div><h2>Period Readings ({start_date} to {end_date})</h2><table><tr><th>Date</th><th>Type</th><th>Meter</th><th>Value</th><th>Unit</th></tr>"""
                 for _, r in period_readings.head(50).iterrows():
                     html_report += f"<tr><td>{str(r.get('reading_date',''))[:10]}</td><td>{r.get('utility_type','')}</td><td>{r.get('meter_id','')}</td><td>{r.get('reading_value','')}</td><td>{r.get('unit','')}</td></tr>"
                 html_report += "</table><div class='footer'>Churchgate Group | facilityXperience | Utility Intelligence Report</div></div></body></html>"
@@ -7064,7 +7066,6 @@ st.metric("💰 Est. Cost", f"₦{est_cost:,.0f}")
                 except Exception as e:
                     st.error(f"PDF error: {str(e)[:80]}")
         
-        # AI Alert Feed
         st.markdown("---")
         st.markdown("### 🚨 AI Alert Feed")
         
