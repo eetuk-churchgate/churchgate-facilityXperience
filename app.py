@@ -6576,7 +6576,7 @@ def page_uc():
     total_elec = elec_readings["reading_value"].sum() if len(elec_readings) > 0 else 0
     total_diesel = diesel_readings["reading_value"].sum() if len(diesel_readings) > 0 else 0
     live_spend_rate = round((total_elec * 75 + total_diesel * 400) / max(total_readings, 1), 2)
-    backup_hours = round((35000 * 3 * 0.7) / 80, 0) if diesel_gen_count > 0 else 0
+    backup_hours = round((33000 * 3 * 0.7) / 80, 0) if diesel_gen_count > 0 else 0
     
     st.markdown("### 🟦 Financial Heartbeat — All Utilities")
     c1, c2, c3, c4, c5 = st.columns(5)
@@ -6731,8 +6731,8 @@ def page_uc():
         for i in range(3):
             with [c1, c2, c3][i]:
                 tank_reading = diesel_readings[diesel_readings["meter_id"] == f"Tank{i+1}"] if len(diesel_readings) > 0 else pd.DataFrame()
-                current_level = tank_reading["reading_value"].iloc[0] if len(tank_reading) > 0 else 35000
-                fill_pct = round((current_level / 35000) * 100)
+                current_level = tank_reading["reading_value"].iloc[0] if len(tank_reading) > 0 else 33000
+                fill_pct = round((current_level / 33000 * 100)
                 color = "#10B981" if fill_pct > 70 else "#F59E0B" if fill_pct > 30 else "#EF4444"
                 
                 st.markdown(f"""
@@ -6743,7 +6743,7 @@ def page_uc():
                     <div style="background:#f0f0f0;border-radius:10px;height:8px;margin:8px 0;">
                         <div style="background:{color};height:8px;border-radius:10px;width:{fill_pct}%;"></div>
                     </div>
-                    <div style="font-size:0.65rem;color:#888;">{fill_pct}% Full | {(35000 - current_level):,.0f} L Ullage</div>
+                    <div style="font-size:0.65rem;color:#888;">{fill_pct}% Full | {(33000 - current_level):,.0f} L Ullage</div>
                 </div>
                 """, unsafe_allow_html=True)
         
