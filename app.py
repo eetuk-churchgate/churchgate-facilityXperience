@@ -6545,32 +6545,308 @@ def page_feedback():
                 st.info("No tenants found in the database. Add tenants in the organizations table.")
 
 # ============================================
-# UTILITY DASHBOARD (FULL)
+# UTILITY INTELLIGENCE COMMAND CENTER
+# ELECTRICITY • WATER • DIESEL
 # ============================================
 def page_uc():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## ⚡ Utility Dashboard — {info.get("full_name",fc)}')
-    tab1,tab2=st.tabs(["📊 Dashboard","➕ Record Reading"])
-    with tab1:
-        readings=DB.get_all("utility_readings",fc,20)
-        if readings:
-            df=pd.DataFrame(readings)
-            st.metric("Total Readings",len(df))
-            st.dataframe(df,use_container_width=True,hide_index=True)
-        else:st.info("No utility readings")
-    with tab2:
-        with st.form("util_f"):
-            c1,c2=st.columns(2)
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    
+    st.markdown(f'## ⚡ Utility Intelligence Command Center — {info.get("full_name", fc)}')
+    
+    # Get all assets
+    all_assets = DB.get_assets(fc, 50000)
+    df = pd.DataFrame(all_assets) if all_assets else pd.DataFrame()
+    
+    # Get utility readings
+    readings = supabase.table("utility_readings").select("*").eq("facility_code", fc).order("reading_date", desc=True).limit(500).execute()
+    readings_df = pd.DataFrame(readings.data) if readings.data else pd.DataFrame()
+    
+    today = date.today()
+    
+    # ============================================
+    # 🟦 TOP RIBBON — UTILITY KPIs
+    # ============================================
+    total_readings = len(readings_df)
+    
+    c1, c2, c3, c4, c5 = st.columns(5)
+    with c1:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Total Readings</div><div style="font-size:1.5rem;font-weight:800;">{total_readings}</div></div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Energy Meters</div><div style="font-size:1.5rem;font-weight:800;color:#F59E0B;">{len(df[df['parent_asset'].str.contains('ENERGY METER', na=False)]) if len(df)>0 else 0}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Diesel Generators</div><div style="font-size:1.5rem;font-weight:800;color:#3B82F6;">{len(df[df['parent_asset'].str.contains('DIESEL', na=False)]) if len(df)>0 else 0}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        water_count = len(df[df['name'].str.contains('water|WATER', na=False)]) if len(df) > 0 else 0
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #06B6D4;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Water Meters</div><div style="font-size:1.5rem;font-weight:800;color:#06B6D4;">{water_count}</div></div>""", unsafe_allow_html=True)
+    with c5:
+        diesel_assets = len(df[df['parent_asset'].str.contains('DIESEL TANK|DIESEL GENERATOR', na=False)]) if len(df) > 0 else 0
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #EF4444;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Diesel Tanks</div><div style="font-size:1.5rem;font-weight:800;color:#EF4444;">3</div></div>""", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TABS
+    # ============================================
+    tabs = st.tabs(["⚡ Electricity", "💧 Water", "⛽ Diesel", "📊 Record Reading", "📈 Analytics"])
+    
+    # ============================================
+    # TAB 0: ELECTRICITY
+    # ============================================
+    with tabs[0]:
+        st.markdown("### ⚡ Electricity — Energy Meters")
+        
+        # Filter energy meters
+        energy_meters = df[df["parent_asset"].str.contains("ENERGY METER", na=False)] if len(df) > 0 else pd.DataFrame()
+        
+        if len(energy_meters) == 0:
+            st.info("No energy meters found in assets.")
+        else:
+            # Building filter
+            buildings = ["All"] + sorted(energy_meters["location_building"].dropna().unique().tolist())
+            sel_bldg = st.selectbox("🏢 Building", buildings, key="elec_bldg")
+            
+            # Meter type filter (AEDC vs DG)
+            meter_types = ["All"] + sorted(energy_meters["parent_asset"].dropna().unique().tolist())
+            sel_type = st.selectbox("🔌 Meter Type", meter_types, key="elec_type")
+            
+            # Filter
+            display_meters = energy_meters.copy()
+            if sel_bldg != "All":
+                display_meters = display_meters[display_meters["location_building"] == sel_bldg]
+            if sel_type != "All":
+                display_meters = display_meters[display_meters["parent_asset"] == sel_type]
+            
+            st.caption(f"📋 {len(display_meters)} meters found")
+            
+            # Pagination
+            page_size = 15
+            if "elec_page" not in st.session_state:
+                st.session_state.elec_page = 1
+            
+            total_pages = max(1, (len(display_meters) + page_size - 1) // page_size)
+            start = (st.session_state.elec_page - 1) * page_size
+            end = min(start + page_size, len(display_meters))
+            
+            c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
             with c1:
-                mtype=st.selectbox("Utility Type",["Electricity","Water","Diesel","Gas"])
-                mname=st.text_input("Meter Name*");mvalue=st.number_input("Reading Value*",min_value=0.0,step=0.1)
+                if st.button("◀◀", key="elec_first"): st.session_state.elec_page = 1; st.rerun()
             with c2:
-                rdate=st.date_input("Reading Date",date.today());rtime=st.time_input("Reading Time",datetime.now().time())
-                rtype=st.selectbox("Reading Type",["Manual","Automated"])
-            notes=st.text_area("Notes")
-            if st.form_submit_button("📝 Record Reading",use_container_width=True):
-                DB.insert("utility_readings",{"facility_code":fc,"utility_type":mtype,"meter_id":None,"meter_name":mname,"reading_date":str(rdate),"reading_time":str(rtime),"reading_value":mvalue,"reading_type":rtype.lower(),"notes":notes,"created_at":datetime.now().isoformat()})
-                st.success("Reading recorded!");st.rerun()
+                if st.button("◀", key="elec_prev") and st.session_state.elec_page > 1:
+                    st.session_state.elec_page -= 1; st.rerun()
+            with c3:
+                st.markdown(f"**Page {st.session_state.elec_page} of {total_pages}**")
+            with c4:
+                if st.button("▶", key="elec_next") and st.session_state.elec_page < total_pages:
+                    st.session_state.elec_page += 1; st.rerun()
+            with c5:
+                if st.button("▶▶", key="elec_last"): st.session_state.elec_page = total_pages; st.rerun()
+            
+            # Meter cards
+            for i, (_, meter) in enumerate(display_meters.iloc[start:end].iterrows()):
+                meter_name = meter.get("name", "N/A")
+                meter_id = meter.get("asset_tag", "N/A")
+                location = meter.get("location_building", "N/A")
+                meter_type = meter.get("parent_asset", "N/A")
+                
+                # Get latest reading for this meter
+                latest_reading = None
+                if len(readings_df) > 0:
+                    meter_readings = readings_df[readings_df["meter_id"] == str(meter_id)]
+                    if len(meter_readings) > 0:
+                        latest_reading = meter_readings.iloc[0]
+                
+                sno = start + i + 1
+                last_value = latest_reading["reading_value"] if latest_reading is not None else "—"
+                last_date = str(latest_reading["reading_date"]) if latest_reading is not None else "—"
+                last_unit = latest_reading["unit"] if latest_reading is not None else "—"
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid #F59E0B;border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div style="flex:1;">
+                            <b>#{sno} {meter_name[:80]}</b>
+                            <br><span style="font-size:0.65rem;color:#666;">🆔 ID: {meter_id} | 📍 {location} | 🔌 {meter_type}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:0.7rem;color:#888;">Last Reading</div>
+                            <div style="font-weight:700;color:#F59E0B;">{last_value} {last_unit}</div>
+                            <div style="font-size:0.6rem;color:#888;">📅 {last_date}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ============================================
+    # TAB 1: WATER
+    # ============================================
+    with tabs[1]:
+        st.markdown("### 💧 Water Meters")
+        
+        water_meters = df[df["name"].str.contains("water|WATER", na=False)] if len(df) > 0 else pd.DataFrame()
+        
+        if len(water_meters) == 0:
+            st.info("No water meters found in assets database. Water meters may need to be added.")
+            st.markdown("""
+            **Expected Water Meters:**
+            | Meter | Location | Type |
+            |-------|----------|------|
+            | WTC water meter 1 | Main Gate | FCT-Water Board 1 |
+            | WTC water meter 2 | Main Gate | FCT-Water Board 2 |
+            | CT Water meter | CT/B3/Fire pump room | In-house |
+            | Club house water meter | SAT/B1/Car park | In-house |
+            | Jogging area water meter | SAT/B1/Car park | In-house |
+            | SAT water meter | SAT/B2/Fire pump room | In-house |
+            """)
+        else:
+            for _, meter in water_meters.iterrows():
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid #06B6D4;border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <b>{meter.get('name','N/A')}</b>
+                    <br><span style="font-size:0.65rem;color:#666;">🆔 {meter.get('asset_tag','N/A')} | 📍 {meter.get('location_building','N/A')}</span>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ============================================
+    # TAB 2: DIESEL
+    # ============================================
+    with tabs[2]:
+        st.markdown("### ⛽ Diesel Tank Farm — Fuel Security Command")
+        
+        st.markdown("""
+        <div style="background:#1a1a1a;border-radius:10px;padding:1.5rem;color:white;margin-bottom:1rem;">
+            <h3 style="margin:0;color:#F59E0B;">⛽ Three Underground Diesel Tanks — 35,000 Litres Each</h3>
+            <p style="margin:5px 0 0 0;font-size:0.8rem;opacity:0.8;">External Location | Daily Readings Required</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Diesel tank status cards
+        c1, c2, c3 = st.columns(3)
+        for i, tank_num in enumerate([1, 2, 3]):
+            with [c1, c2, c3][i]:
+                st.markdown(f"""
+                <div style="background:white;border-radius:10px;padding:1rem;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:2px solid #e5e7eb;">
+                    <div style="font-size:2rem;">⛽</div>
+                    <b style="font-size:1rem;">Tank #{tank_num}</b>
+                    <div style="font-size:1.5rem;font-weight:800;color:#F59E0B;">35,000 L</div>
+                    <div style="font-size:0.6rem;color:#888;">Capacity</div>
+                    <div style="margin-top:0.5rem;background:#ECFDF5;padding:0.3rem;border-radius:6px;font-size:0.65rem;color:#059669;">🟢 Ready</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Diesel reading form
+        st.markdown("### 📝 Record Diesel Reading")
+        with st.form("diesel_reading_form"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                tank_select = st.selectbox("Select Tank", ["Tank 1", "Tank 2", "Tank 3"])
+                opening_stock = st.number_input("Opening Stock (Litres)", min_value=0.0, value=0.0, step=100.0)
+                daily_input = st.number_input("Daily Input/Refill (Litres)", min_value=0.0, value=0.0, step=100.0)
+            with c2:
+                reading_date = st.date_input("Reading Date", today)
+                daily_consumption = st.number_input("Daily Consumption (Litres)", min_value=0.0, value=0.0, step=10.0)
+                generator_hours = st.number_input("Generator Runtime (Hours)", min_value=0.0, value=0.0, step=0.5)
+            with c3:
+                reading_time = st.time_input("Reading Time", datetime.now().time())
+                closing_balance = st.number_input("Closing Balance (Litres)", min_value=0.0, value=0.0, step=100.0)
+                water_level = st.number_input("Water Bottom (mm)", min_value=0.0, value=0.0, step=0.1)
+            
+            notes = st.text_area("Notes/Observations")
+            
+            if st.form_submit_button("📝 Record Diesel Reading", use_container_width=True, type="primary"):
+                supabase.table("utility_readings").insert({
+                    "facility_code": fc,
+                    "utility_type": "Diesel",
+                    "meter_id": tank_select.replace(" ", ""),
+                    "reading_date": str(reading_date),
+                    "reading_time": str(reading_time),
+                    "reading_value": closing_balance,
+                    "unit": "Litres",
+                    "consumption": daily_consumption,
+                    "created_at": datetime.now().isoformat()
+                }).execute()
+                st.success(f"✅ Diesel reading recorded for {tank_select}!")
+                st.rerun()
+        
+        # Recent diesel readings
+        st.markdown("---")
+        st.markdown("### 📊 Recent Diesel Readings")
+        diesel_readings = readings_df[readings_df["utility_type"] == "Diesel"] if len(readings_df) > 0 else pd.DataFrame()
+        if len(diesel_readings) > 0:
+            st.dataframe(diesel_readings[["meter_id","reading_date","reading_value","consumption","unit"]].head(10), use_container_width=True, hide_index=True)
+        else:
+            st.info("No diesel readings recorded yet.")
+    
+    # ============================================
+    # TAB 3: RECORD READING
+    # ============================================
+    with tabs[3]:
+        st.markdown("### 📝 Record Utility Reading")
+        
+        utility_type = st.selectbox("Utility Type", ["Electricity", "Water", "Diesel", "Gas"])
+        
+        with st.form("record_reading_form"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                meter_name = st.text_input("Meter Name/ID*", placeholder="e.g., Energy Meter AEDC-CT-3")
+                reading_value = st.number_input("Reading Value*", min_value=0.0, step=0.1)
+            with c2:
+                reading_date = st.date_input("Reading Date", today)
+                reading_time = st.time_input("Reading Time", datetime.now().time())
+            with c3:
+                unit = st.selectbox("Unit", ["kWh", "MWh", "m³", "Litres", "Gallons", "m³/hr"])
+                consumption_val = st.number_input("Consumption", min_value=0.0, value=0.0, step=0.1)
+            
+            notes = st.text_area("Notes")
+            
+            if st.form_submit_button("📝 RECORD READING", use_container_width=True, type="primary"):
+                if meter_name:
+                    supabase.table("utility_readings").insert({
+                        "facility_code": fc,
+                        "utility_type": utility_type,
+                        "meter_id": meter_name,
+                        "reading_date": str(reading_date),
+                        "reading_time": str(reading_time),
+                        "reading_value": reading_value,
+                        "unit": unit,
+                        "consumption": consumption_val,
+                        "created_at": datetime.now().isoformat()
+                    }).execute()
+                    st.success(f"✅ {utility_type} reading recorded!")
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("⚠️ Meter Name/ID is required")
+    
+    # ============================================
+    # TAB 4: ANALYTICS
+    # ============================================
+    with tabs[4]:
+        st.markdown("### 📈 Utility Analytics")
+        
+        if len(readings_df) > 0:
+            # Group by utility type
+            utility_summary = readings_df.groupby("utility_type").agg(
+                Readings=("id", "count"),
+                Total_Consumption=("consumption", "sum"),
+                Avg_Value=("reading_value", "mean")
+            ).reset_index()
+            
+            st.dataframe(utility_summary, use_container_width=True, hide_index=True)
+            
+            # Chart
+            if len(readings_df) >= 2:
+                readings_df["reading_date_dt"] = pd.to_datetime(readings_df["reading_date"])
+                daily = readings_df.groupby("reading_date_dt")["reading_value"].sum().reset_index()
+                fig = px.line(daily, x="reading_date_dt", y="reading_value", title="Daily Utility Readings Trend", markers=True)
+                fig.update_layout(height=350)
+                st.plotly_chart(fig, use_container_width=True)
+            
+            st.download_button("📥 Download CSV", readings_df.to_csv(index=False), f"utility_readings_{today}.csv", "text/csv", use_container_width=True)
+        else:
+            st.info("No utility readings recorded yet.")
 
 # ============================================
 # PPM COMMAND CENTER — FORTUNE 500 GRADE
