@@ -6728,7 +6728,22 @@ def page_uc():
                 """, unsafe_allow_html=True)
                 
                 # Quick entry form for this meter
-                with st.expander("📝 Enter Reading"):
+                # Custom toggle for reading entry
+                toggle_key = f"wm_toggle_{i}"
+                if toggle_key not in st.session_state:
+                    st.session_state[toggle_key] = False
+                
+                if not st.session_state[toggle_key]:
+                    if st.button(f"📝 Enter Reading for M{i+1}", key=f"wm_toggle_btn_{i}", use_container_width=True):
+                        st.session_state[toggle_key] = True
+                        st.rerun()
+                else:
+                    st.markdown(f"""
+                    <div style="background:#EFF6FF;border-left:4px solid #06B6D4;border-radius:8px;padding:0.6rem;margin:0.3rem 0;">
+                        <b>📝 Recording: {wm['name'][:60]}</b>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                     c1, c2, c3 = st.columns(3)
                     with c1:
                         wm_value = st.number_input(f"Value (Ltr)*", min_value=0.0, value=0.0, step=1.0, key=f"wm_val_{i}")
@@ -6739,19 +6754,34 @@ def page_uc():
                     
                     wm_notes = st.text_input(f"Notes", key=f"wm_notes_{i}", placeholder="Optional...")
                     
-                    if st.button(f"📝 Record Reading for M{i+1}", key=f"wm_btn_{i}", use_container_width=True):
-                        if wm_value > 0:
-                            # Calculate consumption from previous reading
-                            prev_wm = wm_readings.iloc[0]["reading_value"] if len(wm_readings) > 0 else wm_value
-                            consumption = max(0, wm_value - prev_wm) if wm_value > prev_wm else 0
-                            
-                            supabase.table("utility_readings").insert({
-                                "facility_code": fc, "utility_type": "Water",
-                                "meter_id": wm["id"],
-                                "reading_date": str(wm_date), "reading_time": str(wm_time),
-                                "reading_value": wm_value, "unit": "Ltr",
-                                "consumption": consumption, "created_at": datetime.now().isoformat()
-                            }).execute()
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button(f"📝 Record Reading for M{i+1}", key=f"wm_btn_{i}", use_container_width=True, type="primary"):
+                            if wm_value > 0:
+                                prev_wm = wm_readings.iloc[0]["reading_value"] if len(wm_readings) > 0 else wm_value
+                                consumption = max(0, wm_value - prev_wm) if wm_value > prev_wm else 0
+                                
+                                supabase.table("utility_readings").insert({
+                                    "facility_code": fc, "utility_type": "Water",
+                                    "meter_id": wm["id"],
+                                    "reading_date": str(wm_date), "reading_time": str(wm_time),
+                                    "reading_value": wm_value, "unit": "Ltr",
+                                    "consumption": consumption, "created_at": datetime.now().isoformat()
+                                }).execute()
+                                
+                                try:
+                                    send_email_notification("eetuk@churchgate.com", f"💧 Water Reading — {wm['name']}", f"<h3>Water Meter Reading</h3><p><b>Meter:</b> {wm['name']}</p><p><b>Value:</b> {wm_value:,.0f} Ltr</p><p><b>Date:</b> {wm_date}</p>")
+                                except: pass
+                                
+                                st.success(f"✅ Reading recorded!")
+                                st.session_state[toggle_key] = False
+                                st.rerun()
+                            else:
+                                st.error("⚠️ Please enter a reading value")
+                    with c2:
+                        if st.button(f"❌ Close", key=f"wm_close_{i}", use_container_width=True):
+                            st.session_state[toggle_key] = False
+                            st.rerun()
                             
                             # Email notification for water reading
                             try:
