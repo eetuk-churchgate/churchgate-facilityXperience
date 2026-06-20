@@ -5720,7 +5720,7 @@ def page_feedback():
             if total_responses == 0:
                 st.info("No responses yet.")
             else:
-                # Build data structures
+                # Build data
                 q_lookup = {}
                 for q in (questions.data or []):
                     q_lookup[q["id"]] = {"number": q.get("question_number"), "category": q.get("category", ""), "text": q.get("question_text", ""), "type": q.get("question_type", "rating")}
@@ -5736,7 +5736,6 @@ def page_feedback():
                     all_scores[resp_id] = {"name": r.get("respondent_name","?") if not r.get("is_anonymous") else "Anonymous", "company": r.get("company","?"), "scores": tenant_scores, "submitted": str(r.get("submitted_at",""))[:10]}
                     tenant_list.append(all_scores[resp_id])
                 
-                # Calculate indices
                 hard_qs = [qid for qid, q in q_lookup.items() if q["number"] and 1 <= q["number"] <= 8]
                 soft_qs = [qid for qid, q in q_lookup.items() if q["number"] and q["number"] in [9, 10, 12]]
                 
@@ -5751,44 +5750,60 @@ def page_feedback():
                 
                 avg_fsi = round(sum(fsi_vals)/len(fsi_vals), 1) if fsi_vals else 0
                 avg_hei = round(sum(hei_vals)/len(hei_vals), 1) if hei_vals else 0
-                
                 promoters = sum(1 for s in nps_vals if s >= 4)
                 passives = sum(1 for s in nps_vals if s == 3)
                 detractors = sum(1 for s in nps_vals if s <= 2)
                 nps_score = round(((promoters - detractors) / max(len(nps_vals), 1)) * 100)
                 tss = round(((avg_fsi * 0.5 + avg_hei * 0.3 + (promoters/max(total_responses,1)) * 0.2 * 4) / 4) * 100)
-                
                 churn_risk = round((passives / max(total_responses, 1)) * 100) if total_responses > 0 else 0
                 advocacy_delta = round(abs(avg_fsi - avg_hei), 1)
                 
+                tenant_health = []
+                for td in tenant_list:
+                    vals = [v for v in td["scores"].values() if v]
+                    if vals:
+                        avg = sum(vals)/len(vals)
+                        nps = td["scores"].get(q13_id, 3) if q13_id else 3
+                        health = min(100, max(0, round((avg * 0.6 + nps * 0.4) * 25)))
+                        risk = "Low" if health >= 75 else "Medium" if health >= 50 else "High"
+                        tenant_health.append({"Tenant": td["company"], "Health": health, "Risk": risk, "Name": td["name"]})
+                
+                high_risk = len([t for t in tenant_health if t["Risk"] == "High"])
+                at_risk_revenue = high_risk * 50000
+                
+                cat_scores = {}
+                for qid, qinfo in q_lookup.items():
+                    cat = qinfo.get("category", qinfo.get("text", ""))
+                    if not cat: continue
+                    vals = [td["scores"].get(qid) for td in tenant_list if td["scores"].get(qid)]
+                    if vals: cat_scores[cat] = round(sum(vals)/len(vals), 1)
+                
                 # ============================================
-                # 🟦 TOP RIBBON — 4 KPI TILES
+                # 🟦 TOP RIBBON
                 # ============================================
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
                     tc = "#10B981" if tss >= 80 else "#F59E0B" if tss >= 60 else "#EF4444"
-                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Tenant Sentiment Score</div><div style="font-size:2rem;font-weight:800;color:{tc};">{tss}/100</div><div style="font-size:0.6rem;color:#888;">Composite Q1-Q13</div></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Tenant Sentiment Score</div><div style="font-size:2rem;font-weight:800;color:{tc};">{tss}/100</div></div>""", unsafe_allow_html=True)
                 with c2:
                     tc = "#10B981" if churn_risk < 5 else "#F59E0B" if churn_risk < 15 else "#EF4444"
-                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Silent Churn Risk</div><div style="font-size:2rem;font-weight:800;color:{tc};">{churn_risk}%</div><div style="font-size:0.6rem;color:#888;">Passive tenants</div></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Silent Churn Risk</div><div style="font-size:2rem;font-weight:800;color:{tc};">{churn_risk}%</div></div>""", unsafe_allow_html=True)
                 with c3:
-                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid #3B82F6;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">NPS Score</div><div style="font-size:2rem;font-weight:800;color:#3B82F6;">{nps_score}</div><div style="font-size:0.6rem;color:#888;">Promoters-Detractors</div></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid #3B82F6;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">NPS Score</div><div style="font-size:2rem;font-weight:800;color:#3B82F6;">{nps_score}</div></div>""", unsafe_allow_html=True)
                 with c4:
                     tc = "#F59E0B" if advocacy_delta > 0.5 else "#10B981"
-                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Advocacy Delta</div><div style="font-size:2rem;font-weight:800;color:{tc};">{advocacy_delta}</div><div style="font-size:0.6rem;color:#888;">Hard FM vs Soft FM gap</div></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Advocacy Delta</div><div style="font-size:2rem;font-weight:800;color:{tc};">{advocacy_delta}</div></div>""", unsafe_allow_html=True)
                 
                 st.markdown("---")
                 
                 # ============================================
-                # 🟩 LEFT (60%) + 🟨 RIGHT (40%) LAYOUT
+                # LEFT + RIGHT LAYOUT
                 # ============================================
                 left_col, right_col = st.columns([3, 2])
                 
                 with left_col:
                     st.markdown("### 📊 P.R.E.D.I.C.T. Tenant Health Matrix")
-                    st.caption("X-Axis: Hard FM (Q1-Q8) | Y-Axis: Soft FM (Q9,Q10,Q12) | Bubble: Response count")
                     
-                    # Scatter plot data
                     scatter_data = []
                     for td in tenant_list:
                         h_avg = sum([td["scores"].get(qid, 0) for qid in hard_qs if td["scores"].get(qid)]) / max(len([qid for qid in hard_qs if td["scores"].get(qid)]), 1)
@@ -5798,22 +5813,14 @@ def page_feedback():
                     if scatter_data:
                         sd = pd.DataFrame(scatter_data)
                         fig_scatter = px.scatter(sd, x="Hard FM", y="Soft FM", text="Tenant", size="Size", title="Tenant Positioning Matrix", color_discrete_sequence=["#CC0000"], range_x=[0,4.5], range_y=[0,4.5])
-                        fig_scatter.add_hline(y=2.5, line_dash="dash", line_color="#F59E0B", annotation_text="Soft FM Threshold")
-                        fig_scatter.add_vline(x=2.5, line_dash="dash", line_color="#F59E0B", annotation_text="Hard FM Threshold")
+                        fig_scatter.add_hline(y=2.5, line_dash="dash", line_color="#F59E0B")
+                        fig_scatter.add_vline(x=2.5, line_dash="dash", line_color="#F59E0B")
                         fig_scatter.update_layout(height=400)
                         st.plotly_chart(fig_scatter, use_container_width=True)
-                        
                         st.caption("🟢 Top-Right: Stars | 🔵 Bottom-Right: Machines | 🟡 Top-Left: Hospitable but Broken | 🔴 Bottom-Left: At-Risk")
                     
                     st.markdown("---")
-                    st.markdown("### 📉 Category Performance (Lollipop Chart)")
-                    
-                    cat_scores = {}
-                    for qid, qinfo in q_lookup.items():
-                        cat = qinfo.get("category", qinfo.get("text", ""))
-                        if not cat: continue
-                        vals = [td["scores"].get(qid) for td in tenant_list if td["scores"].get(qid)]
-                        if vals: cat_scores[cat] = round(sum(vals)/len(vals), 1)
+                    st.markdown("### 📉 Category Performance")
                     
                     if cat_scores:
                         sorted_cats = sorted(cat_scores.items(), key=lambda x: x[1])
@@ -5829,8 +5836,6 @@ def page_feedback():
                 
                 with right_col:
                     st.markdown("### 💬 Voice of Customer")
-                    
-                    # Show quotes from Q14
                     q14_id = next((qid for qid, q in q_lookup.items() if q["number"] == 14), None)
                     if q14_id:
                         quotes = []
@@ -5840,43 +5845,25 @@ def page_feedback():
                                 for ts in text_scores.data:
                                     if ts.get("text_answer") and ts["text_answer"].strip():
                                         quotes.append(ts["text_answer"])
-                        
                         if quotes:
                             for i, quote in enumerate(quotes[:5]):
-                                st.markdown(f"""
-                                <div style="background:white;border-left:4px solid #CC0000;border-radius:8px;padding:0.8rem;margin:0.4rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                                    <p style="font-size:0.8rem;font-style:italic;margin:0;">"{quote[:150]}{'...' if len(quote)>150 else ''}"</p>
-                                    <p style="font-size:0.6rem;color:#888;margin-top:0.3rem;">— Tenant Response #{i+1}</p>
-                                </div>
-                                """, unsafe_allow_html=True)
+                                st.markdown(f"""<div style="background:white;border-left:4px solid #CC0000;border-radius:8px;padding:0.8rem;margin:0.4rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);"><p style="font-size:0.8rem;font-style:italic;margin:0;">"{quote[:150]}{'...' if len(quote)>150 else ''}"</p><p style="font-size:0.6rem;color:#888;margin-top:0.3rem;">— Response #{i+1}</p></div>""", unsafe_allow_html=True)
                         else:
                             st.info("No open-text responses yet.")
                     
                     st.markdown("---")
                     st.markdown("### ⚠️ AI Risk Alerts")
-                    
                     if detractors > 0:
-                        st.error(f"""
-                        🚨 **Detractor Alert:** {detractors} tenant(s) unlikely to recommend.
-                        <br>💰 Immediate outreach recommended to prevent churn.
-                        """)
-                    
+                        st.error(f"🚨 **Detractor Alert:** {detractors} tenant(s) unlikely to recommend. Immediate outreach recommended.")
                     if churn_risk > 10:
-                        st.warning(f"""
-                        ⚠️ **Silent Churn:** {churn_risk}% of tenants are Passive.
-                        <br>📊 These tenants are one bad experience away from becoming Detractors.
-                        """)
-                    
+                        st.warning(f"⚠️ **Silent Churn:** {churn_risk}% of tenants are Passive. One bad experience away from Detractors.")
                     if advocacy_delta > 0.5:
-                        st.info(f"""
-                        📡 **Perception Gap:** Hard FM and Soft FM scores differ by {advocacy_delta} points.
-                        <br>🔍 Investigate disconnect between infrastructure and service quality.
-                        """)
+                        st.info(f"📡 **Perception Gap:** Hard FM and Soft FM differ by {advocacy_delta} points.")
                 
                 st.markdown("---")
                 
                 # ============================================
-                # 🟪 BOTTOM — RESPONDENT DETAILS WITH PAGINATION
+                # RESPONDENT DETAILS WITH PAGINATION
                 # ============================================
                 st.markdown("### 📋 Respondent Details")
                 
@@ -5898,9 +5885,10 @@ def page_feedback():
                     if st.button("▶", key="resp_next") and st.session_state.resp_page < total_resp_pages:
                         st.session_state.resp_page += 1; st.rerun()
                 
-                # Export buttons
+                # ============================================
+                # EXPORT SECTION
+                # ============================================
                 st.markdown("### 📥 Export Reports")
-                
                 c1, c2 = st.columns(2)
                 with c1:
                     if st.button("📊 Generate Executive Report", key="gen_html_report", use_container_width=True, type="primary"):
@@ -5911,7 +5899,6 @@ def page_feedback():
                         st.session_state.show_pdf_download = True
                         st.rerun()
                 
-                # HTML Preview
                 if st.session_state.get("show_report_preview", False):
                     st.markdown("---")
                     st.markdown("### 📊 Executive Report — Preview")
@@ -5919,10 +5906,8 @@ def page_feedback():
                     logo_b64 = get_logo_base64()
                     logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
                     
-                    # Generate charts
                     import io, base64 as b64
                     chart_html = ""
-                    
                     try:
                         if cat_scores:
                             sorted_cats = sorted(cat_scores.items(), key=lambda x: x[1])
@@ -5930,64 +5915,38 @@ def page_feedback():
                             fig1 = px.bar(cat_df, x="Score", y="Category", orientation='h', title="Category Performance", color="Score", color_continuous_scale=["#EF4444","#F59E0B","#10B981"], range_color=[1,4], height=350)
                             buf1 = io.BytesIO()
                             fig1.write_image(buf1, format='png', engine='kaleido', scale=2)
-                            chart1_b64 = b64.b64encode(buf1.getvalue()).decode()
-                            chart_html += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{chart1_b64}" style="width:100%;max-width:800px;"></div>'
-                    except:
-                        chart_html += '<p>Chart generation unavailable. Install kaleido for embedded charts.</p>'
-                    
+                            chart_html += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{b64.b64encode(buf1.getvalue()).decode()}" style="width:100%;max-width:800px;"></div>'
+                    except: pass
                     try:
                         if nps_vals:
                             fig2 = px.pie(values=[detractors, passives, promoters], names=["Detractors","Passives","Promoters"], title="NPS Distribution", color_discrete_sequence=["#EF4444","#F59E0B","#10B981"], hole=0.5, height=300)
                             buf2 = io.BytesIO()
                             fig2.write_image(buf2, format='png', engine='kaleido', scale=2)
-                            chart2_b64 = b64.b64encode(buf2.getvalue()).decode()
-                            chart_html += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{chart2_b64}" style="width:100%;max-width:400px;"></div>'
-                    except:
-                        pass
-                    
+                            chart_html += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{b64.b64encode(buf2.getvalue()).decode()}" style="width:100%;max-width:400px;"></div>'
+                    except: pass
                     try:
                         if tenant_health:
                             th_df = pd.DataFrame(tenant_health).sort_values("Health")
                             fig3 = px.bar(th_df, x="Health", y="Tenant", orientation='h', title="Tenant Health Scores", color="Health", color_continuous_scale=["#EF4444","#F59E0B","#10B981"], range_color=[0,100], height=300)
                             buf3 = io.BytesIO()
                             fig3.write_image(buf3, format='png', engine='kaleido', scale=2)
-                            chart3_b64 = b64.b64encode(buf3.getvalue()).decode()
-                            chart_html += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{chart3_b64}" style="width:100%;max-width:800px;"></div>'
-                    except:
-                        pass
+                            chart_html += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{b64.b64encode(buf3.getvalue()).decode()}" style="width:100%;max-width:800px;"></div>'
+                    except: pass
                     
-                    # Build HTML report
-                    cat_rows = ""
-                    for cat, score in sorted(cat_scores.items(), key=lambda x: x[1]):
-                        color = "#EF4444" if score < 2.5 else "#F59E0B" if score < 3.5 else "#10B981"
-                        cat_rows += f"<tr><td>{cat}</td><td style='color:{color};font-weight:700;'>{score}/4</td></tr>"
+                    cat_rows = "".join([f"<tr><td>{cat}</td><td style='color:{'#EF4444' if score<2.5 else '#F59E0B' if score<3.5 else '#10B981'};font-weight:700;'>{score}/4</td></tr>" for cat, score in sorted(cat_scores.items(), key=lambda x: x[1])])
+                    resp_rows = "".join([f"<tr><td>{r.get('respondent_name','?')}</td><td>{r.get('company','?')}</td><td>{str(r.get('submitted_at',''))[:10]}</td></tr>" for r in (responses.data or [])])
                     
-                    resp_rows = ""
-                    for r in (responses.data or []):
-                        resp_rows += f"<tr><td>{r.get('respondent_name','?')}</td><td>{r.get('company','?')}</td><td>{str(r.get('submitted_at',''))[:10]}</td></tr>"
-                    
-                    full_html = f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Executive Tenant Satisfaction Report</title>
-<style>body{{font-family:'Segoe UI',Arial,sans-serif;margin:20px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:960px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}.header{{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}.header h1{{color:#CC0000;margin:0;font-size:22px}}.header p{{color:#888;margin:3px 0 0 0;font-size:11px}}.kpi-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}}.kpi{{background:linear-gradient(135deg,#f9fafb,#fff);border-radius:10px;padding:15px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:26px;font-weight:800;color:#CC0000}}.kpi .lbl{{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:1px}}h2{{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:25px;font-size:16px}}table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:12px}}th{{background:#CC0000;color:white;padding:10px;text-align:left;font-size:10px;text-transform:uppercase}}td{{padding:8px 10px;border-bottom:1px solid #eee}}.insight-box{{background:#FEF2F2;border-left:4px solid #EF4444;padding:12px;margin:15px 0;border-radius:6px;font-size:13px}}.footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #eee;padding-top:15px}}</style></head><body><div class="container">
-<div class="header"><div>{logo_img}<h1>Executive Tenant Satisfaction Report</h1><p>{info.get('full_name',fc)} | {date.today().strftime('%d %B %Y')} | {total_responses} Responses</p></div></div>
-<div class="kpi-row"><div class="kpi"><div class="val">{tss}/100</div><div class="lbl">Tenant Sentiment Score</div></div><div class="kpi"><div class="val">{nps_score}</div><div class="lbl">NPS Score</div></div><div class="kpi"><div class="val">{churn_risk}%</div><div class="lbl">Silent Churn Risk</div></div><div class="kpi"><div class="val">{total_responses}</div><div class="lbl">Total Responses</div></div></div>
-<div class="insight-box"><b>Executive Summary:</b> TSS of {tss}/100 indicates {'healthy' if tss>=70 else 'moderate' if tss>=50 else 'critical'} tenant satisfaction. {high_risk} tenants at high churn risk. {detractors} detractor(s) identified.</div>
-<h2>Category Performance</h2>{chart_html}
-<table><tr><th>Category</th><th>Score</th></tr>{cat_rows}</table>
-<h2>Respondent Details</h2><table><tr><th>Name</th><th>Company</th><th>Date</th></tr>{resp_rows}</table>
-<div class="footer">Churchgate Group | facilityXperience | Confidential | Generated {date.today().strftime('%d %B %Y')}</div></div></body></html>"""
+                    full_html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Executive Tenant Satisfaction Report</title><style>body{{font-family:'Segoe UI',Arial,sans-serif;margin:20px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:960px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}.header{{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}.header h1{{color:#CC0000;margin:0;font-size:22px}}.kpi-row{{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}}.kpi{{background:linear-gradient(135deg,#f9fafb,#fff);border-radius:10px;padding:15px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:26px;font-weight:800;color:#CC0000}}.kpi .lbl{{font-size:10px;color:#888;text-transform:uppercase}}h2{{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:25px;font-size:16px}}table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:12px}}th{{background:#CC0000;color:white;padding:10px;text-align:left;font-size:10px;text-transform:uppercase}}td{{padding:8px 10px;border-bottom:1px solid #eee}}.insight-box{{background:#FEF2F2;border-left:4px solid #EF4444;padding:12px;margin:15px 0;border-radius:6px;font-size:13px}}.footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #eee;padding-top:15px}}</style></head><body><div class="container"><div class="header"><div>{logo_img}<h1>Executive Tenant Satisfaction Report</h1><p>{info.get('full_name',fc)} | {date.today().strftime('%d %B %Y')} | {total_responses} Responses</p></div></div><div class="kpi-row"><div class="kpi"><div class="val">{tss}/100</div><div class="lbl">TSS</div></div><div class="kpi"><div class="val">{nps_score}</div><div class="lbl">NPS</div></div><div class="kpi"><div class="val">{churn_risk}%</div><div class="lbl">Churn Risk</div></div><div class="kpi"><div class="val">{total_responses}</div><div class="lbl">Responses</div></div></div><div class="insight-box"><b>Executive Summary:</b> TSS of {tss}/100. {high_risk} high-risk tenants. {detractors} detractor(s).</div><h2>Category Performance</h2>{chart_html}<table><tr><th>Category</th><th>Score</th></tr>{cat_rows}</table><h2>Respondent Details</h2><table><tr><th>Name</th><th>Company</th><th>Date</th></tr>{resp_rows}</table><div class="footer">Churchgate Group | facilityXperience | Confidential | {date.today().strftime('%d %B %Y')}</div></div></body></html>"""
                     
                     st.components.v1.html(full_html, height=800, scrolling=True)
-                    
                     c1, c2 = st.columns(2)
                     with c1:
                         st.download_button("📥 Download HTML Report", full_html, f"executive_tenant_report_{date.today()}.html", "text/html", use_container_width=True)
                     with c2:
-                        if st.button("❌ Close Preview", use_container_width=True):
+                        if st.button("❌ Close Preview", key="close_html_preview", use_container_width=True):
                             st.session_state.show_report_preview = False
                             st.rerun()
                 
-                # PDF Download
                 if st.session_state.get("show_pdf_download", False):
                     try:
                         from fpdf import FPDF
@@ -6021,35 +5980,20 @@ def page_feedback():
                         pdf.output(pdf_file)
                         with open(pdf_file,"rb") as f:
                             st.download_button("📥 Download PDF Report", f.read(), f"executive_tenant_report_{date.today()}.pdf", "application/pdf", use_container_width=True)
-                        if st.button("❌ Close", use_container_width=True):
+                        if st.button("❌ Close PDF", key="close_pdf_preview", use_container_width=True):
                             st.session_state.show_pdf_download = False
                             st.rerun()
                     except Exception as e:
                         st.error(f"PDF error: {str(e)[:80]}")
                         st.session_state.show_pdf_download = False
                 
+                # ============================================
+                # RESPONDENT LOOP
+                # ============================================
                 if responses.data:
                     for r in list(responses.data)[resp_start:resp_end]:
                         td = next((t for t in tenant_list if t.get("name") == r.get("respondent_name","?")), None)
-                        scores_str = ""
-                        if td:
-                            sc_items = [f"Q{q_lookup[qid]['number']}: {td['scores'][qid]}/4" for qid in td["scores"] if qid in q_lookup]
-                            scores_str = " | ".join(sc_items[:8])
-                        
-                        st.markdown(f"""
-                        <div style="background:white;border-radius:10px;padding:1rem;margin:0.4rem 0;border-left:5px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.06);">
-                            <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div>
-                                    <b style="font-size:0.9rem;">{r.get('respondent_name','?')}</b>
-                                    <span style="background:#EFF6FF;color:#2563EB;padding:2px 10px;border-radius:12px;font-size:0.65rem;margin-left:0.5rem;">{r.get('company','?')}</span>
-                                </div>
-                                <span style="font-size:0.7rem;color:#888;">📅 {str(r.get('submitted_at',''))[:10]}</span>
-                            </div>
-                            <div style="margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:4px;">
-                                {''.join([f'<span style="background:#f0f0f0;padding:2px 8px;border-radius:8px;font-size:0.65rem;">Q{q_lookup[qid]["number"]}: <b>{td["scores"][qid]}/4</b></span>' for qid in td["scores"] if qid in q_lookup][:12])}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;margin:0.4rem 0;border-left:5px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.06);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b style="font-size:0.9rem;">{r.get('respondent_name','?')}</b><span style="background:#EFF6FF;color:#2563EB;padding:2px 10px;border-radius:12px;font-size:0.65rem;margin-left:0.5rem;">{r.get('company','?')}</span></div><span style="font-size:0.7rem;color:#888;">📅 {str(r.get('submitted_at',''))[:10]}</span></div><div style="margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:4px;">{''.join([f'<span style="background:#f0f0f0;padding:2px 8px;border-radius:8px;font-size:0.65rem;">Q{q_lookup[qid]["number"]}: <b>{td["scores"][qid]}/4</b></span>' for qid in td["scores"] if qid in q_lookup][:12]) if td else ''}</div></div>""", unsafe_allow_html=True)
     
     # ============================================
     # TAB 2: AI ANALYTICS (PRESERVED FROM BEFORE)
