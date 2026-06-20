@@ -6734,40 +6734,24 @@ def page_uc():
                 current_level = tank_reading["reading_value"].iloc[0] if len(tank_reading) > 0 else 33000
                 fill_pct = round((current_level / 33000) * 100)
                 color = "#10B981" if fill_pct > 70 else "#F59E0B" if fill_pct > 30 else "#EF4444"
-                empty_pct = 100 - fill_pct
-                water_mm = tank_reading.get("water_bottom", 3) if len(tank_reading) > 0 else 3
                 
                 st.markdown(f"""
                 <div style="background:white;border-radius:12px;padding:1.2rem;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:2px solid #e5e7eb;">
                     <b style="font-size:1rem;">Tank #{i+1}</b>
                     <div style="font-size:0.6rem;color:#888;margin-bottom:8px;">Underground Diesel Storage</div>
-                    
-                    <!-- Tank Body -->
                     <div style="position:relative;width:100%;height:80px;margin:10px 0;">
-                        <!-- Tank shell -->
                         <div style="position:absolute;top:0;left:0;width:100%;height:80px;border:3px solid #374151;border-radius:40px;background:linear-gradient(180deg,#e5e7eb 0%,#d1d5db 100%);overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);">
-                            <!-- Liquid fill -->
-                            <div style="position:absolute;bottom:0;left:0;width:100%;height:{fill_pct}%;background:linear-gradient(180deg,{color}dd,{color});border-radius:0 0 37px 37px;transition:height 0.5s ease;box-shadow:inset 0 2px 4px rgba(255,255,255,0.3);">
-                                <!-- Wave effect on top of liquid -->
-                                <div style="position:absolute;top:-4px;left:0;width:100%;height:8px;background:{color};border-radius:50%;opacity:0.6;"></div>
-                            </div>
-                            <!-- Water bottom layer -->
-                            <div style="position:absolute;bottom:0;left:0;width:100%;height:{min(water_mm * 2, 15)}px;background:linear-gradient(180deg,rgba(59,130,246,0.6),rgba(59,130,246,0.9));border-radius:0 0 37px 37px;"></div>
-                            <!-- Measurement lines -->
+                            <div style="position:absolute;bottom:0;left:0;width:100%;height:{fill_pct}%;background:linear-gradient(180deg,{color}dd,{color});border-radius:0 0 37px 37px;transition:height 0.5s ease;box-shadow:inset 0 2px 4px rgba(255,255,255,0.3);"></div>
                             <div style="position:absolute;top:20%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.1);"></div>
                             <div style="position:absolute;top:50%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.15);"></div>
                             <div style="position:absolute;top:80%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.1);"></div>
                         </div>
-                        <!-- Tank end caps -->
-                        <div style="position:absolute;top:5px;left:-8px;width:16px;height:70px;border:3px solid #374151;border-radius:50% 0 0 50%;background:linear-gradient(90deg,#9ca3af,#d1d5db);"></div>
-                        <div style="position:absolute;top:5px;right:-8px;width:16px;height:70px;border:3px solid #374151;border-radius:0 50% 50% 0;background:linear-gradient(270deg,#9ca3af,#d1d5db);"></div>
-                        <!-- Fill pipe -->
-                        <div style="position:absolute;top:-15px;left:50%;transform:translateX(-50%);width:6px;height:20px;background:#374151;border-radius:3px 3px 0 0;"></div>
+                        <div style="position:absolute;top:5px;left:-6px;width:12px;height:70px;border:3px solid #374151;border-radius:50% 0 0 50%;background:linear-gradient(90deg,#9ca3af,#d1d5db);"></div>
+                        <div style="position:absolute;top:5px;right:-6px;width:12px;height:70px;border:3px solid #374151;border-radius:0 50% 50% 0;background:linear-gradient(270deg,#9ca3af,#d1d5db);"></div>
+                        <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);width:6px;height:18px;background:#374151;border-radius:3px 3px 0 0;"></div>
                     </div>
-                    
                     <div style="font-size:1.5rem;font-weight:800;color:{color};">{current_level:,.0f} L</div>
                     <div style="font-size:0.65rem;color:#888;">{fill_pct}% Full | {(33000 - current_level):,.0f} L Ullage</div>
-                    <div style="font-size:0.55rem;color:#3B82F6;margin-top:2px;">💧 Water Bottom: {water_mm}mm</div>
                 </div>
                 """, unsafe_allow_html=True)
         
