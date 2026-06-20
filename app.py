@@ -6553,6 +6553,10 @@ def page_uc():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
     
+    from datetime import timezone, timedelta  # <-- ADD THIS LINE
+    wat = datetime.now(timezone(timedelta(hours=1)))
+    today = wat.date()
+    
     st.markdown(f'## ⚡ Utility Intelligence Command Center — {info.get("full_name", fc)}')
     
     all_assets = DB.get_assets(fc, 50000)
@@ -6775,38 +6779,57 @@ def page_uc():
             c1, c2, c3 = st.columns(3)
             with c1:
                 tank_select = st.selectbox("Select Tank*", ["Tank 1", "Tank 2", "Tank 3"])
-                opening_stock = st.number_input("Opening Stock (Litres)*", min_value=0.0, value=0.0, step=100.0)
-                daily_input = st.number_input("Daily Refill/Input (Litres)", min_value=0.0, value=0.0, step=100.0)
+                dip_reading = st.number_input("Dipstick Reading (Litres)*", min_value=0.0, value=0.0, step=100.0, help="Current fuel level — REQUIRED")
+                fuel_delivered = st.number_input("Fuel Delivered Today (Litres)", min_value=0.0, value=0.0, step=100.0, help="Only fill if tank was refilled today")
             with c2:
-                reading_date_d = st.date_input("Reading Date*", today)
-                daily_consumption = st.number_input("Daily Consumption (Litres)*", min_value=0.0, value=0.0, step=10.0)
-                generator_hours = st.number_input("Generator Runtime (Hours)", min_value=0.0, value=0.0, step=0.5)
+                reading_date_d = st.date_input("Reading Date*", wat_now.date())
+                reading_time_d = st.time_input("Reading Time", wat_now.time())
+                water_bottom = st.number_input("Water Bottom (mm)", min_value=0.0, value=0.0, step=0.1, help="Measured water layer at tank bottom")
             with c3:
-                reading_time_d = st.time_input("Reading Time", datetime.now().time())
-                closing_balance = st.number_input("Closing Balance (Litres)*", min_value=0.0, value=0.0, step=100.0)
-                water_bottom = st.number_input("Water Bottom (mm)", min_value=0.0, value=0.0, step=0.1)
-                fuel_temp = st.number_input("Fuel Temperature (°C)", min_value=0.0, value=25.0, step=0.1)
+                fuel_temp = st.number_input("Fuel Temperature (°C)", min_value=0.0, value=25.0, step=0.1, help="For volume correction")
+                generator_hours = st.number_input("Generator Runtime (Hours)", min_value=0.0, value=0.0, step=0.5, help="If generator ran today")
+                tank_pressure = st.number_input("Tank Pressure (kPa)", min_value=0.0, value=0.0, step=0.1, help="For leak detection monitoring")
             
-            unaccounted = opening_stock + daily_input - daily_consumption - closing_balance
-            if unaccounted != 0:
-                st.warning(f"⚠️ Unaccounted Fuel: {unaccounted:,.0f} Litres (should be zero)")
+            # Auto-calculate consumption
+            prev_reading = diesel_readings[diesel_readings["meter_id"] == tank_select.replace(" ", "")]["reading_value"].iloc[0] if len(diesel_readings) > 0 and len(diesel_readings[diesel_readings["meter_id"] == tank_select.replace(" ", "")]) > 0 else 0
+            
+            if prev_reading > 0:
+                calculated_consumption = max(0, prev_reading + fuel_delivered - dip_reading)
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.metric("📊 Calculated Consumption", f"{calculated_consumption:,.0f} L")
+                with c2:
+                    st.caption(f"Previous: {prev_reading:,.0f} + Delivered: {fuel_delivered:,.0f} - Current: {dip_reading:,.0f}")
+                
+                unaccounted = prev_reading + fuel_delivered - calculated_consumption - dip_reading
+                if abs(unaccounted) > 100:
+                    st.warning(f"⚠️ Variance detected: {unaccounted:,.0f} L unaccounted. Check measurement or investigate possible leak/theft.")
+            else:
+                st.info("📝 First reading for this tank — consumption tracking starts from next reading.")
             
             notes = st.text_area("Notes/Observations")
             
             if st.form_submit_button("📝 RECORD DIESEL READING", use_container_width=True, type="primary"):
-                if tank_select and opening_stock > 0:
+                if tank_select and dip_reading > 0:
+                    consumption = max(0, prev_reading + fuel_delivered - dip_reading) if prev_reading > 0 else 0
+                    
                     supabase.table("utility_readings").insert({
                         "facility_code": fc, "utility_type": "Diesel",
                         "meter_id": tank_select.replace(" ", ""),
                         "reading_date": str(reading_date_d), "reading_time": str(reading_time_d),
-                        "reading_value": closing_balance, "unit": "Litres",
-                        "consumption": daily_consumption, "created_at": datetime.now().isoformat()
+                        "reading_value": dip_reading, "unit": "Litres",
+                        "consumption": consumption, "created_at": datetime.now().isoformat()
                     }).execute()
+                    
+                    # Also log additional data in notes for future reference
+                    extra_info = f"WaterBottom:{water_bottom}mm|FuelTemp:{fuel_temp}C|GenHours:{generator_hours}h|TankPressure:{tank_pressure}kPa|Delivered:{fuel_delivered}L"
+                    supabase.table("utility_readings").update({"notes": f"{notes} | {extra_info}" if notes else extra_info}).eq("meter_id", tank_select.replace(" ", "")).eq("reading_date", str(reading_date_d)).execute()
+                    
                     st.success(f"✅ Diesel reading recorded for {tank_select}!")
                     st.balloons()
                     st.rerun()
                 else:
-                    st.error("⚠️ Tank and Opening Stock are required")
+                    st.error("⚠️ Tank selection and Dipstick Reading are required")
         
         st.markdown("---")
         st.markdown("### 📊 Recent Diesel Readings")
