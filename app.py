@@ -6575,13 +6575,13 @@ def page_uc():
     
     total_elec = elec_readings["reading_value"].sum() if len(elec_readings) > 0 else 0
     total_diesel = diesel_readings["reading_value"].sum() if len(diesel_readings) > 0 else 0
-    live_spend_rate = round((total_elec * 0.15 + total_diesel * 0.80) / max(total_readings, 1), 2)
+    live_spend_rate = round((total_elec * 75 + total_diesel * 400) / max(total_readings, 1), 2)
     backup_hours = round((35000 * 3 * 0.7) / 80, 0) if diesel_gen_count > 0 else 0
     
     st.markdown("### 🟦 Financial Heartbeat — All Utilities")
     c1, c2, c3, c4, c5 = st.columns(5)
     with c1:
-        st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid #CC0000;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Live Spend Rate</div><div style="font-size:1.8rem;font-weight:800;color:#CC0000;">${live_spend_rate}/hr</div><div style="font-size:0.55rem;color:#888;">Combined Utilities</div></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid #CC0000;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Live Spend Rate</div><div style="font-size:1.8rem;font-weight:800;color:#CC0000;">₦{live_spend_rate}/hr</div><div style="font-size:0.55rem;color:#888;">Combined Utilities</div></div>""", unsafe_allow_html=True)
     with c2:
         st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid #F59E0B;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Energy Intensity</div><div style="font-size:1.8rem;font-weight:800;color:#F59E0B;">{energy_meter_count}</div><div style="font-size:0.55rem;color:#888;">Meters Active</div></div>""", unsafe_allow_html=True)
     with c3:
@@ -7014,8 +7014,8 @@ def page_uc():
                 p_water = period_readings[period_readings["utility_type"]=="Water"]["reading_value"].sum() if "utility_type" in period_readings.columns else 0
                 st.metric("💧 Water", f"{p_water:,.0f} m³")
             with c4:
-                est_cost = (p_elec * 0.15) + (p_diesel * 0.80) + (p_water * 2.50)
-                st.metric("💰 Est. Cost", f"${est_cost:,.0f}")
+                est_cost = (p_elec * 75) + (p_diesel * 400) + (p_water * 1250)
+st.metric("💰 Est. Cost", f"₦{est_cost:,.0f}")
         
         st.markdown("---")
         
@@ -7069,9 +7069,9 @@ def page_uc():
         st.markdown("### 🚨 AI Alert Feed")
         
         alerts = [
-            {"severity": "⚠️ Warning", "msg": "Diesel Tank #2 showing 2mm water bottom increase. Recommend fuel polishing within 30 days.", "impact": "$500 potential fuel degradation"},
-            {"severity": "ℹ️ Info", "msg": "Non-Revenue Water estimated at 8.5%. Industry benchmark is <5%. Investigate cooling tower make-up line.", "impact": "$340/month potential savings"},
-            {"severity": "⚠️ Warning", "msg": "Energy intensity trending 5% above seasonal average. Check for after-hours HVAC operation.", "impact": "$1,200/month potential savings"},
+            {"severity": "⚠️ Warning", "msg": "Diesel Tank #2 showing 2mm water bottom increase. Recommend fuel polishing within 30 days.", "impact": "₦250,000 potential fuel degradation"},
+            {"severity": "ℹ️ Info", "msg": "Non-Revenue Water estimated at 8.5%. Industry benchmark is <5%. Investigate cooling tower make-up line.", "impact": "₦170,000/month potential savings"},
+            {"severity": "⚠️ Warning", "msg": "Energy intensity trending 5% above seasonal average. Check for after-hours HVAC operation.", "impact": "₦600,000/month potential savings"},
         ]
         
         for alert in alerts:
