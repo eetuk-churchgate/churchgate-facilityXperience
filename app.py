@@ -5272,7 +5272,6 @@ def page_users():
             st.markdown(f"### ✏️ Edit User: {user.get('name','')}")
             
             with st.form("edit_user_form"):
-                # Personal Details
                 st.markdown("#### 👤 Personal Details")
                 c1, c2, c3 = st.columns(3)
                 with c1:
@@ -5284,73 +5283,57 @@ def page_users():
                 with c3:
                     current_desig = user.get("designation_level", user.get("designation", "Team Member"))
                     designations = ["Team Member", "Team Lead", "Manager", "Sr. Manager", "HOD", "Sr. Management", "Admin", "Super Admin"]
-                    edit_desig = st.selectbox("Designation Level*", designations,
-                        index=designations.index(current_desig) if current_desig in designations else 0)
+                    if current_desig in designations:
+                        desig_idx = designations.index(current_desig)
+                    else:
+                        desig_idx = 0
+                    edit_desig = st.selectbox("Designation Level*", designations, index=desig_idx)
                 
                 st.markdown("---")
                 st.markdown("#### 🔐 Role & Access")
-                
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     current_role = user.get("role", "team_member")
                     roles_list = ["team_member","team_lead","manager","sr_manager","sr_management","admin","super_admin","tenant_admin","tenant_user","contractor","vendor"]
-                    role_names = {
-                        "team_member":"👤 Team Member","team_lead":"🔐 Team Lead","manager":"👔 Manager",
-                        "sr_manager":"💼 Sr. Manager","sr_management":"🏢 Sr. Management",
-                        "admin":"🔴 Admin","super_admin":"👑 Super Admin",
-                        "tenant_admin":"🏢 Tenant Admin","tenant_user":"🏢 Tenant User",
-                        "contractor":"🔧 Contractor","vendor":"📦 Vendor"
-                    }
-                    edit_role = st.selectbox("System Role*", roles_list,
-                        format_func=lambda x: role_names.get(x, x),
-                        index=roles_list.index(current_role) if current_role in roles_list else 0)
+                    role_names = {"team_member":"👤 Team Member","team_lead":"🔐 Team Lead","manager":"👔 Manager","sr_manager":"💼 Sr. Manager","sr_management":"🏢 Sr. Management","admin":"🔴 Admin","super_admin":"👑 Super Admin","tenant_admin":"🏢 Tenant Admin","tenant_user":"🏢 Tenant User","contractor":"🔧 Contractor","vendor":"📦 Vendor"}
+                    if current_role in roles_list:
+                        role_idx = roles_list.index(current_role)
+                    else:
+                        role_idx = 0
+                    edit_role = st.selectbox("System Role*", roles_list, format_func=lambda x: role_names.get(x, x), index=role_idx)
                 with c2:
                     current_type = user.get("user_type", "staff")
-                    edit_type = st.selectbox("User Type", ["staff", "tenant", "contractor", "vendor"],
-                        index=["staff","tenant","contractor","vendor"].index(current_type) if current_type in ["staff","tenant","contractor","vendor"] else 0,
-                        format_func=lambda x: {"staff":"👤 Staff","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}[x])
+                    edit_type = st.selectbox("User Type", ["staff", "tenant", "contractor", "vendor"], index=["staff","tenant","contractor","vendor"].index(current_type) if current_type in ["staff","tenant","contractor","vendor"] else 0, format_func=lambda x: {"staff":"👤 Staff","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}[x])
                 with c3:
                     current_fac = user.get("home_facility", "WTC")
-                    edit_facility = st.selectbox("Home Facility", ["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"],
-                        index=["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"].index(current_fac) if current_fac in ["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"] else 0)
+                    edit_facility = st.selectbox("Home Facility", ["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"], index=["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"].index(current_fac) if current_fac in ["WTC","AGVL","FCPL","RBPL","VDL","WAREHOUSES"] else 0)
                 
-                # Contractor specific
                 if edit_type in ["contractor", "vendor"]:
                     c1, c2 = st.columns(2)
                     with c1:
-                        edit_contractor_dept = st.selectbox("Assigned Department", 
-                            sorted(df["dept_full"].dropna().unique().tolist()) if "dept_full" in df.columns else [],
-                            index=0)
+                        all_depts_list = sorted(df["dept_full"].dropna().unique().tolist()) if "dept_full" in df.columns else ["Engineering — Electrical"]
+                        edit_contractor_dept = st.selectbox("Assigned Department", all_depts_list)
                     with c2:
                         current_expiry = user.get("contract_expiry")
-                        edit_expiry = st.date_input("Contract Expiry", 
-                            value=datetime.strptime(current_expiry, "%Y-%m-%d").date() if current_expiry else date.today() + timedelta(days=365))
+                        if current_expiry:
+                            try:
+                                exp_date = datetime.strptime(str(current_expiry)[:10], "%Y-%m-%d").date()
+                            except:
+                                exp_date = date.today() + timedelta(days=365)
+                        else:
+                            exp_date = date.today() + timedelta(days=365)
+                        edit_expiry = st.date_input("Contract Expiry", value=exp_date)
                 
-                # Tenant specific
                 if edit_type == "tenant":
                     edit_company = st.text_input("Company/Organization", value=user.get("organization_name","") or "")
                 
                 st.markdown("---")
                 st.markdown("#### 📋 Module Permissions")
-                
                 existing_perms = safe_parse_permissions(user.get("extra_permissions", []))
-                
-                module_groups = {
-                    "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
-                    "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"],
-                    "People": ["Visitor Management", "User Management"],
-                    "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
-                    "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
-                    "Utility": ["Utility Dashboard"],
-                }
-                
+                module_groups = {"Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"], "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"], "People": ["Visitor Management", "User Management"], "Services": ["Raise Ticket", "Helpdesk", "Feedback"], "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"], "Utility": ["Utility Dashboard"]}
                 selected_modules = []
                 for group, modules in module_groups.items():
-                    st.markdown(f"""
-                    <div style="background:#f9fafb;border-radius:8px;padding:0.5rem;margin:0.3rem 0;border:1px solid #e5e7eb;">
-                        <b style="font-size:0.75rem;">📁 {group}</b>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:#f9fafb;border-radius:8px;padding:0.5rem;margin:0.3rem 0;border:1px solid #e5e7eb;"><b style="font-size:0.75rem;">📁 {group}</b></div>""", unsafe_allow_html=True)
                     cols = st.columns(3)
                     for i, mod in enumerate(modules):
                         with cols[i % 3]:
@@ -5358,7 +5341,7 @@ def page_users():
                             if st.checkbox(mod, value=checked, key=f"edit_mod_{group}_{mod}"):
                                 selected_modules.append(mod)
                 
-               st.markdown("---")
+                st.markdown("---")
                 st.markdown("#### 🏢 Department Access")
                 all_depts_edit = sorted(df["dept_full"].dropna().unique().tolist()) if "dept_full" in df.columns else []
                 current_depts = safe_parse_permissions(user.get("department_permissions", []))
@@ -5377,43 +5360,22 @@ def page_users():
                     edit_locked = st.checkbox("Account Locked", value=user.get("account_locked", False))
                 with c3:
                     if edit_locked:
-                        st.caption("Failed attempts will be reset on unlock")
+                        st.caption("Failed attempts reset on unlock")
                 
                 c1, c2 = st.columns(2)
                 with c1:
                     if st.form_submit_button("💾 SAVE ALL CHANGES", use_container_width=True, type="primary"):
-                        update_data = {
-                            "name": edit_name,
-                            "email": edit_email,
-                            "employee_id": edit_emp,
-                            "mobile": edit_mobile,
-                            "designation": edit_desig,
-                            "designation_level": edit_desig,
-                            "role": edit_role,
-                            "user_type": edit_type,
-                            "home_facility": edit_facility,
-                            "extra_permissions": selected_modules,
-                            "department_permissions": edit_depts if edit_depts else ["All"],
-                            "is_active": edit_active,
-                            "account_locked": edit_locked,
-                            "updated_by": st.session_state.get("user_name",""),
-                            "updated_at": datetime.now().isoformat()
-                        }
-                        
+                        update_data = {"name": edit_name, "email": edit_email, "employee_id": edit_emp, "mobile": edit_mobile, "designation": edit_desig, "designation_level": edit_desig, "role": edit_role, "user_type": edit_type, "home_facility": edit_facility, "extra_permissions": selected_modules, "department_permissions": edit_depts if edit_depts else ["All"], "is_active": edit_active, "account_locked": edit_locked, "updated_by": st.session_state.get("user_name",""), "updated_at": datetime.now().isoformat()}
                         if edit_locked:
                             update_data["failed_login_attempts"] = 0
-                        
                         if edit_type in ["contractor", "vendor"]:
                             update_data["contractor_department"] = edit_contractor_dept
                             update_data["contract_expiry"] = str(edit_expiry)
-                        
                         if edit_type == "tenant":
-                            update_data["organization_name"] = edit_company
-                        
+                            update_data["organization_name"] = edit_company if edit_company else None
                         if new_pic:
                             pic_b64 = base64.b64encode(new_pic.read()).decode()
                             update_data["profile_picture"] = f"data:image/{new_pic.type.split('/')[-1]};base64,{pic_b64}"
-                        
                         DB.update("app_users", user_id, update_data)
                         st.success("✅ User fully updated!")
                         st.session_state.edit_user_id = None
