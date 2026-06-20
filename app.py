@@ -5691,8 +5691,9 @@ def page_feedback():
                                     except:
                                         pass  # Don't block submission if email fails
                                 
-                                st.success("✅ Thank you for your feedback! Your responses have been recorded. A confirmation has been sent to your email.")
+                               st.success("✅ Thank you for your feedback! Your responses have been recorded. A confirmation has been sent to your email.")
                                 st.balloons()
+                                time.sleep(2)
                                 st.rerun()
     
     # ============================================
@@ -5924,8 +5925,44 @@ def page_feedback():
             questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
             responses = supabase.table("feedback_responses").select("id, respondent_name, company, is_anonymous").eq("survey_id", s["id"]).execute()
             
-            if not responses.data or len(responses.data) < 2:
-                st.info("Need at least 2 responses for AI analysis.")
+            if not responses.data or len(responses.data) < 3:
+                st.warning(f"""
+                📊 **Insufficient Data for Full AI Analysis**
+                <br>Current responses: **{len(responses.data) if responses.data else 0}**
+                <br>Minimum needed: **5** for statistical significance
+                <br>📣 Share the survey link with more tenants to unlock:
+                <br>• Tenant Health Scoring • Churn Prediction • Revenue Risk Analysis • Trend Detection
+                """)
+                
+                if responses.data and len(responses.data) >= 1:
+                    st.markdown("---")
+                    st.markdown("### 📊 Basic Summary (Limited Data)")
+                    st.caption("Full AI insights will unlock with 5+ responses.")
+                    
+                    # Show response count
+                    st.metric("Total Responses", len(responses.data))
+                    
+                    # Show basic category averages
+                    q_lookup_temp = {}
+                    for q in (questions.data or []):
+                        q_lookup_temp[q["id"]] = {"number": q.get("question_number"), "category": q.get("category", ""), "text": q.get("question_text","")}
+                    
+                    cat_scores_temp = {}
+                    for r in responses.data:
+                        scores = supabase.table("feedback_scores").select("question_id, score").eq("response_id", r["id"]).execute()
+                        for sc in (scores.data or []):
+                            qid = sc.get("question_id")
+                            if qid in q_lookup_temp and sc.get("score"):
+                                cat = q_lookup_temp[qid].get("category", q_lookup_temp[qid].get("text",""))
+                                if cat not in cat_scores_temp:
+                                    cat_scores_temp[cat] = []
+                                cat_scores_temp[cat].append(sc["score"])
+                    
+                    if cat_scores_temp:
+                        for cat, vals in cat_scores_temp.items():
+                            avg = round(sum(vals)/len(vals), 1)
+                            stars = "⭐" * round(avg)
+                            st.markdown(f"{stars} **{cat}**: {avg}/4")
             else:
                 # Build data (same as TAB 1)
                 q_lookup = {}
