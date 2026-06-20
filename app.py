@@ -6685,13 +6685,16 @@ def page_uc():
     with tabs[1]:
         st.markdown("### 💧 Water Network Command")
         
+        # Get water meters from assets or use predefined list
+        water_meters_assets = df[df["parent_asset"].str.contains("WATER METER", na=False)] if len(df) > 0 else pd.DataFrame()
+        
         water_meters = [
-            {"name": "WTC Water Meter 1 — FCT Water Board", "id": "CAH000888", "location": "Main Gate", "type": "Bulk Municipal (M1)"},
-            {"name": "WTC Water Meter 2 — FCT Water Board", "id": "CAH00076", "location": "Main Gate", "type": "Bulk Municipal (M2)"},
-            {"name": "CT Water Meter — In-house", "id": "CT-WATER-01", "location": "CT/B3/Fire Pump Room", "type": "Domestic Cold Water (M3)"},
-            {"name": "Club House Water Meter", "id": "SAT-WATER-01", "location": "SAT/B1/Car Park", "type": "Domestic Cold Water (M4)"},
-            {"name": "Jogging Area Water Meter", "id": "SAT-WATER-02", "location": "SAT/B1/Car Park", "type": "Irrigation/Landscape (M5)"},
-            {"name": "SAT Water Meter", "id": "SAT-WATER-03", "location": "SAT/B2/Fire Pump Room", "type": "Fire Suppression (M6)"},
+            {"name": "WTC Water Meter 1 — FCT Water Board", "id": "CAH000888", "location": "Main Gate", "type": "Bulk Municipal (M1)", "meter_num": 2076},
+            {"name": "WTC Water Meter 2 — FCT Water Board", "id": "CAH00076", "location": "Main Gate", "type": "Bulk Municipal (M2)", "meter_num": 2077},
+            {"name": "CT Water Meter — In-house", "id": "CT-WATER-01", "location": "CT/B3/Fire Pump Room", "type": "Domestic Cold Water (M3)", "meter_num": 2078},
+            {"name": "Club House Water Meter", "id": "SAT-WATER-01", "location": "SAT/B1/Car Park", "type": "Domestic Cold Water (M4)", "meter_num": 2079},
+            {"name": "Jogging Area Water Meter", "id": "SAT-WATER-02", "location": "SAT/B1/Car Park", "type": "Irrigation/Landscape (M5)", "meter_num": 2080},
+            {"name": "SAT Water Meter — Fire Pump Room", "id": "SAT-WATER-03", "location": "SAT/B2/Fire Pump Room", "type": "Fire Suppression (M6)", "meter_num": 2081},
         ]
         
         c1, c2, c3 = st.columns(3)
@@ -6702,17 +6705,67 @@ def page_uc():
         st.markdown("---")
         
         for i, wm in enumerate(water_meters):
-            st.markdown(f"""
-            <div style="background:white;border-left:4px solid #06B6D4;border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <b>M{i+1}: {wm['name']}</b>
-                        <br><span style="font-size:0.65rem;color:#666;">🆔 {wm['id']} | 📍 {wm['location']} | 🏷️ {wm['type']}</span>
+            # Get latest reading
+            wm_readings = readings_df[readings_df["meter_id"] == wm["id"]] if len(readings_df) > 0 else pd.DataFrame()
+            latest_wm = wm_readings.iloc[0] if len(wm_readings) > 0 else None
+            last_val = f"{latest_wm['reading_value']:,.0f} {latest_wm.get('unit','Ltr')}" if latest_wm is not None else "—"
+            last_date = str(latest_wm["reading_date"]) if latest_wm is not None else "No readings"
+            
+            with st.container():
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid #06B6D4;border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>M{i+1}: {wm['name']}</b>
+                            <br><span style="font-size:0.65rem;color:#666;">🆔 {wm['id']} | 📍 {wm['location']} | 🏷️ {wm['type']}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:0.6rem;color:#888;">Last: {last_date}</div>
+                            <div style="font-weight:700;color:#06B6D4;">{last_val}</div>
+                        </div>
                     </div>
-                    <span style="background:#EFF6FF;color:#06B6D4;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">METER {i+1}</span>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+                
+                # Quick entry form for this meter
+                with st.expander("📝 Enter Reading"):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        wm_value = st.number_input(f"Value (Ltr)*", min_value=0.0, value=0.0, step=1.0, key=f"wm_val_{i}")
+                    with c2:
+                        wm_date = st.date_input(f"Date", wat_now.date(), key=f"wm_date_{i}")
+                    with c3:
+                        wm_time = st.time_input(f"Time", wat_now.time(), key=f"wm_time_{i}")
+                    
+                    wm_notes = st.text_input(f"Notes", key=f"wm_notes_{i}", placeholder="Optional...")
+                    
+                    if st.button(f"📝 Record Reading for M{i+1}", key=f"wm_btn_{i}", use_container_width=True):
+                        if wm_value > 0:
+                            # Calculate consumption from previous reading
+                            prev_wm = wm_readings.iloc[0]["reading_value"] if len(wm_readings) > 0 else wm_value
+                            consumption = max(0, wm_value - prev_wm) if wm_value > prev_wm else 0
+                            
+                            supabase.table("utility_readings").insert({
+                                "facility_code": fc, "utility_type": "Water",
+                                "meter_id": wm["id"],
+                                "reading_date": str(wm_date), "reading_time": str(wm_time),
+                                "reading_value": wm_value, "unit": "Ltr",
+                                "consumption": consumption, "created_at": datetime.now().isoformat()
+                            }).execute()
+                            
+                            # Email notification for water reading
+                            try:
+                                send_email_notification(
+                                    "eetuk@churchgate.com",
+                                    f"💧 Water Reading — {wm['name']}",
+                                    f"<h3>Water Meter Reading Recorded</h3><p><b>Meter:</b> {wm['name']}</p><p><b>Value:</b> {wm_value:,.0f} Ltr</p><p><b>Consumption:</b> {consumption:,.0f} Ltr</p><p><b>Date:</b> {wm_date}</p>"
+                                )
+                            except: pass
+                            
+                            st.success(f"✅ Reading recorded for {wm['name']}!")
+                            st.rerun()
+                        else:
+                            st.error("⚠️ Please enter a reading value")
         
         st.markdown("---")
         st.markdown("### 🔍 Non-Revenue Water (NRW) Tracking")
