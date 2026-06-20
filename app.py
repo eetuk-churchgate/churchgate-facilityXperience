@@ -5358,12 +5358,12 @@ def page_users():
                             if st.checkbox(mod, value=checked, key=f"edit_mod_{group}_{mod}"):
                                 selected_modules.append(mod)
                 
-                st.markdown("---")
+               st.markdown("---")
                 st.markdown("#### 🏢 Department Access")
                 all_depts_edit = sorted(df["dept_full"].dropna().unique().tolist()) if "dept_full" in df.columns else []
                 current_depts = safe_parse_permissions(user.get("department_permissions", []))
-                 valid_defaults = [d for d in (current_depts if current_depts != ["All"] else all_depts_edit) if d in all_depts_edit]
-                edit_depts = st.multiselect("Departments (leave empty for All)", all_depts_edit, default=valid_defaults if valid_defaults else [])
+                valid_defaults = [d for d in current_depts if d in all_depts_edit] if current_depts != ["All"] else all_depts_edit
+                edit_depts = st.multiselect("Departments (leave empty for All)", all_depts_edit, default=valid_defaults)
                 
                 st.markdown("---")
                 st.markdown("#### 📸 Profile Picture")
