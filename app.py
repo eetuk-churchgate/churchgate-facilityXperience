@@ -5026,8 +5026,7 @@ def page_users():
                 <div style="flex:1;">
                     <div style="display:flex;align-items:center;gap:0.5rem;">
                         <b style="font-size:0.9rem;">{name}</b>
-                        <span style="background:{role_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{role.replace('_', ' ').title().replace(' ', '.')}</span>
-                        <span style="background:{type_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{user_type.upper()}</span>
+                        <span style="background:{role_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;font-weight:600;">{designation}</span>
                     </div>
                     <div style="font-size:0.7rem;color:#666;">📧 {email} | 🆔 {emp_id} | 👔 {designation}</div>
                     <div style="font-size:0.6rem;color:#888;">🕐 Last Login: {last_login} | 🏷️ {', '.join(depts) if depts else 'All Depts'}</div>
@@ -5298,7 +5297,9 @@ def page_users():
                     edit_role = st.selectbox("System Role*", roles_list, format_func=lambda x: role_names.get(x, x), index=role_idx)
                 with c2:
                     current_type = user.get("user_type", "staff")
-                    edit_type = st.selectbox("User Type", ["staff", "tenant", "contractor", "vendor"], index=["staff","tenant","contractor","vendor"].index(current_type) if current_type in ["staff","tenant","contractor","vendor"] else 0, format_func=lambda x: {"staff":"👤 Staff","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}[x])
+                   edit_type = st.selectbox("User Type", ["staff", "management", "tenant", "contractor", "vendor"], 
+                        index=["staff","management","tenant","contractor","vendor"].index(current_type) if current_type in ["staff","management","tenant","contractor","vendor"] else 0, 
+                        format_func=lambda x: {"staff":"👤 Staff","management":"💼 Management","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}[x])
                 with c3:
                     current_facs = safe_parse_permissions(user.get("home_facility", "WTC"))
                     if isinstance(current_facs, str):
@@ -5364,7 +5365,7 @@ def page_users():
                 c1, c2 = st.columns(2)
                 with c1:
                     if st.form_submit_button("💾 SAVE ALL CHANGES", use_container_width=True, type="primary"):
-                        update_data = {"name": edit_name, "email": edit_email, "employee_id": edit_emp, "mobile": edit_mobile, "designation": edit_desig, "designation_level": edit_desig, "role": edit_role, "user_type": edit_type, "home_facility": edit_facilities, "extra_permissions": selected_modules, "department_permissions": edit_depts if edit_depts else ["All"], "is_active": edit_active, "account_locked": edit_locked, "updated_by": st.session_state.get("user_name",""), "updated_at": datetime.now().isoformat()}
+                        update_data = {"name": edit_name, "email": edit_email, "employee_id": edit_emp, "mobile": edit_mobile, "designation": edit_desig, "designation_level": edit_desig, "role": edit_role, "user_type": edit_type, "home_facility": ",".join(edit_facilities) if edit_facilities else "WTC", "extra_permissions": selected_modules, "department_permissions": edit_depts if edit_depts else ["All"], "is_active": edit_active, "account_locked": edit_locked, "updated_by": st.session_state.get("user_name",""), "updated_at": datetime.now().isoformat()}
                         if edit_locked:
                             update_data["failed_login_attempts"] = 0
                         if edit_type in ["contractor", "vendor"]:
