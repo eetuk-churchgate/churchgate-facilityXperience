@@ -5369,7 +5369,6 @@ def page_users():
                 st.markdown("#### 📸 Profile Picture")
                 new_pic = st.file_uploader("Change Picture", type=["png","jpg","jpeg"], key="edit_pic")
                 
-                # Account status
                 st.markdown("---")
                 c1, c2, c3 = st.columns(3)
                 with c1:
