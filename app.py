@@ -6553,9 +6553,9 @@ def page_uc():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
     
-    from datetime import timezone, timedelta  # <-- ADD THIS LINE
-    wat = datetime.now(timezone(timedelta(hours=1)))
-    today = wat.date()
+    from datetime import timezone, timedelta
+    wat_now = datetime.now(timezone(timedelta(hours=1)))
+    today = wat_now.date()
     
     st.markdown(f'## ⚡ Utility Intelligence Command Center — {info.get("full_name", fc)}')
     
@@ -6827,11 +6827,7 @@ def page_uc():
                 </div>
                 """, unsafe_allow_html=True)
         
-        st.markdown("### 📝 Record Diesel Tank Reading")
-        
-        # Define WAT time BEFORE the form
-        from datetime import timezone, timedelta
-        wat_now = datetime.now(timezone(timedelta(hours=1)))
+       st.markdown("### 📝 Record Diesel Tank Reading")
         
         with st.form("diesel_reading_form"):
             c1, c2, c3 = st.columns(3)
