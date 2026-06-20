@@ -6773,8 +6773,12 @@ def page_uc():
                 </div>
                 """, unsafe_allow_html=True)
         
-        st.markdown("---")
         st.markdown("### 📝 Record Diesel Tank Reading")
+        
+        # Define WAT time BEFORE the form
+        from datetime import timezone, timedelta
+        wat_now = datetime.now(timezone(timedelta(hours=1)))
+        
         with st.form("diesel_reading_form"):
             c1, c2, c3 = st.columns(3)
             with c1:
@@ -6803,16 +6807,15 @@ def page_uc():
                 
                 unaccounted = prev_reading + fuel_delivered - calculated_consumption - dip_reading
                 if abs(unaccounted) > 100:
-                    st.warning(f"⚠️ Variance detected: {unaccounted:,.0f} L unaccounted. Check measurement or investigate possible leak/theft.")
+                    st.warning(f"⚠️ Variance detected: {unaccounted:,.0f} L unaccounted.")
             else:
-                st.info("📝 First reading for this tank — consumption tracking starts from next reading.")
+                st.info("📝 First reading for this tank.")
             
             notes = st.text_area("Notes/Observations")
             
             if st.form_submit_button("📝 RECORD DIESEL READING", use_container_width=True, type="primary"):
                 if tank_select and dip_reading > 0:
                     consumption = max(0, prev_reading + fuel_delivered - dip_reading) if prev_reading > 0 else 0
-                    
                     supabase.table("utility_readings").insert({
                         "facility_code": fc, "utility_type": "Diesel",
                         "meter_id": tank_select.replace(" ", ""),
@@ -6820,11 +6823,6 @@ def page_uc():
                         "reading_value": dip_reading, "unit": "Litres",
                         "consumption": consumption, "created_at": datetime.now().isoformat()
                     }).execute()
-                    
-                    # Also log additional data in notes for future reference
-                    extra_info = f"WaterBottom:{water_bottom}mm|FuelTemp:{fuel_temp}C|GenHours:{generator_hours}h|TankPressure:{tank_pressure}kPa|Delivered:{fuel_delivered}L"
-                    supabase.table("utility_readings").update({"notes": f"{notes} | {extra_info}" if notes else extra_info}).eq("meter_id", tank_select.replace(" ", "")).eq("reading_date", str(reading_date_d)).execute()
-                    
                     st.success(f"✅ Diesel reading recorded for {tank_select}!")
                     st.balloons()
                     st.rerun()
