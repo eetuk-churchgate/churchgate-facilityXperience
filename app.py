@@ -6738,8 +6738,9 @@ def page_uc():
                 current_level = tank_reading["reading_value"].iloc[0] if len(tank_reading) > 0 else 20000
                 
                 # Thresholds based on 20,000L operational max
-                fill_pct = round((current_level / 20000) * 100)  # % of operational max
-                abs_pct = round((current_level / 33000) * 100)   # % of absolute capacity
+                fill_pct = round((current_level / 20000) * 100)  # % of operational max (for thresholds)
+                abs_pct = round((current_level / 33000) * 100)   # % of absolute capacity (for display)
+                visual_pct = round((current_level / 33000) * 100)  # % for tank visual height
                 
                 # Color: Green > 50% operational, Amber 25-50%, Red < 25%
                 if fill_pct > 50:
@@ -6758,7 +6759,7 @@ def page_uc():
                     <div style="font-size:0.6rem;color:#888;margin-bottom:8px;">Underground Diesel Storage</div>
                     <div style="position:relative;width:100%;height:80px;margin:10px 0;">
                         <div style="position:absolute;top:0;left:0;width:100%;height:80px;border:3px solid #374151;border-radius:40px;background:linear-gradient(180deg,#e5e7eb 0%,#d1d5db 100%);overflow:hidden;box-shadow:inset 0 2px 4px rgba(0,0,0,0.1);">
-                            <div style="position:absolute;bottom:0;left:0;width:100%;height:{min(fill_pct, 100)}%;background:linear-gradient(180deg,{color}dd,{color});border-radius:0 0 37px 37px;transition:height 0.5s ease;box-shadow:inset 0 2px 4px rgba(255,255,255,0.3);"></div>
+                            <div style="position:absolute;bottom:0;left:0;width:100%;height:{min(visual_pct, 100)}%;background:linear-gradient(180deg,{color}dd,{color});border-radius:0 0 37px 37px;transition:height 0.5s ease;box-shadow:inset 0 2px 4px rgba(255,255,255,0.3);"></div>
                             <div style="position:absolute;top:50%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.15);"></div>
                             <div style="position:absolute;top:25%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.1);"></div>
                             <div style="position:absolute;top:75%;left:0;width:100%;border-top:1px dashed rgba(0,0,0,0.1);"></div>
