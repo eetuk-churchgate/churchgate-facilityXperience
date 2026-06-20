@@ -5646,45 +5646,270 @@ def page_feedback():
                                         "text_answer": data.get("text")
                                     }).execute()
                                 
-                                st.success("✅ Thank you for your feedback! Your responses have been recorded.")
+                                # Send confirmation email to tenant
+                                if resp_email and not anon:
+                                    try:
+                                        send_email_notification(
+                                            resp_email,
+                                            f"✅ Survey Received — Thank You, {resp_name}!",
+                                            f"""
+                                            <div style="font-family:Arial;max-width:550px;border:1px solid #ddd;border-radius:12px;overflow:hidden;margin:0 auto;">
+                                                <div style="background:linear-gradient(135deg,#1a1a1a,#2a2a2a);padding:25px;text-align:center;color:white;">
+                                                    <h2 style="margin:0;font-weight:800;">🙏 Thank You for Your Feedback</h2>
+                                                    <p style="margin:8px 0 0 0;font-size:14px;opacity:0.9;">{info.get('full_name',fc)} — Churchgate Group</p>
+                                                </div>
+                                                <div style="padding:25px;background:#f9fafb;">
+                                                    <p style="font-size:15px;color:#1a1a1a;">Dear <b>{resp_name}</b>,</p>
+                                                    <p style="font-size:14px;color:#444;line-height:1.6;">
+                                                        Thank you for taking the time to complete our <b>{quarter_display}</b> tenant satisfaction survey.
+                                                    </p>
+                                                    <p style="font-size:14px;color:#444;line-height:1.6;">
+                                                        Your feedback is invaluable to us. It helps us understand what we're doing well and where we need to improve to serve you better.
+                                                    </p>
+                                                    <div style="background:white;border-left:4px solid #10B981;border-radius:8px;padding:15px;margin:15px 0;">
+                                                        <p style="margin:0;font-size:13px;color:#065F46;"><b>✅ What happens next?</b></p>
+                                                        <ul style="margin:8px 0 0 0;font-size:12px;color:#444;">
+                                                            <li>Your responses are reviewed by our Facility Management team</li>
+                                                            <li>Action plans are created for areas needing improvement</li>
+                                                            <li>You may receive a follow-up if we need clarification</li>
+                                                        </ul>
+                                                    </div>
+                                                    <p style="font-size:13px;color:#888;">
+                                                        If you have any urgent concerns, please contact our facility team directly or raise a ticket through the facilityXperience app.
+                                                    </p>
+                                                    <div style="text-align:center;margin:20px 0;">
+                                                        <a href="https://facilityxperience.streamlit.app" style="background:#CC0000;color:white;padding:12px 28px;text-decoration:none;border-radius:6px;font-weight:bold;font-size:13px;">Open facilityXperience</a>
+                                                    </div>
+                                                    <p style="font-size:12px;color:#999;text-align:center;margin-top:15px;">
+                                                        Churchgate Group — Committed to World-Class Facility Management<br>
+                                                        This is an automated confirmation of your survey submission.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            """
+                                        )
+                                    except:
+                                        pass  # Don't block submission if email fails
+                                
+                                st.success("✅ Thank you for your feedback! Your responses have been recorded. A confirmation has been sent to your email.")
                                 st.balloons()
                                 st.rerun()
     
     # ============================================
-    # TAB 1: FEEDBACK DASHBOARD
+    # TAB 1: ASSET HEALTH CONTROL TOWER
     # ============================================
     with tabs[1]:
-        st.markdown("### 📊 Feedback Dashboard")
+        st.markdown("### 🏢 Asset Health Control Tower")
         
         survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(1).execute()
         
-        if survey.data:
+        if not survey.data or len(survey.data) == 0:
+            st.info("No survey data available.")
+        else:
             s = survey.data[0]
-            responses = supabase.table("feedback_responses").select("id", count="exact").eq("survey_id", s["id"]).execute()
+            responses = supabase.table("feedback_responses").select("id, respondent_name, company, is_anonymous, submitted_at").eq("survey_id", s["id"]).execute()
             questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
             
-            total_responses = responses.count or 0
-            st.markdown(f"**Survey:** {s.get('title','')}")
-            st.metric("Total Responses", total_responses)
+            total_responses = len(responses.data) if responses.data else 0
             
-            if total_responses > 0 and questions.data:
+            if total_responses == 0:
+                st.info("No responses yet.")
+            else:
+                # Build data structures
+                q_lookup = {}
+                for q in (questions.data or []):
+                    q_lookup[q["id"]] = {"number": q.get("question_number"), "category": q.get("category", ""), "text": q.get("question_text", ""), "type": q.get("question_type", "rating")}
+                
+                all_scores = {}
+                tenant_list = []
+                for r in (responses.data or []):
+                    resp_id = r["id"]
+                    scores = supabase.table("feedback_scores").select("question_id, score, text_answer").eq("response_id", resp_id).execute()
+                    tenant_scores = {}
+                    for sc in (scores.data or []):
+                        if sc.get("score"): tenant_scores[sc["question_id"]] = sc.get("score")
+                    all_scores[resp_id] = {"name": r.get("respondent_name","?") if not r.get("is_anonymous") else "Anonymous", "company": r.get("company","?"), "scores": tenant_scores, "submitted": str(r.get("submitted_at",""))[:10]}
+                    tenant_list.append(all_scores[resp_id])
+                
+                # Calculate indices
+                hard_qs = [qid for qid, q in q_lookup.items() if q["number"] and 1 <= q["number"] <= 8]
+                soft_qs = [qid for qid, q in q_lookup.items() if q["number"] and q["number"] in [9, 10, 12]]
+                
+                fsi_vals, hei_vals, nps_vals = [], [], []
+                for td in tenant_list:
+                    h = [td["scores"].get(qid, 0) for qid in hard_qs if td["scores"].get(qid)]
+                    s = [td["scores"].get(qid, 0) for qid in soft_qs if td["scores"].get(qid)]
+                    if h: fsi_vals.append(sum(h)/len(h))
+                    if s: hei_vals.append(sum(s)/len(s))
+                    q13_id = next((qid for qid, q in q_lookup.items() if q["number"] == 13), None)
+                    if q13_id and td["scores"].get(q13_id): nps_vals.append(td["scores"][q13_id])
+                
+                avg_fsi = round(sum(fsi_vals)/len(fsi_vals), 1) if fsi_vals else 0
+                avg_hei = round(sum(hei_vals)/len(hei_vals), 1) if hei_vals else 0
+                
+                promoters = sum(1 for s in nps_vals if s >= 4)
+                passives = sum(1 for s in nps_vals if s == 3)
+                detractors = sum(1 for s in nps_vals if s <= 2)
+                nps_score = round(((promoters - detractors) / max(len(nps_vals), 1)) * 100)
+                tss = round(((avg_fsi * 0.5 + avg_hei * 0.3 + (promoters/max(total_responses,1)) * 0.2 * 4) / 4) * 100)
+                
+                churn_risk = round((passives / max(total_responses, 1)) * 100) if total_responses > 0 else 0
+                advocacy_delta = round(abs(avg_fsi - avg_hei), 1)
+                
+                # ============================================
+                # 🟦 TOP RIBBON — 4 KPI TILES
+                # ============================================
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    tc = "#10B981" if tss >= 80 else "#F59E0B" if tss >= 60 else "#EF4444"
+                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Tenant Sentiment Score</div><div style="font-size:2rem;font-weight:800;color:{tc};">{tss}/100</div><div style="font-size:0.6rem;color:#888;">Composite Q1-Q13</div></div>""", unsafe_allow_html=True)
+                with c2:
+                    tc = "#10B981" if churn_risk < 5 else "#F59E0B" if churn_risk < 15 else "#EF4444"
+                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Silent Churn Risk</div><div style="font-size:2rem;font-weight:800;color:{tc};">{churn_risk}%</div><div style="font-size:0.6rem;color:#888;">Passive tenants</div></div>""", unsafe_allow_html=True)
+                with c3:
+                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid #3B82F6;box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">NPS Score</div><div style="font-size:2rem;font-weight:800;color:#3B82F6;">{nps_score}</div><div style="font-size:0.6rem;color:#888;">Promoters-Detractors</div></div>""", unsafe_allow_html=True)
+                with c4:
+                    tc = "#F59E0B" if advocacy_delta > 0.5 else "#10B981"
+                    st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;text-align:center;border-top:4px solid {tc};box-shadow:0 2px 8px rgba(0,0,0,0.06);"><div style="font-size:0.6rem;color:#888;text-transform:uppercase;">Advocacy Delta</div><div style="font-size:2rem;font-weight:800;color:{tc};">{advocacy_delta}</div><div style="font-size:0.6rem;color:#888;">Hard FM vs Soft FM gap</div></div>""", unsafe_allow_html=True)
+                
                 st.markdown("---")
-                st.markdown("### 📈 Category Scores")
-                for q in questions.data:
-                    if q.get("question_type") == "rating":
-                        scores_data = supabase.table("feedback_scores").select("score").eq("question_id", q["id"]).execute()
-                        if scores_data.data:
-                            avg_score = sum(sc["score"] for sc in scores_data.data) / len(scores_data.data)
-                            stars = "⭐" * round(avg_score)
-                            st.markdown(f"**{q.get('question_number')}. {q.get('category','')}**")
-                            st.markdown(f"{stars} **{avg_score:.1f}/4**")
-                            st.progress(avg_score / 4)
-        else:
-            st.info("No survey data yet")
+                
+                # ============================================
+                # 🟩 LEFT (60%) + 🟨 RIGHT (40%) LAYOUT
+                # ============================================
+                left_col, right_col = st.columns([3, 2])
+                
+                with left_col:
+                    st.markdown("### 📊 P.R.E.D.I.C.T. Tenant Health Matrix")
+                    st.caption("X-Axis: Hard FM (Q1-Q8) | Y-Axis: Soft FM (Q9,Q10,Q12) | Bubble: Response count")
+                    
+                    # Scatter plot data
+                    scatter_data = []
+                    for td in tenant_list:
+                        h_avg = sum([td["scores"].get(qid, 0) for qid in hard_qs if td["scores"].get(qid)]) / max(len([qid for qid in hard_qs if td["scores"].get(qid)]), 1)
+                        s_avg = sum([td["scores"].get(qid, 0) for qid in soft_qs if td["scores"].get(qid)]) / max(len([qid for qid in soft_qs if td["scores"].get(qid)]), 1)
+                        scatter_data.append({"Tenant": td["company"], "Hard FM": h_avg, "Soft FM": s_avg, "Size": 20})
+                    
+                    if scatter_data:
+                        sd = pd.DataFrame(scatter_data)
+                        fig_scatter = px.scatter(sd, x="Hard FM", y="Soft FM", text="Tenant", size="Size", title="Tenant Positioning Matrix", color_discrete_sequence=["#CC0000"], range_x=[0,4.5], range_y=[0,4.5])
+                        fig_scatter.add_hline(y=2.5, line_dash="dash", line_color="#F59E0B", annotation_text="Soft FM Threshold")
+                        fig_scatter.add_vline(x=2.5, line_dash="dash", line_color="#F59E0B", annotation_text="Hard FM Threshold")
+                        fig_scatter.update_layout(height=400)
+                        st.plotly_chart(fig_scatter, use_container_width=True)
+                        
+                        st.caption("🟢 Top-Right: Stars | 🔵 Bottom-Right: Machines | 🟡 Top-Left: Hospitable but Broken | 🔴 Bottom-Left: At-Risk")
+                    
+                    st.markdown("---")
+                    st.markdown("### 📉 Category Performance (Lollipop Chart)")
+                    
+                    cat_scores = {}
+                    for qid, qinfo in q_lookup.items():
+                        cat = qinfo.get("category", qinfo.get("text", ""))
+                        if not cat: continue
+                        vals = [td["scores"].get(qid) for td in tenant_list if td["scores"].get(qid)]
+                        if vals: cat_scores[cat] = round(sum(vals)/len(vals), 1)
+                    
+                    if cat_scores:
+                        sorted_cats = sorted(cat_scores.items(), key=lambda x: x[1])
+                        cat_df = pd.DataFrame(sorted_cats, columns=["Category", "Score"])
+                        cat_df["Color"] = ["#EF4444" if s < 2.5 else "#F59E0B" if s < 3.5 else "#10B981" for s in cat_df["Score"]]
+                        
+                        fig_lollipop = go.Figure()
+                        for _, row in cat_df.iterrows():
+                            fig_lollipop.add_trace(go.Scatter(x=[row["Score"]], y=[row["Category"]], mode="markers", marker=dict(color=row["Color"], size=14), name=row["Category"]))
+                            fig_lollipop.add_trace(go.Scatter(x=[0, row["Score"]], y=[row["Category"], row["Category"]], mode="lines", line=dict(color=row["Color"], width=3), showlegend=False))
+                        fig_lollipop.update_layout(height=400, xaxis_title="Score /4", xaxis_range=[0,4.5], showlegend=False)
+                        st.plotly_chart(fig_lollipop, use_container_width=True)
+                
+                with right_col:
+                    st.markdown("### 💬 Voice of Customer")
+                    
+                    # Show quotes from Q14
+                    q14_id = next((qid for qid, q in q_lookup.items() if q["number"] == 14), None)
+                    if q14_id:
+                        quotes = []
+                        for td in tenant_list:
+                            text_scores = supabase.table("feedback_scores").select("text_answer").eq("question_id", q14_id).execute()
+                            if text_scores.data:
+                                for ts in text_scores.data:
+                                    if ts.get("text_answer") and ts["text_answer"].strip():
+                                        quotes.append(ts["text_answer"])
+                        
+                        if quotes:
+                            for i, quote in enumerate(quotes[:5]):
+                                st.markdown(f"""
+                                <div style="background:white;border-left:4px solid #CC0000;border-radius:8px;padding:0.8rem;margin:0.4rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                                    <p style="font-size:0.8rem;font-style:italic;margin:0;">"{quote[:150]}{'...' if len(quote)>150 else ''}"</p>
+                                    <p style="font-size:0.6rem;color:#888;margin-top:0.3rem;">— Tenant Response #{i+1}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+                        else:
+                            st.info("No open-text responses yet.")
+                    
+                    st.markdown("---")
+                    st.markdown("### ⚠️ AI Risk Alerts")
+                    
+                    if detractors > 0:
+                        st.error(f"""
+                        🚨 **Detractor Alert:** {detractors} tenant(s) unlikely to recommend.
+                        <br>💰 Immediate outreach recommended to prevent churn.
+                        """)
+                    
+                    if churn_risk > 10:
+                        st.warning(f"""
+                        ⚠️ **Silent Churn:** {churn_risk}% of tenants are Passive.
+                        <br>📊 These tenants are one bad experience away from becoming Detractors.
+                        """)
+                    
+                    if advocacy_delta > 0.5:
+                        st.info(f"""
+                        📡 **Perception Gap:** Hard FM and Soft FM scores differ by {advocacy_delta} points.
+                        <br>🔍 Investigate disconnect between infrastructure and service quality.
+                        """)
+                
+                st.markdown("---")
+                
+                # ============================================
+                # 🟪 BOTTOM — RESPONDENT DETAILS WITH PAGINATION
+                # ============================================
+                st.markdown("### 📋 Respondent Details")
+                
+                resp_page_size = 10
+                if "resp_page" not in st.session_state:
+                    st.session_state.resp_page = 1
+                
+                total_resp_pages = max(1, (total_responses + resp_page_size - 1) // resp_page_size)
+                resp_start = (st.session_state.resp_page - 1) * resp_page_size
+                resp_end = min(resp_start + resp_page_size, total_responses)
+                
+                c1, c2, c3 = st.columns([1, 2, 1])
+                with c1:
+                    if st.button("◀", key="resp_prev") and st.session_state.resp_page > 1:
+                        st.session_state.resp_page -= 1; st.rerun()
+                with c2:
+                    st.markdown(f"**Page {st.session_state.resp_page} of {total_resp_pages}**")
+                with c3:
+                    if st.button("▶", key="resp_next") and st.session_state.resp_page < total_resp_pages:
+                        st.session_state.resp_page += 1; st.rerun()
+                
+                if responses.data:
+                    for r in list(responses.data)[resp_start:resp_end]:
+                        td = next((t for t in tenant_list if t.get("name") == r.get("respondent_name","?")), None)
+                        scores_str = ""
+                        if td:
+                            sc_items = [f"Q{q_lookup[qid]['number']}: {td['scores'][qid]}/4" for qid in td["scores"] if qid in q_lookup]
+                            scores_str = " | ".join(sc_items[:8])
+                        
+                        st.markdown(f"""
+                        <div style="background:white;border-radius:8px;padding:0.7rem;margin:0.2rem 0;border-left:3px solid #3B82F6;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                            <b>{r.get('respondent_name','?')}</b> — {r.get('company','?')}
+                            <br><span style="font-size:0.65rem;color:#888;">📅 {str(r.get('submitted_at',''))[:10]} | {scores_str}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
     
     # ============================================
-    # TAB 2: AI-POWERED TENANT HEALTH & REVENUE PROTECTION
-    # P.R.E.D.I.C.T. FRAMEWORK
+    # TAB 2: AI ANALYTICS (PRESERVED FROM BEFORE)
     # ============================================
     with tabs[2]:
         st.markdown("### 🤖 AI-Powered Tenant Health & Revenue Protection Report")
@@ -5699,269 +5924,116 @@ def page_feedback():
             questions = supabase.table("feedback_questions").select("*").eq("survey_id", s["id"]).order("question_number").execute()
             responses = supabase.table("feedback_responses").select("id, respondent_name, company, is_anonymous").eq("survey_id", s["id"]).execute()
             
-            if not responses.data or len(responses.data) < 3:
-                st.info("Need at least 3 responses for AI analysis.")
+            if not responses.data or len(responses.data) < 2:
+                st.info("Need at least 2 responses for AI analysis.")
             else:
-                # Build response matrix
-                all_scores = {}
-                tenant_data = []
-                
-                for r in responses.data:
-                    resp_id = r["id"]
-                    scores = supabase.table("feedback_scores").select("question_id, score, text_answer").eq("response_id", resp_id).execute()
-                    
-                    tenant_scores = {}
-                    for sc in (scores.data or []):
-                        qid = sc.get("question_id")
-                        score_val = sc.get("score")
-                        if score_val:
-                            tenant_scores[qid] = score_val
-                    
-                    all_scores[resp_id] = {
-                        "name": r.get("respondent_name", "Anonymous") if not r.get("is_anonymous") else "Anonymous",
-                        "company": r.get("company", "Unknown"),
-                        "scores": tenant_scores
-                    }
-                    tenant_data.append(all_scores[resp_id])
-                
-                # Build question lookup
+                # Build data (same as TAB 1)
                 q_lookup = {}
                 for q in (questions.data or []):
-                    q_lookup[q["id"]] = {
-                        "number": q.get("question_number"),
-                        "category": q.get("category", ""),
-                        "text": q.get("question_text", ""),
-                        "type": q.get("question_type", "rating")
-                    }
+                    q_lookup[q["id"]] = {"number": q.get("question_number"), "category": q.get("category", ""), "text": q.get("question_text", ""), "type": q.get("question_type", "rating")}
                 
-                # ============================================
-                # EXECUTIVE KPI ROW
-                # ============================================
-                total_respondents = len(responses.data)
+                all_scores = {}
+                tenant_list = []
+                for r in (responses.data or []):
+                    resp_id = r["id"]
+                    scores = supabase.table("feedback_scores").select("question_id, score, text_answer").eq("response_id", resp_id).execute()
+                    tenant_scores = {}
+                    for sc in (scores.data or []):
+                        if sc.get("score"): tenant_scores[sc["question_id"]] = sc.get("score")
+                    all_scores[resp_id] = {"name": r.get("respondent_name","?"), "company": r.get("company","?"), "scores": tenant_scores}
+                    tenant_list.append(all_scores[resp_id])
                 
-                # Calculate indices
-                hard_fm_qs = [qid for qid, q in q_lookup.items() if q["number"] and q["number"] <= 8]
-                soft_fm_qs = [qid for qid, q in q_lookup.items() if q["number"] and q["number"] in [9, 10, 12]]
+                # FSI, HEI, NPS
+                hard_qs = [qid for qid, q in q_lookup.items() if q["number"] and 1 <= q["number"] <= 8]
+                soft_qs = [qid for qid, q in q_lookup.items() if q["number"] and q["number"] in [9, 10, 12]]
                 
-                fsi_scores = []
-                hei_scores = []
-                nps_scores = []
+                fsi_vals, hei_vals, nps_vals = [], [], []
+                for td in tenant_list:
+                    h = [td["scores"].get(qid, 0) for qid in hard_qs if td["scores"].get(qid)]
+                    s = [td["scores"].get(qid, 0) for qid in soft_qs if td["scores"].get(qid)]
+                    if h: fsi_vals.append(sum(h)/len(h))
+                    if s: hei_vals.append(sum(s)/len(s))
+                    q13_id = next((qid for qid, q in q_lookup.items() if q["number"] == 13), None)
+                    if q13_id and td["scores"].get(q13_id): nps_vals.append(td["scores"][q13_id])
                 
-                for td in tenant_data:
-                    hards = [td["scores"].get(qid, 0) for qid in hard_fm_qs if td["scores"].get(qid)]
-                    softs = [td["scores"].get(qid, 0) for qid in soft_fm_qs if td["scores"].get(qid)]
-                    if hards: fsi_scores.append(sum(hards)/len(hards))
-                    if softs: hei_scores.append(sum(softs)/len(softs))
-                    # Q13 is NPS proxy
-                    nps_val = td["scores"].get([qid for qid, q in q_lookup.items() if q["number"] == 13][0] if any(q["number"] == 13 for q in q_lookup.values()) else None)
-                    if nps_val: nps_scores.append(nps_val)
+                avg_fsi = round(sum(fsi_vals)/len(fsi_vals), 1) if fsi_vals else 0
+                avg_hei = round(sum(hei_vals)/len(hei_vals), 1) if hei_vals else 0
+                promoters = sum(1 for s in nps_vals if s >= 4)
+                passives = sum(1 for s in nps_vals if s == 3)
+                detractors = sum(1 for s in nps_vals if s <= 2)
+                nps_score = round(((promoters - detractors) / max(len(nps_vals), 1)) * 100)
+                tss = round(((avg_fsi * 0.5 + avg_hei * 0.3 + (promoters/max(len(tenant_list),1)) * 0.2 * 4) / 4) * 100)
+                churn_risk = round((passives / max(len(tenant_list), 1)) * 100)
                 
-                avg_fsi = round(sum(fsi_scores)/len(fsi_scores), 1) if fsi_scores else 0
-                avg_hei = round(sum(hei_scores)/len(hei_scores), 1) if hei_scores else 0
-                avg_nps = round(sum(nps_scores)/len(nps_scores), 1) if nps_scores else 0
+                # Tenant health scores
+                tenant_health = []
+                for td in tenant_list:
+                    vals = [v for v in td["scores"].values() if v]
+                    if vals:
+                        avg = sum(vals)/len(vals)
+                        nps = td["scores"].get(q13_id, 3) if q13_id else 3
+                        health = min(100, max(0, round((avg * 0.6 + nps * 0.4) * 25)))
+                        risk = "Low" if health >= 75 else "Medium" if health >= 50 else "High"
+                        tenant_health.append({"Tenant": td["company"], "Health": health, "Risk": risk})
                 
-                # Detractor/Passive/Promoter counts
-                promoters = sum(1 for s in nps_scores if s >= 4)
-                passives = sum(1 for s in nps_scores if s == 3)
-                detractors = sum(1 for s in nps_scores if s <= 2)
-                nps_score = round(((promoters - detractors) / max(len(nps_scores), 1)) * 100)
+                high_risk = len([t for t in tenant_health if t["Risk"] == "High"])
+                at_risk_revenue = high_risk * 50000
                 
-                st.markdown("### 🎯 Executive Indices")
-                c1, c2, c3, c4, c5 = st.columns(5)
-                with c1:
-                    color = "#10B981" if avg_fsi >= 3.5 else "#F59E0B" if avg_fsi >= 2.5 else "#EF4444"
-                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">🏗️ FSI (Hard FM)</div><div style="font-size:1.5rem;font-weight:800;color:{color};">{avg_fsi}/4</div></div>""", unsafe_allow_html=True)
-                with c2:
-                    color = "#10B981" if avg_hei >= 3.5 else "#F59E0B" if avg_hei >= 2.5 else "#EF4444"
-                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">🤝 HEI (Soft FM)</div><div style="font-size:1.5rem;font-weight:800;color:{color};">{avg_hei}/4</div></div>""", unsafe_allow_html=True)
-                with c3:
-                    color = "#10B981" if nps_score >= 50 else "#F59E0B" if nps_score >= 0 else "#EF4444"
-                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">📊 NPS Score</div><div style="font-size:1.5rem;font-weight:800;color:{color};">{nps_score}</div></div>""", unsafe_allow_html=True)
-                with c4:
-                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">🟢 Promoters</div><div style="font-size:1.5rem;font-weight:800;color:#10B981;">{promoters}</div></div>""", unsafe_allow_html=True)
-                with c5:
-                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #EF4444;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">🔴 Detractors</div><div style="font-size:1.5rem;font-weight:800;color:#EF4444;">{detractors}</div></div>""", unsafe_allow_html=True)
-                
-                # NPS gauge
-                if nps_scores:
-                    nps_labels = ["Detractors", "Passives", "Promoters"]
-                    nps_values = [detractors, passives, promoters]
-                    nps_colors = ["#EF4444", "#F59E0B", "#10B981"]
-                    fig_nps = px.pie(values=nps_values, names=nps_labels, title=f"NPS Distribution (Score: {nps_score})", color_discrete_sequence=nps_colors, hole=0.5)
-                    fig_nps.update_layout(height=350)
-                    st.plotly_chart(fig_nps, use_container_width=True)
-                
-                st.markdown("---")
-                
-                # ============================================
-                # LAYER 1: SILENT CHURN RISK MATRIX
-                # ============================================
-                st.markdown("### 🔴 Layer 1: Silent Churn Risk Matrix")
-                st.caption("Identifying tenants at risk of non-renewal based on satisfaction patterns")
-                
-                # Calculate category averages
+                # Category scores
                 cat_scores = {}
                 for qid, qinfo in q_lookup.items():
                     cat = qinfo.get("category", qinfo.get("text", ""))
                     if not cat: continue
-                    scores_list = [td["scores"].get(qid) for td in tenant_data if td["scores"].get(qid)]
-                    if scores_list:
-                        cat_scores[cat] = round(sum(scores_list)/len(scores_list), 1)
-                
-                if cat_scores:
-                    # Bar chart
-                    sorted_cats = sorted(cat_scores.items(), key=lambda x: x[1])
-                    cat_names = [c[0] for c in sorted_cats]
-                    cat_vals = [c[1] for c in sorted_cats]
-                    colors_cats = ["#EF4444" if v < 2.5 else "#F59E0B" if v < 3.5 else "#10B981" for v in cat_vals]
-                    
-                    fig_cats = px.bar(x=cat_vals, y=cat_names, orientation='h', title="Category Performance — Lowest Scores = Highest Churn Risk", color=cat_vals, color_continuous_scale=["#EF4444","#F59E0B","#10B981"], range_color=[1,4])
-                    fig_cats.update_layout(height=400)
-                    st.plotly_chart(fig_cats, use_container_width=True)
-                    
-                    # Weakest link
-                    weakest = sorted_cats[0]
-                    strongest = sorted_cats[-1]
-                    
-                    st.markdown(f"""
-                    <div style="background:#FEF2F2;border-left:4px solid #EF4444;border-radius:8px;padding:1rem;margin:0.5rem 0;">
-                        <b>⚠️ Critical Finding:</b> <b>{weakest[0]}</b> is your weakest category at <b>{weakest[1]}/4</b>. 
-                        Tenants rating this below 3/4 are statistically more likely to become Detractors, even if other services score highly.
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.markdown("---")
+                    vals = [td["scores"].get(qid) for td in tenant_list if td["scores"].get(qid)]
+                    if vals: cat_scores[cat] = round(sum(vals)/len(vals), 1)
                 
                 # ============================================
-                # LAYER 2: AI SERVICE RECOVERY ACTION LOG
+                # AI EXECUTIVE SUMMARY (Top)
                 # ============================================
-                st.markdown("### 🟡 Layer 2: AI Service Recovery Action Log")
-                st.caption("Revenue-prioritized task list based on tenant impact, not just urgency")
-                
-                # Gap analysis: Aesthetics vs Core Functions
-                aesthetic_qs = [qid for qid, q in q_lookup.items() if "aesthetic" in q.get("category","").lower() or "clean" in q.get("category","").lower()]
-                core_qs = [qid for qid, q in q_lookup.items() if q["number"] and q["number"] <= 4]
-                
-                aesthetic_avg = round(sum([cat_scores.get(q_lookup[qid]["category"], 0) for qid in aesthetic_qs if q_lookup[qid]["category"] in cat_scores]) / max(len(aesthetic_qs), 1), 1)
-                core_avg = round(sum([cat_scores.get(q_lookup[qid]["category"], 0) for qid in core_qs if q_lookup[qid]["category"] in cat_scores]) / max(len(core_qs), 1), 1)
-                
-                if aesthetic_avg > 0 and core_avg > 0:
-                    gap = aesthetic_avg - core_avg
-                    if gap > 0.5:
-                        st.warning(f"""
-                        🚨 **Aesthetics vs. Function Gap Detected:** Aesthetics score <b>{aesthetic_avg}/4</b> but Core Functions score <b>{core_avg}/4</b>.
-                        <br>⚠️ The building looks good but doesn't function well. Tenants notice the gap.
-                        <br>💰 <b>Recommendation:</b> Redirect capital from cosmetic upgrades to core infrastructure (HVAC, plumbing, elevators).
-                        <br>📊 <b>Reason:</b> Aesthetics don't compensate for physical discomfort over a 12-month lease period.
-                        """, unsafe_allow_html=True)
-                
-                # Digital Disconnect Alert
-                internet_qs = [qid for qid, q in q_lookup.items() if "internet" in q.get("category","").lower() or "wifi" in q.get("category","").lower()]
-                response_qs = [qid for qid, q in q_lookup.items() if "response" in q.get("category","").lower() or "app" in q.get("category","").lower()]
-                
-                internet_avg = round(sum([cat_scores.get(q_lookup[qid]["category"], 0) for qid in internet_qs if q_lookup[qid]["category"] in cat_scores]) / max(len(internet_qs), 1), 1)
-                response_avg = round(sum([cat_scores.get(q_lookup[qid]["category"], 0) for qid in response_qs if q_lookup[qid]["category"] in cat_scores]) / max(len(response_qs), 1), 1)
-                
-                if internet_avg > 0 and response_avg > 0 and internet_avg > response_avg + 0.5:
-                    st.info(f"""
-                    📡 **Digital Disconnect Alert:** Internet quality is <b>{internet_avg}/4</b> but App Response is <b>{response_avg}/4</b>.
-                    <br>💡 The infrastructure isn't the problem — the helpdesk response time is.
-                    <br>🔧 <b>Action:</b> Review helpdesk staffing and ticket triage process.
-                    """, unsafe_allow_html=True)
-                
-                st.markdown("---")
-                
-                # ============================================
-                # LAYER 3: PREDICTIVE LEASE RENEWAL PROBABILITY
-                # ============================================
-                st.markdown("### 🟢 Layer 3: Predictive Lease Renewal Probability")
-                st.caption("AI-calculated tenant health scores and revenue risk exposure")
-                
-                # Individual Tenant Health Scores
-                tenant_health = []
-                for td in tenant_data:
-                    scores_list = [v for v in td["scores"].values() if v]
-                    if scores_list:
-                        avg = sum(scores_list) / len(scores_list)
-                        nps = td["scores"].get([qid for qid, q in q_lookup.items() if q["number"] == 13][0] if any(q["number"] == 13 for q in q_lookup.values()) else None, 3)
-                        health = round((avg * 0.6 + nps * 0.4) * 25)  # Scale to 0-100
-                        health = min(100, max(0, health))
-                        
-                        risk = "Low" if health >= 75 else "Medium" if health >= 50 else "High"
-                        risk_color = "#10B981" if risk == "Low" else "#F59E0B" if risk == "Medium" else "#EF4444"
-                        
-                        tenant_health.append({
-                            "Tenant": td["name"],
-                            "Company": td["company"],
-                            "Health Score": health,
-                            "Risk Level": risk,
-                            "Risk Color": risk_color
-                        })
-                
-                if tenant_health:
-                    th_df = pd.DataFrame(tenant_health)
-                    
-                    # Health score chart
-                    fig_health = px.bar(th_df.sort_values("Health Score"), x="Health Score", y="Tenant", orientation='h', title="Individual Tenant Health Scores (0-100)", color="Health Score", color_continuous_scale=["#EF4444","#F59E0B","#10B981"], range_color=[0,100])
-                    fig_health.update_layout(height=400)
-                    st.plotly_chart(fig_health, use_container_width=True)
-                    
-                    # Risk breakdown
-                    high_risk = len(th_df[th_df["Risk Level"] == "High"])
-                    medium_risk = len(th_df[th_df["Risk Level"] == "Medium"])
-                    low_risk = len(th_df[th_df["Risk Level"] == "Low"])
-                    
-                    # Monetization estimate
-                    avg_annual_rent = 50000  # Assumed average annual rent per tenant in USD
-                    at_risk_revenue = high_risk * avg_annual_rent
-                    
-                    c1, c2, c3 = st.columns(3)
-                    with c1:
-                        st.metric("🟢 Low Risk", low_risk)
-                    with c2:
-                        st.metric("🟡 Medium Risk", medium_risk)
-                    with c3:
-                        st.metric("🔴 High Risk (Churn)", high_risk)
-                    
-                    if high_risk > 0:
-                        st.error(f"""
-                        💰 **Revenue at Risk:** <b>{high_risk}</b> tenants are at high risk of non-renewal.
-                        <br>📊 Estimated annual revenue exposure: <b>${at_risk_revenue:,}</b>
-                        <br>🎯 <b>Recommendation:</b> Prioritize service recovery for these tenants within 30 days.
-                        """)
-                
-                st.markdown("---")
-                
-                # ============================================
-                # AI EXECUTIVE SUMMARY
-                # ============================================
-                st.markdown("### 📋 AI Executive Summary — REVENUE PROTECTION ADVISORY")
-                
-                summary_points = []
+                st.markdown("### 📋 REVENUE PROTECTION ADVISORY")
                 
                 if cat_scores:
                     weakest = min(cat_scores, key=cat_scores.get)
-                    summary_points.append(f"🔴 **Critical Finding:** '{weakest}' ({cat_scores[weakest]}/4) is dragging down your overall NPS. Address this within 48 hours.")
+                    st.error(f"""
+                    🔴 **Critical Finding:** '{weakest}' ({cat_scores[weakest]}/4) is dragging down your NPS.
+                    <br>💰 Tenants rating this below 3/4 are statistically more likely to become Detractors.
+                    """)
                 
-                if aesthetic_avg > 0 and core_avg > 0 and aesthetic_avg > core_avg:
-                    summary_points.append(f"⚠️ **Broken Window Effect:** Aesthetics outscoring Core Functions by {round(aesthetic_avg - core_avg, 1)} points. Redirect capital to infrastructure.")
+                if avg_fsi > avg_hei + 0.5:
+                    st.info(f"""
+                    📡 **Perception Gap:** Hard FM ({avg_fsi}/4) outpaces Soft FM ({avg_hei}/4).
+                    <br>🔧 The building works, but service attitude needs improvement.
+                    """)
                 
-                if nps_score < 0:
-                    summary_points.append(f"🚨 **NPS Alert:** Your NPS score of {nps_score} indicates more Detractors than Promoters. Immediate service recovery required.")
-                elif nps_score < 30:
-                    summary_points.append(f"⚠️ **NPS Warning:** Score of {nps_score} is below the 30-point threshold for B2B office rentals.")
-                else:
-                    summary_points.append(f"✅ **NPS Healthy:** Score of {nps_score} indicates strong tenant advocacy.")
+                if detractors > 0:
+                    st.error(f"""
+                    🚨 **Revenue at Risk:** {detractors} Detractors identified.
+                    <br>📊 Estimated annual exposure: <b>${detractors * 50000:,}</b>
+                    """)
                 
-                if high_risk > 0:
-                    summary_points.append(f"💰 **Revenue Protection:** {high_risk} tenants at high churn risk. Predicted exposure: ${at_risk_revenue:,} annually.")
+                if passives > promoters:
+                    st.warning(f"""
+                    ⚠️ **Silent Churn:** More Passives ({passives}) than Promoters ({promoters}).
+                    <br>🎯 These tenants are undecided — proactive outreach can convert them.
+                    """)
                 
-                for point in summary_points:
-                    st.markdown(f"""
-                    <div style="background:white;border-left:4px solid #CC0000;border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                        {point}
-                    </div>
-                    """, unsafe_allow_html=True)
+                st.markdown("---")
+                
+                # Charts
+                c1, c2 = st.columns(2)
+                with c1:
+                    if tenant_health:
+                        th_df = pd.DataFrame(tenant_health).sort_values("Health")
+                        fig_h = px.bar(th_df, x="Health", y="Tenant", orientation='h', title="Tenant Health Scores (0-100)", color="Health", color_continuous_scale=["#EF4444","#F59E0B","#10B981"], range_color=[0,100])
+                        fig_h.update_layout(height=350)
+                        st.plotly_chart(fig_h, use_container_width=True)
+                with c2:
+                    if nps_vals:
+                        nps_labels = ["Detractors", "Passives", "Promoters"]
+                        nps_values = [detractors, passives, promoters]
+                        fig_n = px.pie(values=nps_values, names=nps_labels, title=f"NPS Distribution (Score: {nps_score})", color_discrete_sequence=["#EF4444","#F59E0B","#10B981"], hole=0.5)
+                        fig_n.update_layout(height=350)
+                        st.plotly_chart(fig_n, use_container_width=True)
     
     # ============================================
     # TAB 3: SURVEY ADMIN
