@@ -5364,7 +5364,7 @@ def page_users():
                 c1, c2 = st.columns(2)
                 with c1:
                     if st.form_submit_button("💾 SAVE ALL CHANGES", use_container_width=True, type="primary"):
-                        update_data = {"name": edit_name, "email": edit_email, "employee_id": edit_emp, "mobile": edit_mobile, "designation": edit_desig, "designation_level": edit_desig, "role": edit_role, "user_type": edit_type, "home_facility": edit_facility, "extra_permissions": selected_modules, "department_permissions": edit_depts if edit_depts else ["All"], "is_active": edit_active, "account_locked": edit_locked, "updated_by": st.session_state.get("user_name",""), "updated_at": datetime.now().isoformat()}
+                        update_data = {"name": edit_name, "email": edit_email, "employee_id": edit_emp, "mobile": edit_mobile, "designation": edit_desig, "designation_level": edit_desig, "role": edit_role, "user_type": edit_type, "home_facility": edit_facilities, "extra_permissions": selected_modules, "department_permissions": edit_depts if edit_depts else ["All"], "is_active": edit_active, "account_locked": edit_locked, "updated_by": st.session_state.get("user_name",""), "updated_at": datetime.now().isoformat()}
                         if edit_locked:
                             update_data["failed_login_attempts"] = 0
                         if edit_type in ["contractor", "vendor"]:
