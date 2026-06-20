@@ -5297,9 +5297,7 @@ def page_users():
                     edit_role = st.selectbox("System Role*", roles_list, format_func=lambda x: role_names.get(x, x), index=role_idx)
                 with c2:
                     current_type = user.get("user_type", "staff")
-                   edit_type = st.selectbox("User Type", ["staff", "management", "tenant", "contractor", "vendor"], 
-                        index=["staff","management","tenant","contractor","vendor"].index(current_type) if current_type in ["staff","management","tenant","contractor","vendor"] else 0, 
-                        format_func=lambda x: {"staff":"👤 Staff","management":"💼 Management","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}[x])
+                    edit_type = st.selectbox("User Type", ["staff", "management", "tenant", "contractor", "vendor"], index=["staff","management","tenant","contractor","vendor"].index(current_type) if current_type in ["staff","management","tenant","contractor","vendor"] else 0, format_func=lambda x: {"staff":"👤 Staff","management":"💼 Management","tenant":"🏢 Tenant","contractor":"🔧 Contractor","vendor":"📦 Vendor"}[x])
                 with c3:
                     current_facs = safe_parse_permissions(user.get("home_facility", "WTC"))
                     if isinstance(current_facs, str):
