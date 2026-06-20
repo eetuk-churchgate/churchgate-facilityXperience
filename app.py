@@ -5505,6 +5505,12 @@ def page_feedback():
     # TAB 0: TAKE SURVEY
     # ============================================
     with tabs[0]:
+        # Show success message if flag is set
+        if st.session_state.get("show_success", False):
+            st.success("✅ Thank you for your feedback! Your responses have been recorded. A confirmation has been sent to your email.")
+            st.balloons()
+            st.session_state.show_success = False
+        
         survey = supabase.table("feedback_surveys").select("*").eq("facility_code", fc).eq("is_active", True).execute()
         
         if not survey.data or len(survey.data) == 0:
@@ -5691,8 +5697,7 @@ def page_feedback():
                                     except:
                                         pass
                                 
-                                st.success("✅ Thank you for your feedback! Your responses have been recorded. A confirmation has been sent to your email.")
-                                st.balloons()
+                                st.session_state.show_success = True
                                 st.rerun()
     
     # ============================================
@@ -5893,6 +5898,43 @@ def page_feedback():
                     if st.button("▶", key="resp_next") and st.session_state.resp_page < total_resp_pages:
                         st.session_state.resp_page += 1; st.rerun()
                 
+                # Export buttons
+                st.markdown("### 📥 Export Reports")
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("📄 Generate HTML Report", key="gen_html_report", use_container_width=True):
+                        logo_b64 = get_logo_base64()
+                        html_report = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px;color:#1a1a1a}}h1{{color:#CC0000}}.kpi{{display:flex;gap:10px;margin:15px 0}}.kpi div{{flex:1;background:#f5f5f5;padding:15px;border-radius:8px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:24px;font-weight:800}}.card{{background:white;border-left:4px solid #3B82F6;padding:10px;margin:8px 0;border-radius:6px}}</style></head><body><h1>Tenant Satisfaction Report</h1><p>{info.get('full_name',fc)} | {date.today().strftime('%d %B %Y')}</p><div class="kpi"><div><div class="val">{tss}/100</div>TSS</div><div><div class="val">{nps_score}</div>NPS</div><div><div class="val">{churn_risk}%</div>Churn Risk</div><div><div class="val">{total_responses}</div>Responses</div></div><h2>Respondents</h2>"""
+                        for r in (responses.data or []):
+                            html_report += f'<div class="card"><b>{r.get("respondent_name","?")}</b> — {r.get("company","?")}<br><small>{str(r.get("submitted_at",""))[:10]}</small></div>'
+                        html_report += "</body></html>"
+                        st.download_button("📥 Download HTML", html_report, f"tenant_report_{date.today()}.html", "text/html", use_container_width=True)
+                with c2:
+                    if st.button("📕 Generate PDF Report", key="gen_pdf_report", use_container_width=True):
+                        try:
+                            from fpdf import FPDF
+                            pdf = FPDF()
+                            pdf.add_page()
+                            pdf.set_font('Helvetica','B',16)
+                            pdf.set_text_color(204,0,0)
+                            pdf.cell(0,10,'Tenant Satisfaction Report',0,1)
+                            pdf.set_font('Helvetica','',10)
+                            pdf.set_text_color(0,0,0)
+                            pdf.cell(0,6,f'{info.get("full_name",fc)} | {date.today().strftime("%d %B %Y")}',0,1)
+                            pdf.ln(5)
+                            for r in (responses.data or []):
+                                pdf.set_font('Helvetica','B',11)
+                                pdf.cell(0,6,f'{r.get("respondent_name","?")} — {r.get("company","?")}',0,1)
+                                pdf.set_font('Helvetica','',9)
+                                pdf.cell(0,5,f'Submitted: {str(r.get("submitted_at",""))[:10]}',0,1)
+                                pdf.ln(2)
+                            pdf_file = f"/tmp/tenant_report_{date.today()}.pdf"
+                            pdf.output(pdf_file)
+                            with open(pdf_file,"rb") as f:
+                                st.download_button("📥 Download PDF", f.read(), f"tenant_report_{date.today()}.pdf", "application/pdf", use_container_width=True)
+                        except Exception as e:
+                            st.error(f"PDF: {str(e)[:50]}")
+                
                 if responses.data:
                     for r in list(responses.data)[resp_start:resp_end]:
                         td = next((t for t in tenant_list if t.get("name") == r.get("respondent_name","?")), None)
@@ -5902,9 +5944,17 @@ def page_feedback():
                             scores_str = " | ".join(sc_items[:8])
                         
                         st.markdown(f"""
-                        <div style="background:white;border-radius:8px;padding:0.7rem;margin:0.2rem 0;border-left:3px solid #3B82F6;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
-                            <b>{r.get('respondent_name','?')}</b> — {r.get('company','?')}
-                            <br><span style="font-size:0.65rem;color:#888;">📅 {str(r.get('submitted_at',''))[:10]} | {scores_str}</span>
+                        <div style="background:white;border-radius:10px;padding:1rem;margin:0.4rem 0;border-left:5px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.06);">
+                            <div style="display:flex;justify-content:space-between;align-items:center;">
+                                <div>
+                                    <b style="font-size:0.9rem;">{r.get('respondent_name','?')}</b>
+                                    <span style="background:#EFF6FF;color:#2563EB;padding:2px 10px;border-radius:12px;font-size:0.65rem;margin-left:0.5rem;">{r.get('company','?')}</span>
+                                </div>
+                                <span style="font-size:0.7rem;color:#888;">📅 {str(r.get('submitted_at',''))[:10]}</span>
+                            </div>
+                            <div style="margin-top:0.5rem;display:flex;flex-wrap:wrap;gap:4px;">
+                                {''.join([f'<span style="background:#f0f0f0;padding:2px 8px;border-radius:8px;font-size:0.65rem;">Q{q_lookup[qid]["number"]}: <b>{td["scores"][qid]}/4</b></span>' for qid in td["scores"] if qid in q_lookup][:12])}
+                            </div>
                         </div>
                         """, unsafe_allow_html=True)
     
@@ -5963,23 +6013,22 @@ def page_feedback():
                             stars = "⭐" * round(avg)
                             st.markdown(f"{stars} **{cat}**: {avg}/4")
             else:
-                # Build data (same as TAB 1)
+                # Build data
                 q_lookup = {}
                 for q in (questions.data or []):
                     q_lookup[q["id"]] = {"number": q.get("question_number"), "category": q.get("category", ""), "text": q.get("question_text", ""), "type": q.get("question_type", "rating")}
                 
-                all_scores = {}
                 tenant_list = []
                 for r in (responses.data or []):
                     resp_id = r["id"]
                     scores = supabase.table("feedback_scores").select("question_id, score, text_answer").eq("response_id", resp_id).execute()
                     tenant_scores = {}
+                    text_answers = {}
                     for sc in (scores.data or []):
                         if sc.get("score"): tenant_scores[sc["question_id"]] = sc.get("score")
-                    all_scores[resp_id] = {"name": r.get("respondent_name","?"), "company": r.get("company","?"), "scores": tenant_scores}
-                    tenant_list.append(all_scores[resp_id])
+                        if sc.get("text_answer"): text_answers[sc["question_id"]] = sc.get("text_answer")
+                    tenant_list.append({"name": r.get("respondent_name","?"), "company": r.get("company","?"), "scores": tenant_scores, "texts": text_answers})
                 
-                # FSI, HEI, NPS
                 hard_qs = [qid for qid, q in q_lookup.items() if q["number"] and 1 <= q["number"] <= 8]
                 soft_qs = [qid for qid, q in q_lookup.items() if q["number"] and q["number"] in [9, 10, 12]]
                 
@@ -6001,7 +6050,6 @@ def page_feedback():
                 tss = round(((avg_fsi * 0.5 + avg_hei * 0.3 + (promoters/max(len(tenant_list),1)) * 0.2 * 4) / 4) * 100)
                 churn_risk = round((passives / max(len(tenant_list), 1)) * 100)
                 
-                # Tenant health scores
                 tenant_health = []
                 for td in tenant_list:
                     vals = [v for v in td["scores"].values() if v]
@@ -6010,12 +6058,11 @@ def page_feedback():
                         nps = td["scores"].get(q13_id, 3) if q13_id else 3
                         health = min(100, max(0, round((avg * 0.6 + nps * 0.4) * 25)))
                         risk = "Low" if health >= 75 else "Medium" if health >= 50 else "High"
-                        tenant_health.append({"Tenant": td["company"], "Health": health, "Risk": risk})
+                        tenant_health.append({"Tenant": td["company"], "Health": health, "Risk": risk, "Name": td["name"]})
                 
                 high_risk = len([t for t in tenant_health if t["Risk"] == "High"])
                 at_risk_revenue = high_risk * 50000
                 
-                # Category scores
                 cat_scores = {}
                 for qid, qinfo in q_lookup.items():
                     cat = qinfo.get("category", qinfo.get("text", ""))
@@ -6024,52 +6071,157 @@ def page_feedback():
                     if vals: cat_scores[cat] = round(sum(vals)/len(vals), 1)
                 
                 # ============================================
-                # AI EXECUTIVE SUMMARY (Top)
+                # 🟦 TOP RIBBON
                 # ============================================
-                st.markdown("### 📋 REVENUE PROTECTION ADVISORY")
-                
-                if cat_scores:
-                    weakest = min(cat_scores, key=cat_scores.get)
-                    st.error(f"""
-                    🔴 **Critical Finding:** '{weakest}' ({cat_scores[weakest]}/4) is dragging down your NPS.
-                    <br>💰 Tenants rating this below 3/4 are statistically more likely to become Detractors.
-                    """)
-                
-                if avg_fsi > avg_hei + 0.5:
-                    st.info(f"""
-                    📡 **Perception Gap:** Hard FM ({avg_fsi}/4) outpaces Soft FM ({avg_hei}/4).
-                    <br>🔧 The building works, but service attitude needs improvement.
-                    """)
-                
-                if detractors > 0:
-                    st.error(f"""
-                    🚨 **Revenue at Risk:** {detractors} Detractors identified.
-                    <br>📊 Estimated annual exposure: <b>${detractors * 50000:,}</b>
-                    """)
-                
-                if passives > promoters:
-                    st.warning(f"""
-                    ⚠️ **Silent Churn:** More Passives ({passives}) than Promoters ({promoters}).
-                    <br>🎯 These tenants are undecided — proactive outreach can convert them.
-                    """)
+                st.markdown("### 🟦 Global KPI Ribbon")
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    tc = "#10B981" if tss >= 80 else "#F59E0B" if tss >= 60 else "#EF4444"
+                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid {tc};"><div style="font-size:0.6rem;color:#888;">TSS</div><div style="font-size:1.5rem;font-weight:800;color:{tc};">{tss}/100</div></div>""", unsafe_allow_html=True)
+                with c2:
+                    tc = "#10B981" if churn_risk < 10 else "#F59E0B" if churn_risk < 20 else "#EF4444"
+                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid {tc};"><div style="font-size:0.6rem;color:#888;">Silent Churn Risk</div><div style="font-size:1.5rem;font-weight:800;color:{tc};">{churn_risk}%</div></div>""", unsafe_allow_html=True)
+                with c3:
+                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #3B82F6;"><div style="font-size:0.6rem;color:#888;">NPS Score</div><div style="font-size:1.5rem;font-weight:800;color:#3B82F6;">{nps_score}</div></div>""", unsafe_allow_html=True)
+                with c4:
+                    delta = round(abs(avg_fsi - avg_hei), 1)
+                    tc = "#F59E0B" if delta > 0.5 else "#10B981"
+                    st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid {tc};"><div style="font-size:0.6rem;color:#888;">Advocacy Delta</div><div style="font-size:1.5rem;font-weight:800;color:{tc};">{delta}</div></div>""", unsafe_allow_html=True)
                 
                 st.markdown("---")
                 
-                # Charts
+                # ============================================
+                # LAYER 1: SILENT CHURN RISK MATRIX
+                # ============================================
+                st.markdown("### 🔴 Layer 1: Silent Churn Risk Matrix")
+                
+                if tenant_health:
+                    th_df = pd.DataFrame(tenant_health).sort_values("Health")
+                    fig_h = px.bar(th_df, x="Health", y="Tenant", orientation='h', title="Individual Tenant Health Scores (0-100)", color="Health", color_continuous_scale=["#EF4444","#F59E0B","#10B981"], range_color=[0,100], text="Name")
+                    fig_h.update_layout(height=400)
+                    st.plotly_chart(fig_h, use_container_width=True)
+                
+                c1, c2, c3 = st.columns(3)
+                with c1: st.metric("🟢 Low Risk", len([t for t in tenant_health if t["Risk"]=="Low"]))
+                with c2: st.metric("🟡 Medium Risk", len([t for t in tenant_health if t["Risk"]=="Medium"]))
+                with c3: st.metric("🔴 High Risk", high_risk)
+                
+                if high_risk > 0:
+                    st.error(f"💰 **Revenue at Risk:** {high_risk} tenants. Estimated exposure: **${at_risk_revenue:,}** annually.")
+                
+                st.markdown("---")
+                
+                # ============================================
+                # LAYER 2: P.R.E.D.I.C.T. SCATTER MATRIX
+                # ============================================
+                st.markdown("### 🟡 Layer 2: P.R.E.D.I.C.T. Tenant Positioning Matrix")
+                st.caption("X: Hard FM (Q1-Q8) | Y: Soft FM (Q9,Q10,Q12)")
+                
+                scatter_data = []
+                for td in tenant_list:
+                    h_avg = sum([td["scores"].get(qid, 0) for qid in hard_qs if td["scores"].get(qid)]) / max(len([qid for qid in hard_qs if td["scores"].get(qid)]), 1)
+                    s_avg = sum([td["scores"].get(qid, 0) for qid in soft_qs if td["scores"].get(qid)]) / max(len([qid for qid in soft_qs if td["scores"].get(qid)]), 1)
+                    scatter_data.append({"Tenant": td["company"][:15], "Hard FM": round(h_avg,1), "Soft FM": round(s_avg,1), "Size": 25})
+                
+                if scatter_data:
+                    sd = pd.DataFrame(scatter_data)
+                    fig_s = px.scatter(sd, x="Hard FM", y="Soft FM", text="Tenant", size="Size", title="Tenant Positioning Matrix", color_discrete_sequence=["#CC0000"], range_x=[0,4.5], range_y=[0,4.5])
+                    fig_s.add_hline(y=2.5, line_dash="dash", line_color="#F59E0B")
+                    fig_s.add_vline(x=2.5, line_dash="dash", line_color="#F59E0B")
+                    fig_s.update_layout(height=450)
+                    st.plotly_chart(fig_s, use_container_width=True)
+                    st.caption("🟢 Top-Right: Stars | 🔵 Bottom-Right: Machines | 🟡 Top-Left: Hospitable but Broken | 🔴 Bottom-Left: At-Risk")
+                
+                st.markdown("---")
+                
+                # ============================================
+                # LAYER 3: AI EXECUTIVE SUMMARY
+                # ============================================
+                st.markdown("### 🟢 Layer 3: AI Executive Summary — REVENUE PROTECTION ADVISORY")
+                
+                if cat_scores:
+                    weakest = min(cat_scores, key=cat_scores.get)
+                    strongest = max(cat_scores, key=cat_scores.get)
+                    
+                    st.markdown(f"""
+                    <div style="background:#FEF2F2;border-left:4px solid #EF4444;border-radius:8px;padding:1rem;margin:0.5rem 0;">
+                        <b>🔴 Critical Finding:</b> <b>{weakest}</b> ({cat_scores[weakest]}/4) is your weakest category. Tenants rating this below 3/4 are statistically more likely to become Detractors.
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown(f"""
+                    <div style="background:#ECFDF5;border-left:4px solid #10B981;border-radius:8px;padding:1rem;margin:0.5rem 0;">
+                        <b>✅ Strength:</b> <b>{strongest}</b> ({cat_scores[strongest]}/4) is your top performer. Leverage this in marketing materials.
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                if avg_fsi > avg_hei + 0.3:
+                    st.info(f"📡 **Perception Gap Detected:** Hard FM ({avg_fsi}/4) outpaces Soft FM ({avg_hei}/4). The building works but service attitude needs attention.")
+                
+                if avg_hei > avg_fsi + 0.3:
+                    st.info(f"📡 **Inverse Gap:** Soft FM ({avg_hei}/4) outpaces Hard FM ({avg_fsi}/4). Great team, but infrastructure needs investment.")
+                
+                if detractors > 0:
+                    st.error(f"🚨 **{detractors} Detractor(s)** identified. Revenue exposure: **${detractors * 50000:,}**. Immediate outreach recommended.")
+                
+                if passives > promoters:
+                    st.warning(f"⚠️ **Silent Churn:** {passives} Passives vs {promoters} Promoters. Proactive engagement can convert undecided tenants.")
+                
+                st.markdown("---")
+                
+                # ============================================
+                # CATEGORY PERFORMANCE + NPS
+                # ============================================
                 c1, c2 = st.columns(2)
                 with c1:
-                    if tenant_health:
-                        th_df = pd.DataFrame(tenant_health).sort_values("Health")
-                        fig_h = px.bar(th_df, x="Health", y="Tenant", orientation='h', title="Tenant Health Scores (0-100)", color="Health", color_continuous_scale=["#EF4444","#F59E0B","#10B981"], range_color=[0,100])
-                        fig_h.update_layout(height=350)
-                        st.plotly_chart(fig_h, use_container_width=True)
+                    if cat_scores:
+                        sorted_cats = sorted(cat_scores.items(), key=lambda x: x[1])
+                        cat_df = pd.DataFrame(sorted_cats, columns=["Category", "Score"])
+                        fig_l = px.bar(cat_df, x="Score", y="Category", orientation='h', title="Category Performance (Sorted Lowest→Highest)", color="Score", color_continuous_scale=["#EF4444","#F59E0B","#10B981"], range_color=[1,4])
+                        fig_l.update_layout(height=400)
+                        st.plotly_chart(fig_l, use_container_width=True)
                 with c2:
                     if nps_vals:
                         nps_labels = ["Detractors", "Passives", "Promoters"]
                         nps_values = [detractors, passives, promoters]
                         fig_n = px.pie(values=nps_values, names=nps_labels, title=f"NPS Distribution (Score: {nps_score})", color_discrete_sequence=["#EF4444","#F59E0B","#10B981"], hole=0.5)
-                        fig_n.update_layout(height=350)
+                        fig_n.update_layout(height=400)
                         st.plotly_chart(fig_n, use_container_width=True)
+                
+                st.markdown("---")
+                
+                # ============================================
+                # VOICE OF CUSTOMER QUOTES
+                # ============================================
+                st.markdown("### 💬 Voice of Customer")
+                q14_id = next((qid for qid, q in q_lookup.items() if q["number"] == 14), None)
+                if q14_id:
+                    quotes_found = False
+                    for td in tenant_list:
+                        if q14_id in td.get("texts", {}) and td["texts"][q14_id].strip():
+                            quotes_found = True
+                            st.markdown(f"""
+                            <div style="background:white;border-left:4px solid #8B5CF6;border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                                <p style="font-size:0.85rem;font-style:italic;margin:0;">"{td['texts'][q14_id][:200]}"</p>
+                                <p style="font-size:0.65rem;color:#888;margin-top:0.3rem;">— {td['name']} ({td['company']})</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    if not quotes_found:
+                        st.info("No open-text responses submitted yet.")
+                
+                # Export
+                st.markdown("---")
+                st.markdown("### 📥 Export AI Report")
+                c1, c2 = st.columns(2)
+                with c1:
+                    logo_b64 = get_logo_base64()
+                    html_export = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}.kpi{{display:flex;gap:10px}}.kpi div{{flex:1;background:#f5f5f5;padding:10px;border-radius:8px;text-align:center;border-top:3px solid #CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:6px}}td{{padding:4px;border-bottom:1px solid #eee}}</style></head><body><h1>AI Tenant Health Report</h1><p>{info.get('full_name',fc)} | {date.today()}</p><div class="kpi"><div><b>TSS</b><br>{tss}/100</div><div><b>NPS</b><br>{nps_score}</div><div><b>Churn Risk</b><br>{churn_risk}%</div><div><b>Responses</b><br>{len(tenant_list)}</div></div><h2>Tenant Health Scores</h2><table><tr><th>Tenant</th><th>Health</th><th>Risk</th></tr>"""
+                    for t in tenant_health:
+                        html_export += f"<tr><td>{t['Tenant']}</td><td>{t['Health']}</td><td>{t['Risk']}</td></tr>"
+                    html_export += "</table></body></html>"
+                    st.download_button("📥 Download HTML Report", html_export, f"ai_tenant_report_{date.today()}.html", "text/html", use_container_width=True)
+                with c2:
+                    st.download_button("📥 Download CSV Data", pd.DataFrame(tenant_health).to_csv(index=False), f"tenant_health_{date.today()}.csv", "text/csv", use_container_width=True)
     
     # ============================================
     # TAB 3: SURVEY ADMIN
