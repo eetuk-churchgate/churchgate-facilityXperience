@@ -8244,6 +8244,14 @@ def page_wo():
                         st.session_state.resuming_wo = wo_id
                         st.rerun()
     
+    # DEBUG: Check if session state is set
+    if "holding_wo" in st.session_state and st.session_state.holding_wo:
+        st.warning(f"DEBUG: holding_wo is set to {st.session_state.holding_wo}")
+    if "starting_wo" in st.session_state and st.session_state.starting_wo:
+        st.warning(f"DEBUG: starting_wo is set to {st.session_state.starting_wo}")
+    if "cancelling_wo" in st.session_state and st.session_state.cancelling_wo:
+        st.warning(f"DEBUG: cancelling_wo is set to {st.session_state.cancelling_wo}")
+    
     # ============================================
     # ALL ACTION FORMS (OUTSIDE THE LOOP)
     # ============================================
