@@ -8852,7 +8852,7 @@ def page_wo():
                 st.plotly_chart(fig_aging, use_container_width=True)
             
             with c2:
-                st.markdown("### 🔥 Firefighting Index")
+                st.markdown("### 🏥 PM Health Index")
                 pm_ratio = round((pm_count / max(period_total, 1)) * 100)
                 reactive_ratio = round((reactive_count / max(period_total, 1)) * 100)
                 ratio_data = pd.DataFrame({"Type":["Preventive","Reactive"],"Count":[pm_count, reactive_count]})
