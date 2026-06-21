@@ -8855,7 +8855,9 @@ def page_wo():
                 st.markdown("### 🏥 PM Health Index")
                 pm_ratio = round((pm_count / max(period_total, 1)) * 100)
                 reactive_ratio = round((reactive_count / max(period_total, 1)) * 100)
-                ratio_data = pd.DataFrame({"Type":["Preventive","Reactive"],"Count":[pm_count, reactive_count]})
+                corrective_count = len(period_wo[period_wo["type"] == "Corrective"])
+                proactive_count = pm_count + corrective_count
+                ratio_data = pd.DataFrame({"Type":["Planned (PM+Corrective)","Reactive"],"Count":[proactive_count, reactive_count]})
                 fig_ratio = px.pie(ratio_data, values="Count", names="Type", title=f"PM ({pm_ratio}%) vs Reactive ({reactive_ratio}%)", color_discrete_sequence=["#10B981","#EF4444"], hole=0.5)
                 fig_ratio.update_layout(height=350)
                 st.plotly_chart(fig_ratio, use_container_width=True)
