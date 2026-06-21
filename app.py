@@ -8763,39 +8763,249 @@ def page_wo():
                 st.download_button("📥 Download CSV", tech_stats.to_csv(index=False), f"tech_performance_{today}.csv", "text/csv", use_container_width=True)
     
     # ============================================
-    # TAB 5: REPORTS
+    # TAB 5: AI-POWERED INTELLIGENCE REPORTS
     # ============================================
     with tabs[5]:
-        st.markdown("### 📊 Reports")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("📄 HTML Report", key="wo_html_btn", use_container_width=True, type="primary"):
-                logo_b64 = get_logo_base64()
-                logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="30">' if logo_b64 else ''
-                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>WO Report</title><style>body{{font-family:Arial;margin:20px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:960px;margin:0 auto;background:white;border-radius:12px;padding:30px}}.header{{border-bottom:3px solid #CC0000;padding-bottom:15px}}h1{{color:#CC0000;margin:0}}.kpi-row{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:20px;font-weight:800;color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:10px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}</style></head><body><div class="container"><div class="header">{logo_img}<h1>Work Order Intelligence Report</h1><p>{info.get('full_name',fc)} | {today.strftime('%d %B %Y')}</p></div><div class="kpi-row"><div class="kpi"><div class="val">{total_wo}</div>Total</div><div class="kpi"><div class="val">{open_wo}</div>Open</div><div class="kpi"><div class="val">{in_progress}</div>In Progress</div><div class="kpi"><div class="val">{completed}</div>Completed</div><div class="kpi"><div class="val">{ftf_rate}%</div>FTF</div><div class="kpi"><div class="val">₦{total_spend:,.0f}</div>Spend</div></div><h2>Work Orders</h2><table><tr><th>WO#</th><th>Title</th><th>Type</th><th>Status</th><th>Tech</th><th>Team</th></tr>"""
-                for _,wo in wo_df.head(40).iterrows(): html += f"<tr><td>{wo.get('wo_number','')}</td><td>{wo.get('title','')[:50]}</td><td>{wo.get('type','')}</td><td>{wo.get('status','')}</td><td>{wo.get('technician_name','')}</td><td>{wo.get('assigned_team','')}</td></tr>"
-                html += "</table></div></body></html>"
-                st.download_button("📥 Download HTML", html, f"wo_report_{today}.html", "text/html", use_container_width=True)
-        with c2:
-            if st.button("📕 PDF Report", key="wo_pdf_btn", use_container_width=True):
-                try:
-                    from fpdf import FPDF
-                    pdf = FPDF('L','mm','A4'); pdf.add_page()
-                    pdf.set_font('Helvetica','B',16); pdf.set_text_color(204,0,0)
-                    pdf.cell(0,10,safe_text('WO Intelligence Report'),0,1)
-                    pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
-                    pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {today.strftime("%d %B %Y")}'),0,1); pdf.ln(4)
-                    pdf.set_font('Helvetica','B',7); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
-                    for h,w in zip(['WO#','Title','Type','Status','Tech','Team'],[35,65,25,22,55,55]): pdf.cell(w,5,h,1,0,'C',True)
-                    pdf.ln(); pdf.set_font('Helvetica','',7); pdf.set_text_color(0,0,0)
-                    for _,wo in wo_df.head(40).iterrows():
-                        pdf.cell(35,4,safe_text(wo.get('wo_number','')),1,0); pdf.cell(65,4,safe_text(str(wo.get('title',''))[:28]),1,0)
-                        pdf.cell(25,4,safe_text(wo.get('type','')),1,0); pdf.cell(22,4,safe_text(wo.get('status','')),1,0)
-                        pdf.cell(55,4,safe_text(str(wo.get('technician_name',''))[:24]),1,0); pdf.cell(55,4,safe_text(str(wo.get('assigned_team',''))[:24]),1,0)
+        st.markdown("### 📊 Work Order Intelligence Reports")
+        
+        # Period Selector
+        report_period = st.selectbox("📅 Report Period", ["Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly", "Custom"], key="wo_period")
+        
+        if report_period == "Weekly":
+            start_date = today - timedelta(days=7)
+            end_date = today
+        elif report_period == "Monthly":
+            start_date = today.replace(day=1)
+            end_date = today
+        elif report_period == "Quarterly":
+            q_month = ((today.month - 1) // 3) * 3 + 1
+            start_date = date(today.year, q_month, 1)
+            end_date = today
+        elif report_period == "Half-Yearly":
+            h_month = 1 if today.month <= 6 else 7
+            start_date = date(today.year, h_month, 1)
+            end_date = today
+        elif report_period == "Yearly":
+            start_date = date(today.year, 1, 1)
+            end_date = today
+        else:
+            c1, c2 = st.columns(2)
+            with c1: start_date = st.date_input("From", today - timedelta(days=30), key="wo_from")
+            with c2: end_date = st.date_input("To", today, key="wo_to")
+        
+        # Filter WOs for period
+        period_wo = wo_df[(pd.to_datetime(wo_df["created_at"], errors='coerce').dt.date >= start_date) & (pd.to_datetime(wo_df["created_at"], errors='coerce').dt.date <= end_date)] if total_wo > 0 else pd.DataFrame()
+        period_total = len(period_wo)
+        
+        st.caption(f"📅 {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')} | {period_total} work orders")
+        
+        if period_total == 0:
+            st.info("No work orders in this period.")
+        else:
+            # Period calculations
+            period_spend = period_wo["total_cost"].sum() if "total_cost" in period_wo.columns else 0
+            period_labour = period_wo["labour_cost"].sum() if "labour_cost" in period_wo.columns else 0
+            period_parts = period_wo["parts_cost"].sum() if "parts_cost" in period_wo.columns else 0
+            period_ftf = len(period_wo[period_wo["first_time_fix"] == True]) if "first_time_fix" in period_wo.columns else 0
+            period_ftf_rate = round((period_ftf / period_total) * 100) if period_total > 0 else 0
+            period_sla_breach = len(period_wo[(pd.to_datetime(period_wo["sla_due_date"], errors='coerce').dt.date < today) & (~period_wo["status"].isin(["completed","closed"]))]) if "sla_due_date" in period_wo.columns else 0
+            period_sla = round(((period_total - period_sla_breach) / max(period_total, 1)) * 100) if period_total > 0 else 0
+            period_avg_hours = round(period_wo["actual_hours"].mean(), 1) if "actual_hours" in period_wo.columns else 0
+            period_tenant = len(period_wo[period_wo["tenant_impact"] == True]) if "tenant_impact" in period_wo.columns else 0
+            
+            reactive_count = len(period_wo[period_wo["type"].isin(["Reactive","Emergency Repair"])])
+            pm_count = len(period_wo[period_wo["type"] == "Preventive"])
+            
+            # WO Aging
+            aging_24h = len(period_wo[(pd.to_datetime(period_wo["created_at"], errors='coerce') >= wat_now - timedelta(hours=24)) & (~period_wo["status"].isin(["completed","closed"]))])
+            aging_72h = len(period_wo[(pd.to_datetime(period_wo["created_at"], errors='coerce') >= wat_now - timedelta(hours=72)) & (pd.to_datetime(period_wo["created_at"], errors='coerce') < wat_now - timedelta(hours=24)) & (~period_wo["status"].isin(["completed","closed"]))])
+            aging_old = len(period_wo[(pd.to_datetime(period_wo["created_at"], errors='coerce') < wat_now - timedelta(hours=72)) & (~period_wo["status"].isin(["completed","closed"]))])
+            
+            # ============================================
+            # EXECUTIVE KPIs
+            # ============================================
+            st.markdown("### 🟦 Executive KPIs")
+            c1, c2, c3, c4, c5, c6 = st.columns(6)
+            with c1:
+                color = "#10B981" if period_sla >= 90 else "#F59E0B" if period_sla >= 70 else "#EF4444"
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">SLA Compliance</div><div style="font-size:1.4rem;font-weight:800;color:{color};">{period_sla}%</div></div>""", unsafe_allow_html=True)
+            with c2:
+                color = "#10B981" if period_ftf_rate >= 80 else "#F59E0B" if period_ftf_rate >= 60 else "#EF4444"
+                st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">First-Time Fix</div><div style="font-size:1.4rem;font-weight:800;color:{color};">{period_ftf_rate}%</div></div>""", unsafe_allow_html=True)
+            with c3: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Avg Resolution</div><div style="font-size:1.4rem;font-weight:800;color:#3B82F6;">{period_avg_hours}hrs</div></div>""", unsafe_allow_html=True)
+            with c4: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Period Spend</div><div style="font-size:1.4rem;font-weight:800;color:#CC0000;">₦{period_spend:,.0f}</div></div>""", unsafe_allow_html=True)
+            with c5: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Tenant WOs</div><div style="font-size:1.4rem;font-weight:800;color:#8B5CF6;">{period_tenant}</div></div>""", unsafe_allow_html=True)
+            with c6: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.8rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Total WOs</div><div style="font-size:1.4rem;font-weight:800;color:#F59E0B;">{period_total}</div></div>""", unsafe_allow_html=True)
+            
+            st.markdown("---")
+            
+            # ============================================
+            # WO AGING & CHARTS
+            # ============================================
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("### 📊 WO Aging Analysis")
+                aging_data = pd.DataFrame({"Age":["<24 Hours","24-72 Hours",">72 Hours"],"Count":[aging_24h,aging_72h,aging_old]})
+                colors_aging = ["#10B981","#F59E0B","#EF4444"]
+                fig_aging = px.bar(aging_data, x="Age", y="Count", title="Open WO Aging", color="Age", color_discrete_sequence=colors_aging)
+                fig_aging.update_layout(height=350, showlegend=False)
+                st.plotly_chart(fig_aging, use_container_width=True)
+            
+            with c2:
+                st.markdown("### 🔥 Firefighting Index")
+                pm_ratio = round((pm_count / max(period_total, 1)) * 100)
+                reactive_ratio = round((reactive_count / max(period_total, 1)) * 100)
+                ratio_data = pd.DataFrame({"Type":["Preventive","Reactive"],"Count":[pm_count, reactive_count]})
+                fig_ratio = px.pie(ratio_data, values="Count", names="Type", title=f"PM ({pm_ratio}%) vs Reactive ({reactive_ratio}%)", color_discrete_sequence=["#10B981","#EF4444"], hole=0.5)
+                fig_ratio.update_layout(height=350)
+                st.plotly_chart(fig_ratio, use_container_width=True)
+            
+            # Cost breakdown
+            st.markdown("---")
+            st.markdown("### 💰 Cost Analysis")
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("👷 Labour", f"₦{period_labour:,.0f}")
+            with c2: st.metric("🔧 Parts", f"₦{period_parts:,.0f}")
+            with c3: st.metric("📊 Cost/WO", f"₦{round(period_spend/max(period_total,1)):,.0f}")
+            with c4: st.metric("🏢 Tenant Cost", f"₦{period_wo[period_wo['tenant_impact']==True]['total_cost'].sum() if 'tenant_impact' in period_wo.columns else 0:,.0f}")
+            
+            # Failure mode analysis
+            if "failure_class" in period_wo.columns and period_total > 0:
+                st.markdown("---")
+                st.markdown("### 🔍 Failure Mode Analysis")
+                failure_counts = period_wo["failure_class"].value_counts().head(8)
+                fig_fail = px.bar(x=failure_counts.values, y=failure_counts.index, orientation='h', title="Top Failure Classes", color=failure_counts.values, color_continuous_scale=["#10B981","#F59E0B","#EF4444"])
+                fig_fail.update_layout(height=350)
+                st.plotly_chart(fig_fail, use_container_width=True)
+            
+            # ============================================
+            # AI EXECUTIVE SUMMARY
+            # ============================================
+            st.markdown("---")
+            st.markdown("### 🤖 AI Executive Summary")
+            
+            insights = []
+            if period_sla_breach > 0:
+                insights.append(f"🔴 **SLA Alert:** {period_sla_breach} WOs breached SLA. {period_sla}% compliance — {'critical' if period_sla < 70 else 'needs improvement'}.")
+            if reactive_count > pm_count * 2:
+                insights.append(f"⚠️ **Firefighting Mode:** Reactive WOs ({reactive_count}) are {round(reactive_count/max(pm_count,1))}x Preventive ({pm_count}). Underinvesting in PM creates 3x reactive work downstream.")
+            if period_avg_hours > 8:
+                insights.append(f"⚠️ **Slow Resolution:** Average {period_avg_hours}hrs exceeds 8hr target. Review technician workload and parts availability.")
+            if period_ftf_rate < 70:
+                insights.append(f"⚠️ **First-Time Fix at {period_ftf_rate}%:** Training or diagnostic tools review recommended.")
+            if aging_old > 5:
+                insights.append(f"🔴 **Aging WOs:** {aging_old} WOs open >72 hours. These represent risk to tenant satisfaction and SLA compliance.")
+            if period_total > 0 and period_sla >= 90 and period_ftf_rate >= 80:
+                insights.append("✅ **Excellent Performance:** SLA and FTF exceeding targets. Team operating at world-class levels.")
+            if period_total == 0:
+                insights.append("📝 No work orders in this period.")
+            
+            for insight in insights:
+                st.markdown(f"""<div style="background:white;border-left:4px solid #CC0000;border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">{insight}</div>""", unsafe_allow_html=True)
+            
+            # ============================================
+            # EXPORT
+            # ============================================
+            st.markdown("---")
+            st.markdown("### 📥 Download Intelligence Reports")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("📄 Generate Full Intelligence Report (HTML)", key="intel_html_btn", use_container_width=True, type="primary"):
+                    logo_b64 = get_logo_base64()
+                    logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
+                    
+                    # Build WO table rows
+                    wo_rows = ""
+                    for _, wo in period_wo.head(50).iterrows():
+                        sla_date = str(wo.get('sla_due_date','N/A'))[:10]
+                        sla_status = "⚠️ Breached" if pd.to_datetime(wo.get('sla_due_date'), errors='coerce').date() < today and wo.get('status') not in ['completed','closed'] else "✅ OK"
+                        wo_rows += f"<tr><td>{wo.get('wo_number','')}</td><td>{wo.get('title','')[:50]}</td><td>{wo.get('type','')}</td><td>{wo.get('priority','').upper()}</td><td>{wo.get('status','').upper()}</td><td>{wo.get('technician_name','Unassigned')}</td><td>{sla_date} {sla_status}</td><td>₦{wo.get('total_cost',0):,.0f}</td></tr>"
+                    
+                    html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Work Order Intelligence Report</title>
+<style>
+body{{font-family:'Segoe UI',Arial,sans-serif;margin:25px;color:#1a1a1a;background:#f0f2f5}}
+.container{{max-width:1000px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}
+.header{{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}
+.header h1{{color:#CC0000;margin:0;font-size:22px}}
+.header p{{color:#888;margin:3px 0 0 0;font-size:11px}}
+.kpi-row{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0}}
+.kpi{{background:linear-gradient(135deg,#f9fafb,#fff);border-radius:10px;padding:12px;text-align:center;border-top:3px solid #CC0000}}
+.kpi .val{{font-size:22px;font-weight:800;color:#CC0000}}
+.kpi .lbl{{font-size:9px;color:#888;text-transform:uppercase}}
+h2{{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:25px;font-size:16px}}
+table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:10px}}
+th{{background:#CC0000;color:white;padding:10px;text-align:left;font-size:9px;text-transform:uppercase}}
+td{{padding:8px;border-bottom:1px solid #eee}}
+.insight-box{{background:#FEF2F2;border-left:4px solid #EF4444;padding:12px;margin:8px 0;border-radius:6px;font-size:12px}}
+.insight-box.green{{background:#ECFDF5;border-left-color:#10B981}}
+.footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #eee;padding-top:15px}}
+</style></head><body><div class="container">
+<div class="header"><div>{logo_img}<h1>Work Order Intelligence Report</h1><p>{info.get('full_name',fc)} | {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')} | {report_period}</p></div></div>
+<div class="kpi-row">
+<div class="kpi"><div class="val">{period_total}</div><div class="lbl">Total WOs</div></div>
+<div class="kpi"><div class="val">{period_sla}%</div><div class="lbl">SLA</div></div>
+<div class="kpi"><div class="val">{period_ftf_rate}%</div><div class="lbl">First-Time Fix</div></div>
+<div class="kpi"><div class="val">{period_avg_hours}hrs</div><div class="lbl">Avg Resolution</div></div>
+<div class="kpi"><div class="val">₦{period_spend:,.0f}</div><div class="lbl">Total Spend</div></div>
+<div class="kpi"><div class="val">{period_tenant}</div><div class="lbl">Tenant WOs</div></div>
+</div>
+<div class="insight-box"><b>SLA Performance:</b> {period_sla}% compliance. {period_sla_breach} WOs breached. {'Immediate attention required.' if period_sla_breach > 0 else 'All WOs within SLA.'}</div>
+<div class="insight-box green"><b>Cost Efficiency:</b> ₦{period_spend:,.0f} total. ₦{round(period_spend/max(period_total,1)):,.0f}/WO. Labour: ₦{period_labour:,.0f} | Parts: ₦{period_parts:,.0f}</div>
+<div class="insight-box"><b>Firefighting Index:</b> {pm_count} PM ({pm_ratio}%) vs {reactive_count} Reactive ({reactive_ratio}%). {'World-class PM ratio.' if pm_ratio >= 60 else 'Increase PM to reduce reactive work.'}</div>
+<h2>Work Order Details</h2>
+<table><tr><th>WO#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Tech</th><th>SLA</th><th>Cost</th></tr>{wo_rows}</table>
+<div class="footer">Churchgate Group | facilityXperience | AI-Generated Intelligence Report | {today.strftime('%d %B %Y')}</div>
+</div></body></html>"""
+                    
+                    st.download_button("📥 Download Intelligence Report (HTML)", html, f"wo_intelligence_{start_date}_{end_date}.html", "text/html", use_container_width=True)
+            
+            with c2:
+                if st.button("📕 Generate PDF Report", key="intel_pdf_btn", use_container_width=True):
+                    try:
+                        from fpdf import FPDF
+                        pdf = FPDF('L','mm','A4')
+                        pdf.add_page()
+                        pdf.set_font('Helvetica','B',18)
+                        pdf.set_text_color(204,0,0)
+                        pdf.cell(0,12,safe_text('Work Order Intelligence Report'),0,1)
+                        pdf.set_font('Helvetica','',10)
+                        pdf.set_text_color(0,0,0)
+                        pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {start_date.strftime("%d %b %Y")} - {end_date.strftime("%d %b %Y")} | {report_period}'),0,1)
+                        pdf.ln(2)
+                        pdf.set_font('Helvetica','B',10)
+                        pdf.cell(0,6,f'SLA: {period_sla}% | FTF: {period_ftf_rate}% | Avg: {period_avg_hours}hrs | Spend: NGN {period_spend:,.0f} | Tenant WOs: {period_tenant}',0,1)
+                        pdf.ln(3)
+                        pdf.set_font('Helvetica','B',8)
+                        pdf.set_fill_color(204,0,0)
+                        pdf.set_text_color(255,255,255)
+                        for h,w in zip(['WO#','Title','Type','Priority','Status','Tech','SLA','Cost'],[30,50,22,18,20,38,28,22]):
+                            pdf.cell(w,6,h,1,0,'C',True)
                         pdf.ln()
-                    pdf_file = f"/tmp/wo_report_{today}.pdf"; pdf.output(pdf_file)
-                    with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"wo_report_{today}.pdf", "application/pdf", use_container_width=True)
-                except Exception as e: st.error(f"PDF: {str(e)[:80]}")
+                        pdf.set_font('Helvetica','',7)
+                        pdf.set_text_color(0,0,0)
+                        for _,wo in period_wo.head(40).iterrows():
+                            pdf.cell(30,5,safe_text(wo.get('wo_number','')),1,0)
+                            pdf.cell(50,5,safe_text(str(wo.get('title',''))[:22]),1,0)
+                            pdf.cell(22,5,safe_text(wo.get('type','')),1,0)
+                            pdf.cell(18,5,safe_text(wo.get('priority','').upper()),1,0)
+                            pdf.cell(20,5,safe_text(wo.get('status','').upper()),1,0)
+                            pdf.cell(38,5,safe_text(str(wo.get('technician_name','Unassigned'))[:17]),1,0)
+                            pdf.cell(28,5,str(wo.get('sla_due_date',''))[:10],1,0)
+                            pdf.cell(22,5,str(wo.get('total_cost',0)),1,0)
+                            pdf.ln()
+                        pdf.ln(4)
+                        pdf.set_font('Helvetica','B',8)
+                        pdf.cell(0,5,'AI Recommendations:',0,1)
+                        pdf.set_font('Helvetica','',7)
+                        pdf.multi_cell(0,4,'Based on work order analysis, focus on preventive maintenance compliance and technician training for improved first-time fix rates. SLA compliance and aging WOs should be reviewed weekly.')
+                        pdf_file = f"/tmp/wo_intel_{start_date}_{end_date}.pdf"
+                        pdf.output(pdf_file)
+                        with open(pdf_file,"rb") as f:
+                            st.download_button("📥 Download Intelligence Report (PDF)", f.read(), f"wo_intelligence_{start_date}_{end_date}.pdf", "application/pdf", use_container_width=True)
+                    except Exception as e:
+                        st.error(f"PDF error: {str(e)[:80]}")
 
 # ============================================
 # HOTO CHECK (STUB)
