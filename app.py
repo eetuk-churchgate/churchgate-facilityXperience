@@ -8917,6 +8917,43 @@ def page_wo():
                     logo_b64 = get_logo_base64()
                     logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
                     
+                    # Generate chart images
+                    import io, base64 as b64
+                    chart_images = ""
+                    
+                    try:
+                        # Chart 1: WO Aging
+                        aging_data = pd.DataFrame({"Age":["<24 Hours","24-72 Hours",">72 Hours"],"Count":[aging_24h,aging_72h,aging_old]})
+                        fig1 = px.bar(aging_data, x="Age", y="Count", title="WO Aging Analysis", color="Age", color_discrete_sequence=["#10B981","#F59E0B","#EF4444"])
+                        fig1.update_layout(height=300, width=500)
+                        buf1 = io.BytesIO()
+                        fig1.write_image(buf1, format='png', engine='kaleido', scale=2)
+                        chart_images += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{b64.b64encode(buf1.getvalue()).decode()}" style="max-width:100%;"></div>'
+                    except: pass
+                    
+                    try:
+                        # Chart 2: PM Health Index
+                        pm_ratio_val = round((proactive_count / max(period_total, 1)) * 100)
+                        reactive_ratio_val = round((reactive_count / max(period_total, 1)) * 100)
+                        ratio_data = pd.DataFrame({"Type":["Planned (PM+Corrective)","Reactive"],"Count":[proactive_count, reactive_count]})
+                        fig2 = px.pie(ratio_data, values="Count", names="Type", title="PM Health Index", color_discrete_sequence=["#10B981","#EF4444"], hole=0.5)
+                        fig2.update_layout(height=300, width=500)
+                        buf2 = io.BytesIO()
+                        fig2.write_image(buf2, format='png', engine='kaleido', scale=2)
+                        chart_images += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{b64.b64encode(buf2.getvalue()).decode()}" style="max-width:100%;"></div>'
+                    except: pass
+                    
+                    try:
+                        # Chart 3: Failure Mode
+                        if "failure_class" in period_wo.columns and period_total > 0:
+                            failure_counts = period_wo["failure_class"].value_counts().head(8)
+                            fig3 = px.bar(x=failure_counts.values, y=failure_counts.index, orientation='h', title="Top Failure Classes", color=failure_counts.values, color_continuous_scale=["#10B981","#F59E0B","#EF4444"])
+                            fig3.update_layout(height=300, width=600)
+                            buf3 = io.BytesIO()
+                            fig3.write_image(buf3, format='png', engine='kaleido', scale=2)
+                            chart_images += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{b64.b64encode(buf3.getvalue()).decode()}" style="max-width:100%;"></div>'
+                    except: pass
+                    
                     # Build WO table rows
                     wo_rows = ""
                     for _, wo in period_wo.head(50).iterrows():
@@ -8937,6 +8974,7 @@ body{{font-family:'Segoe UI',Arial,sans-serif;margin:25px;color:#1a1a1a;backgrou
 .kpi .val{{font-size:22px;font-weight:800;color:#CC0000}}
 .kpi .lbl{{font-size:9px;color:#888;text-transform:uppercase}}
 h2{{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:25px;font-size:16px}}
+.charts-section{{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin:20px 0}}
 table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:10px}}
 th{{background:#CC0000;color:white;padding:10px;text-align:left;font-size:9px;text-transform:uppercase}}
 td{{padding:8px;border-bottom:1px solid #eee}}
@@ -8953,9 +8991,13 @@ td{{padding:8px;border-bottom:1px solid #eee}}
 <div class="kpi"><div class="val">₦{period_spend:,.0f}</div><div class="lbl">Total Spend</div></div>
 <div class="kpi"><div class="val">{period_tenant}</div><div class="lbl">Tenant WOs</div></div>
 </div>
+
 <div class="insight-box"><b>SLA Performance:</b> {period_sla}% compliance. {period_sla_breach} WOs breached. {'Immediate attention required.' if period_sla_breach > 0 else 'All WOs within SLA.'}</div>
 <div class="insight-box green"><b>Cost Efficiency:</b> ₦{period_spend:,.0f} total. ₦{round(period_spend/max(period_total,1)):,.0f}/WO. Labour: ₦{period_labour:,.0f} | Parts: ₦{period_parts:,.0f}</div>
 <div class="insight-box"><b>🏥 PM Health Index:</b> {proactive_count} Planned ({round((proactive_count/max(period_total,1))*100)}%) vs {reactive_count} Reactive ({round((reactive_count/max(period_total,1))*100)}%). {'World-class PM ratio.' if pm_ratio >= 60 else 'Increase planned maintenance to reduce emergency work.'}</div>
+
+<div class="charts-section">{chart_images}</div>
+
 <h2>Work Order Details</h2>
 <table><tr><th>WO#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Tech</th><th>SLA</th><th>Cost</th></tr>{wo_rows}</table>
 <div class="footer">Churchgate Group | facilityXperience | AI-Generated Intelligence Report | {today.strftime('%d %B %Y')}</div>
