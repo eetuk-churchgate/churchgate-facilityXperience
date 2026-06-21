@@ -8412,13 +8412,12 @@ def page_wo():
                 
                 if status == "open":
                     if st.button("✅ Accept & Start", key=f"mytask_start_{wo_id}", use_container_width=True, type="primary"):
-                        supabase.table("work_orders").update({"status":"in_progress","actual_start":wat_now.isoformat()}).eq("id",wo_id).execute()
-                        supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"open","status_to":"in_progress","changed_by":user_name,"created_at":wat_now.isoformat()}).execute()
-                        st.success("✅ Started!"); st.rerun()
+                        st.session_state.starting_wo = wo_id
+                        st.rerun()
                 
                 if status == "in_progress":
                     c1, c2, c3 = st.columns(3)
-                   with c1:
+                    with c1:
                         if st.button("✅ Complete", key=f"mytask_comp_{wo_id}", use_container_width=True):
                             st.session_state.completing_wo = wo_id
                             st.rerun()
@@ -8430,13 +8429,11 @@ def page_wo():
                         if st.button("❌ Cancel", key=f"mytask_cancel_{wo_id}", use_container_width=True):
                             st.session_state.cancelling_wo = wo_id
                             st.rerun()
-                            supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"in_progress","status_to":"cancelled","changed_by":user_name,"created_at":wat_now.isoformat()}).execute()
-                            st.error("❌ Cancelled"); st.rerun()
                 
                 if status == "on_hold":
                     if st.button("▶ Resume", key=f"mytask_resume_{wo_id}", use_container_width=True):
-                        supabase.table("work_orders").update({"status":"in_progress"}).eq("id",wo_id).execute()
-                        st.success("▶ Resumed!"); st.rerun()
+                        st.session_state.resuming_wo = wo_id
+                        st.rerun()
     
     # ============================================
     # TAB 2: REVIEW & CLOSE
