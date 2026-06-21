@@ -8487,50 +8487,7 @@ def page_wo():
                 if st.form_submit_button("CANCEL", use_container_width=True):
                     st.session_state.rejecting_wo = None; st.rerun()
     
-    # ============================================
-    # COMPLETE WO FORM
-    # ============================================
-    if "completing_wo" in st.session_state and st.session_state.completing_wo:
-        wo_id = st.session_state.completing_wo
-        wo = wo_df[wo_df["id"] == wo_id].iloc[0] if len(wo_df[wo_df["id"] == wo_id]) > 0 else None
-        if wo is not None:
-            st.markdown("---")
-            st.markdown(f"### ✅ Complete: {wo.get('wo_number','')} — {wo.get('title','')[:60]}")
-            with st.form("complete_wo_form"):
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    actual_hours = st.number_input("Actual Hours*", min_value=0.0, value=float(wo.get("estimated_hours",1)), step=0.5)
-                    labour_cost = st.number_input("Labour Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
-                with c2:
-                    parts_cost = st.number_input("Parts Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
-                    contractor_cost = st.number_input("Contractor Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
-                with c3:
-                    resolution_code = st.selectbox("Resolution*", ["Repaired","Replaced","Adjusted","Deferred","No Fault Found"])
-                    first_time_fix = st.checkbox("First-Time Fix?", value=True)
-                root_cause = st.text_area("Root Cause", height=60)
-                resolution_notes = st.text_area("Resolution Notes", height=60)
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.form_submit_button("✅ SUBMIT COMPLETION", use_container_width=True, type="primary"):
-                        total_cost = parts_cost + labour_cost + contractor_cost
-                        supabase.table("work_orders").update({
-                            "status":"completed","actual_end":wat_now.isoformat(),"actual_hours":actual_hours,
-                            "labour_hours":actual_hours,"parts_cost":parts_cost,"labour_cost":labour_cost,
-                            "contractor_cost":contractor_cost,"total_cost":total_cost,
-                            "resolution_code":resolution_code,"first_time_fix":first_time_fix,
-                            "root_cause":root_cause,"resolution_notes":resolution_notes
-                        }).eq("id",wo_id).execute()
-                        supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"in_progress","status_to":"completed","changed_by":user_name,"created_at":wat_now.isoformat()}).execute()
-                        
-                        # Email Team Lead
-                        try:
-                            send_email_notification("eetuk@churchgate.com", f"✅ WO Completed — {wo.get('wo_number','')}", f"<h3>Work Order Completed</h3><p><b>WO:</b> {wo.get('wo_number','')}</p><p><b>Title:</b> {wo.get('title','')}</p><p><b>Completed by:</b> {user_name}</p><p><b>Total Cost:</b> ₦{total_cost:,.0f}</p><p>Please review and close.</p>")
-                        except: pass
-                        
-                        st.success("✅ Completed! Team Lead notified."); st.session_state.completing_wo = None; st.rerun()
-                with c2:
-                    if st.form_submit_button("❌ CANCEL", use_container_width=True):
-                        st.session_state.completing_wo = None; st.rerun()
+    
     
     # ============================================
     # TAB 3: CREATE WO (KEPT FROM BEFORE - SAME CODE)
