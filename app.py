@@ -8193,7 +8193,8 @@ def page_wo():
                     with st.expander(f"📋 Timeline ({len(timeline.data)} events)"):
                         for t in timeline.data:
                             icon = {"open":"🔵","in_progress":"🟡","on_hold":"🟣","completed":"🟢","cancelled":"🔴","closed":"⚫"}.get(t.get("status_to",""),"📝")
-                            st.caption(f"{icon} {str(t.get('created_at',''))[:16]} | {t.get('changed_by','')} | {t.get('status_from','')} → {t.get('status_to','')} | {t.get('comment','No comment')[:80]}")
+                            comment_text = str(t.get('comment') or 'No comment')
+                            st.caption(f"{icon} {str(t.get('created_at',''))[:16]} | {t.get('changed_by','')} | {t.get('status_from','')} → {t.get('status_to','')} | {comment_text[:80]}")
                 
                 # ============================================
                 # ACTION BUTTONS (SET SESSION STATE ONLY)
