@@ -8151,6 +8151,13 @@ def page_wo():
     with tabs[0]:
         st.markdown("### 📋 Work Order Queue")
         
+        # Show success message if WO was just created
+        if st.session_state.get("wo_created", False):
+            st.success(f"✅ Work Order {st.session_state.get('wo_number_created','')} created successfully!")
+            st.balloons()
+            st.session_state.wo_created = False
+            st.session_state.wo_number_created = ""
+        
         if total_wo == 0:
             st.info("No work orders yet.")
         else:
@@ -8313,7 +8320,9 @@ def page_wo():
                             "attachments": attachment_data
                         }).eq("wo_number", wo_number).execute()
                     
-                    st.success(f"✅ WO {wo_number} created!"); st.balloons(); st.rerun()
+                    st.session_state.wo_created = True
+                    st.session_state.wo_number_created = wo_number
+                    st.rerun()
                 else:
                     st.error("⚠️ Title is required")
     
