@@ -8249,7 +8249,14 @@ def page_wo():
                 wo_priority = st.selectbox("Priority*", ["Emergency", "High", "Medium", "Low"])
                 wo_category = st.selectbox("Category", ["HVAC", "Electrical", "Plumbing", "Elevator", "Fire Safety", "Civil/Structural", "BMS", "ELV", "Technology", "General"])
             with c3:
-                wo_failure_class = st.selectbox("Failure Class", ["Mechanical", "Electrical", "User Error", "Wear & Tear", "Design Issue", "Technology", "Software/Firmware", "Network/Connectivity", "Unknown"])
+                # Auto-select N/A for non-failure types
+                non_failure_types = ["Preventive", "New Installation", "Inspection"]
+                default_failure = "N/A — Not Applicable" if wo_type in non_failure_types else "Unknown"
+                failure_index = 0 if wo_type in non_failure_types else 8
+                
+                wo_failure_class = st.selectbox("Failure Class", 
+                    ["N/A — Not Applicable", "Mechanical", "Electrical", "User Error", "Wear & Tear", "Design Issue", "Technology", "Software/Firmware", "Network/Connectivity", "Unknown"],
+                    index=failure_index)
                 wo_team = st.selectbox("Assigned Team", ["Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing", "Facility Management — Hard Services", "Technology Group"])
             
             c1, c2 = st.columns(2)
