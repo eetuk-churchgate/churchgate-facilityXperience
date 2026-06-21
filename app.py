@@ -8239,9 +8239,9 @@ def page_wo():
         
         with st.form("create_wo_form"):
             c1, c2, c3 = st.columns(3)
-            with c1:
+           with c1:
                 wo_title = st.text_input("Title*", placeholder="Brief description of work required")
-                 wo_type = st.selectbox("Type*", ["Reactive", "Preventive", "Corrective", "New Installation", "Inspection", "Emergency Repair"])
+                wo_type = st.selectbox("Type*", ["Reactive", "Preventive", "Corrective", "New Installation", "Inspection", "Emergency Repair"])
             with c2:
                 wo_priority = st.selectbox("Priority*", ["Emergency", "High", "Medium", "Low"])
                 wo_category = st.selectbox("Category", ["HVAC", "Electrical", "Plumbing", "Elevator", "Fire Safety", "Civil/Structural", "BMS", "ELV", "General"])
