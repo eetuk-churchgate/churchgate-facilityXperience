@@ -8295,7 +8295,7 @@ def page_wo():
                         "tenant_impact": wo_tenant_impact,
                         "tenant_name": wo_tenant_name if wo_tenant_impact else None,
                         "created_at": wat_now.isoformat()
-                    })
+                    }).execute()
                     
                     # Handle attachment if uploaded
                     if wo_attachment:
@@ -8311,9 +8311,6 @@ def page_wo():
                         supabase.table("work_orders").update({
                             "attachments": attachment_data
                         }).eq("wo_number", wo_number).execute()
-                    
-                    st.success(f"✅ WO {wo_number} created!"); st.balloons(); st.rerun()
-                    }).execute()
                     
                     st.success(f"✅ WO {wo_number} created!"); st.balloons(); st.rerun()
                 else:
