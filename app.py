@@ -8155,7 +8155,7 @@ def page_wo():
             st.info("No work orders yet.")
         else:
             c1, c2, c3, c4 = st.columns(4)
-            with c1: wo_type_filter = st.selectbox("Type", ["All", "Reactive", "Preventive", "Corrective"], key="wo_type")
+            with c1: wo_type_filter = st.selectbox("Type", ["All", "Reactive", "Preventive", "Corrective", "New Installation", "Inspection", "Emergency Repair"], key="wo_type")
             with c2: wo_status_filter = st.selectbox("Status", ["All", "open", "in_progress", "completed", "verified", "closed"], key="wo_status")
             with c3: wo_priority_filter = st.selectbox("Priority", ["All", "Emergency", "High", "Medium", "Low"], key="wo_pri")
             with c4: wo_search = st.text_input("🔍 Search", key="wo_search", placeholder="WO# or title...")
@@ -8241,12 +8241,12 @@ def page_wo():
             c1, c2, c3 = st.columns(3)
             with c1:
                 wo_title = st.text_input("Title*", placeholder="Brief description of work required")
-                wo_type = st.selectbox("Type*", ["Reactive", "Preventive", "Corrective"])
+                 wo_type = st.selectbox("Type*", ["Reactive", "Preventive", "Corrective", "New Installation", "Inspection", "Emergency Repair"])
             with c2:
                 wo_priority = st.selectbox("Priority*", ["Emergency", "High", "Medium", "Low"])
                 wo_category = st.selectbox("Category", ["HVAC", "Electrical", "Plumbing", "Elevator", "Fire Safety", "Civil/Structural", "BMS", "ELV", "General"])
             with c3:
-                wo_failure_class = st.selectbox("Failure Class", ["Mechanical", "Electrical", "User Error", "Wear & Tear", "Design Issue", "Unknown"])
+               wo_failure_class = st.selectbox("Failure Class", ["Mechanical", "Electrical", "User Error", "Wear & Tear", "Design Issue", "Technology", "Software/Firmware", "Network/Connectivity", "Unknown"])
                 wo_team = st.selectbox("Assigned Team", ["Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing", "Facility Management — Hard Services", "Technology Group"])
             
             c1, c2 = st.columns(2)
