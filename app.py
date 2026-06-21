@@ -8190,11 +8190,33 @@ def page_wo():
                 # Timeline
                 timeline = supabase.table("wo_timeline").select("*").eq("wo_id", wo_id).order("created_at").execute()
                 if timeline.data:
-                    with st.expander(f"📋 Timeline ({len(timeline.data)} events)"):
+                    toggle_key = f"timeline_{wo_id}"
+                    if toggle_key not in st.session_state:
+                        st.session_state[toggle_key] = False
+                    
+                    if not st.session_state[toggle_key]:
+                        if st.button(f"📋 View Timeline ({len(timeline.data)} events)", key=f"timeline_btn_{wo_id}", use_container_width=True):
+                            st.session_state[toggle_key] = True
+                            st.rerun()
+                    else:
+                        st.markdown(f"""
+                        <div style="background:#f9fafb;border-left:4px solid #3B82F6;border-radius:8px;padding:0.8rem;margin:0.3rem 0;">
+                            <b>📋 Timeline ({len(timeline.data)} events)</b>
+                        </div>
+                        """, unsafe_allow_html=True)
                         for t in timeline.data:
                             icon = {"open":"🔵","in_progress":"🟡","on_hold":"🟣","completed":"🟢","cancelled":"🔴","closed":"⚫"}.get(t.get("status_to",""),"📝")
                             comment_text = str(t.get('comment') or 'No comment')
-                            st.caption(f"{icon} {str(t.get('created_at',''))[:16]} | {t.get('changed_by','')} | {t.get('status_from','')} → {t.get('status_to','')} | {comment_text[:80]}")
+                            st.markdown(f"""
+                            <div style="background:white;border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;border:1px solid #e5e7eb;">
+                                {icon} <b>{str(t.get('created_at',''))[:16]}</b> | {t.get('changed_by','')}
+                                <br><span style="color:#888;">{t.get('status_from','')} → {t.get('status_to','')}</span>
+                                <br><span style="font-size:0.65rem;">💬 {comment_text[:100]}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        if st.button(f"❌ Close Timeline", key=f"timeline_close_{wo_id}", use_container_width=True):
+                            st.session_state[toggle_key] = False
+                            st.rerun()
                 
                 # ============================================
                 # ACTION BUTTONS (SET SESSION STATE ONLY)
