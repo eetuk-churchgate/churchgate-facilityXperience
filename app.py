@@ -8227,7 +8227,7 @@ def page_wo():
                     c1, c2 = st.columns(2)
                     with c1:
                         all_users = DB.get_users()
-                        tech_names = [u.get("name","") for u in all_users]
+                        tech_names = sorted([u.get("name","") for u in all_users if u.get("name")])
                         current_tech = wo.get("technician_name","")
                         default_idx = tech_names.index(current_tech) if current_tech in tech_names else 0
                         assign_to = st.selectbox("Assign to", tech_names, index=default_idx, key=f"assign_{wo_id}", label_visibility="collapsed")
@@ -8235,7 +8235,41 @@ def page_wo():
                         if st.button("👤 Assign", key=f"assign_btn_{wo_id}", use_container_width=True):
                             supabase.table("work_orders").update({"technician_name": assign_to}).eq("id", wo_id).execute()
                             supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"open","status_to":"open","changed_by":user_name,"comment":f"Assigned to {assign_to}","created_at":wat_now.isoformat()}).execute()
-                            st.success(f"✅ Assigned!"); st.rerun()
+                            
+                            # Send email to assigned technician
+                            assigned_user = next((u for u in all_users if u.get("name") == assign_to), None)
+                            if assigned_user and assigned_user.get("email"):
+                                try:
+                                    send_email_notification(
+                                        assigned_user["email"],
+                                        f"🔧 New Work Order Assigned — {wo.get('wo_number','')}",
+                                        f"""
+                                        <div style="font-family:Arial;max-width:550px;border:1px solid #ddd;border-radius:12px;overflow:hidden;">
+                                            <div style="background:#CC0000;padding:20px;color:white;">
+                                                <h2 style="margin:0;">🔧 New Work Order Assigned</h2>
+                                                <p style="margin:5px 0 0 0;font-size:12px;">{info.get('full_name',fc)}</p>
+                                            </div>
+                                            <div style="padding:20px;">
+                                                <p>Dear <b>{assign_to}</b>,</p>
+                                                <p>A new work order has been assigned to you.</p>
+                                                <table style="width:100%;font-size:13px;">
+                                                    <tr><td><b>WO#:</b></td><td>{wo.get('wo_number','')}</td></tr>
+                                                    <tr><td><b>Title:</b></td><td>{wo.get('title','')}</td></tr>
+                                                    <tr><td><b>Type:</b></td><td>{wo.get('type','')}</td></tr>
+                                                    <tr><td><b>Priority:</b></td><td>{wo.get('priority','').upper()}</td></tr>
+                                                    <tr><td><b>Location:</b></td><td>{wo.get('location_building','')} / {wo.get('location_floor','')}</td></tr>
+                                                    <tr><td><b>SLA:</b></td><td>{str(wo.get('sla_due_date',''))[:10]}</td></tr>
+                                                </table>
+                                                <div style="text-align:center;margin:20px 0;">
+                                                    <a href="https://facilityxperience.streamlit.app" style="background:#CC0000;color:white;padding:10px 25px;text-decoration:none;border-radius:6px;font-weight:bold;">View in facilityXperience</a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        """
+                                    )
+                                except: pass
+                            
+                            st.success(f"✅ Assigned to {assign_to}! Email sent."); st.rerun()
                 
                 # Accept & Start
                 if status == "open" and wo.get("technician_name") == user_name:
