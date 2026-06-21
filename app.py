@@ -8220,13 +8220,31 @@ def page_wo():
                             }).eq("id", wo_id).execute()
                             st.success("✅ Verified!"); st.rerun()
                 
-                with c4:
+               with c4:
                     if status in ["verified", "completed"] and is_manager:
                         if st.button("🔒 Close", key=f"close_{wo_id}", use_container_width=True):
                             supabase.table("work_orders").update({
                                 "status": "closed", "closed_by": user_name, "closed_at": wat_now.isoformat()
                             }).eq("id", wo_id).execute()
                             st.success("🔒 Closed!"); st.rerun()
+                
+                # Show attachments if any
+                if wo.get("attachments") and len(wo.get("attachments", [])) > 0:
+                    import base64 as b64
+                    for att in wo["attachments"]:
+                        if isinstance(att, dict) and att.get("data"):
+                            try:
+                                file_bytes = b64.b64decode(att["data"])
+                                st.download_button(
+                                    f"📎 {att.get('name','Download')}",
+                                    file_bytes,
+                                    att.get('name','attachment'),
+                                    mime=att.get('type','application/octet-stream'),
+                                    key=f"att_{wo_id}_{att.get('name','')[:20]}",
+                                    use_container_width=True
+                                )
+                            except:
+                                st.caption(f"📎 {att.get('name','Attachment')} (unavailable)")
     
     # ============================================
     # TAB 1: CREATE WO
@@ -8296,8 +8314,25 @@ def page_wo():
                         "location_building": wo_location_bldg, "location_floor": wo_location_floor,
                         "tenant_impact": wo_tenant_impact,
                         "tenant_name": wo_tenant_name if wo_tenant_impact else None,
-                        "attachments": [{"name": wo_attachment.name, "type": wo_attachment.type, "size": wo_attachment.size}] if wo_attachment else [],
                         "created_at": wat_now.isoformat()
+                    })
+                    
+                    # Handle attachment if uploaded
+                    if wo_attachment:
+                        import base64 as b64
+                        file_bytes = wo_attachment.read()
+                        file_b64 = b64.b64encode(file_bytes).decode()
+                        attachment_data = [{
+                            "name": wo_attachment.name,
+                            "type": wo_attachment.type,
+                            "size": len(file_bytes),
+                            "data": file_b64
+                        }]
+                        supabase.table("work_orders").update({
+                            "attachments": attachment_data
+                        }).eq("wo_number", wo_number).execute()
+                    
+                    st.success(f"✅ WO {wo_number} created!"); st.balloons(); st.rerun()
                     }).execute()
                     
                     st.success(f"✅ WO {wo_number} created!"); st.balloons(); st.rerun()
