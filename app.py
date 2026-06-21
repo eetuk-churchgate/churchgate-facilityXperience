@@ -8230,6 +8230,7 @@ def page_wo():
                             st.rerun()
                     with c2:
                         if st.button("⏸️ On Hold", key=f"hold_{wo_id}", use_container_width=True):
+                            st.write("DEBUG: Setting holding_wo =", wo_id)
                             st.session_state.holding_wo = wo_id
                             st.rerun()
                     with c3:
