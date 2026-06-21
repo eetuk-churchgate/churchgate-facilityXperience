@@ -8265,6 +8265,8 @@ def page_wo():
             
             wo_description = st.text_area("Description", height=80)
             
+            wo_attachment = st.file_uploader("📎 Attach Quote/Invoice/PO (Optional)", type=["pdf", "png", "jpg", "jpeg", "docx", "xlsx"], help="Attach supporting document for estimated cost")
+            
             c1, c2, c3, c4 = st.columns(4)
             with c1: wo_est_hours = st.number_input("Estimated Hours", min_value=0.0, value=1.0, step=0.5)
             with c2: wo_est_cost = st.number_input("Estimated Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
@@ -8294,6 +8296,7 @@ def page_wo():
                         "location_building": wo_location_bldg, "location_floor": wo_location_floor,
                         "tenant_impact": wo_tenant_impact,
                         "tenant_name": wo_tenant_name if wo_tenant_impact else None,
+                        "attachments": [{"name": wo_attachment.name, "type": wo_attachment.type, "size": wo_attachment.size}] if wo_attachment else [],
                         "created_at": wat_now.isoformat()
                     }).execute()
                     
