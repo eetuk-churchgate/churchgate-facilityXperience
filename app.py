@@ -8561,259 +8561,189 @@ def page_ppm_activities():
 
     
     # ============================================
-    # TAB 0: EXECUTE PPM (SCHEDULED)
+    # TAB 0: WO QUEUE WITH FULL ACTION FORMS
     # ============================================
     with tabs[0]:
-        st.markdown("### 🔧 Execute Scheduled PPM")
+        st.markdown("### 📋 Work Order Queue")
         
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            sel_dept = st.selectbox("Select Department*", ["Select..."] + allowed_depts, key="ppm_dept")
+        if st.session_state.get("wo_created", False):
+            st.success(f"✅ WO {st.session_state.get('wo_number_created','')} created!")
+            st.balloons()
+            st.session_state.wo_created = False
         
-        if sel_dept != "Select...":
-            dept_df = df[df["dept_full"] == sel_dept]
+        if total_wo == 0:
+            st.info("No work orders yet.")
+        else:
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: wo_type_filter = st.selectbox("Type", ["All","Reactive","Preventive","Corrective","New Installation","Inspection","Emergency Repair"], key="wo_type")
+            with c2: wo_status_filter = st.selectbox("Status", ["All","open","in_progress","on_hold","completed","cancelled","closed"], key="wo_status")
+            with c3: wo_priority_filter = st.selectbox("Priority", ["All","emergency","high","medium","low"], key="wo_pri")
+            with c4: wo_search = st.text_input("🔍 Search", key="wo_search", placeholder="WO# or title...")
             
-            with c2:
-                asset_list = ["Select..."] + sorted(dept_df["parent_asset"].dropna().unique().tolist())
-                sel_asset = st.selectbox("Select Asset*", asset_list, key="ppm_asset")
+            display_wo = wo_df.copy()
+            if wo_type_filter != "All": display_wo = display_wo[display_wo["type"] == wo_type_filter]
+            if wo_status_filter != "All": display_wo = display_wo[display_wo["status"] == wo_status_filter]
+            if wo_priority_filter != "All": display_wo = display_wo[display_wo["priority"] == wo_priority_filter]
+            if wo_search:
+                display_wo = display_wo[display_wo["wo_number"].str.contains(wo_search, case=False, na=False) | display_wo["title"].str.contains(wo_search, case=False, na=False)]
             
-            if sel_asset != "Select...":
-                asset_df = dept_df[dept_df["parent_asset"] == sel_asset]
+            st.caption(f"📋 {len(display_wo)} work orders")
+            
+            for _, wo in display_wo.head(20).iterrows():
+                status = wo.get("status", "open")
+                priority = wo.get("priority", "medium")
+                wo_type = wo.get("type", "Reactive")
+                sc = {"open":"#3B82F6","in_progress":"#F59E0B","on_hold":"#8B5CF6","completed":"#10B981","cancelled":"#EF4444","closed":"#6B7280"}.get(status,"#3B82F6")
+                pc = {"emergency":"#EF4444","high":"#F59E0B","medium":"#3B82F6","low":"#10B981"}.get(priority,"#3B82F6")
+                wo_id = wo["id"]
                 
-                with c3:
-                    sub_list = ["Select..."] + sorted(asset_df["name"].dropna().unique().tolist())
-                    sel_sub = st.selectbox("Select Sub Asset*", sub_list, key="ppm_sub")
-                
-                if sel_sub != "Select...":
-                    selected_asset = asset_df[asset_df["name"] == sel_sub].iloc[0]
-                    
-                    with c4:
-                        st.markdown(f"""
-                        <div style="background:#EFF6FF;border-radius:8px;padding:0.6rem;text-align:center;border:1px solid #BFDBFE;margin-top:0.5rem;">
-                            <div style="font-size:0.6rem;color:#2563EB;">📋 Frequency</div>
-                            <div style="font-weight:700;font-size:0.8rem;">{selected_asset.get('ppm_frequency', selected_asset.get('verification_frequency', 'Monthly'))}</div>
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>{wo.get('wo_number','')}</b> — {wo.get('title','')[:80]}
+                            <br><span style="font-size:0.65rem;color:#666;">👤 {wo.get('technician_name','Unassigned')} | 🏢 {wo.get('assigned_team','')} | 📅 {str(wo.get('created_at',''))[:10]}</span>
+                            <br><span style="font-size:0.6rem;color:#888;">🕐 SLA: {str(wo.get('sla_due_date','N/A'))[:10]} | 📍 {wo.get('location_building','')}</span>
                         </div>
-                        """, unsafe_allow_html=True)
-                    
-                    st.markdown("---")
-                    
-                    # Asset details card
-                    st.markdown(f"""
-                    <div style="background:white;border-radius:10px;padding:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:1rem;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <div>
-                                <h4 style="margin:0;">{sel_asset}</h4>
-                                <p style="margin:0;color:#666;font-size:0.8rem;">{sel_sub[:80]}</p>
-                            </div>
-                            <div style="text-align:right;">
-                                <span style="background:#3B82F6;color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;">{selected_asset.get('dept_full','')}</span>
-                                <br><span style="font-size:0.6rem;color:#888;">📍 {selected_asset.get('location_building','')}</span>
-                            </div>
+                        <div style="text-align:right;">
+                            <span style="background:{sc};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status.upper()}</span>
+                            <br><span style="background:{pc};color:white;padding:2px 8px;border-radius:12px;font-size:0.55rem;">{priority.upper()}</span>
                         </div>
                     </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # ============================================
-                    # DYNAMIC CHECKLIST — CUSTOMIZABLE
-                    # ============================================
-                    st.markdown("### 📝 PPM Checklist")
-                    
-                    # Select checklist template
-                    sel_checklist = st.selectbox("Select Checklist Template", checklist_options, key="ppm_checklist_template")
-                    
-                    # Build checklist items
-                    checklist_items = []
-                    
-                    if sel_checklist == "Standard Template":
-                        checklist_items = [
-                            {"item_number": 1, "description": "Safety Precautions & Pre-Checks", "check_type": "section", "options": None},
-                            {"item_number": 2, "description": "LOTO (Lock-Out/Tag-Out): Power isolated and locked out", "check_type": "yes_no", "options": None},
-                            {"item_number": 3, "description": "PPE: Appropriate PPE worn (gloves, safety glasses)", "check_type": "yes_no", "options": None},
-                            {"item_number": 4, "description": "Work Area Assessment: Area clear of obstructions", "check_type": "status", "options": ["Clear", "Not Clear"]},
-                            {"item_number": 5, "description": "Permits: All necessary work permits obtained", "check_type": "yes_no", "options": None},
-                            {"item_number": 6, "description": "Visual Inspection - Unit casing for damage, cleanliness", "check_type": "yes_no", "options": None},
-                            {"item_number": 7, "description": "Air Filter(s) - Inspect for cleanliness and damage", "check_type": "status", "options": ["Clean", "Dirty", "Replaced"]},
-                            {"item_number": 8, "description": "Fan & Motor - Check for unusual noise, vibration", "check_type": "status", "options": ["Normal", "Abnormal"]},
-                            {"item_number": 9, "description": "Condensate Drain - Inspect drain pan", "check_type": "status", "options": ["Good", "Damage", "Dirty"]},
-                            {"item_number": 10, "description": "Electrical - Check wiring for damage, loose connections", "check_type": "yes_no", "options": None},
-                            {"item_number": 11, "description": "Measure air-on temperature (°C)", "check_type": "reading", "options": None},
-                            {"item_number": 12, "description": "Measure air-off temperature (°C)", "check_type": "reading", "options": None},
-                            {"item_number": 13, "description": "Record voltage parameters - RY", "check_type": "reading", "options": None},
-                            {"item_number": 14, "description": "Record voltage parameters - YB", "check_type": "reading", "options": None},
-                            {"item_number": 15, "description": "Record voltage parameters - BR", "check_type": "reading", "options": None},
-                            {"item_number": 16, "description": "Record Amps parameters - R", "check_type": "reading", "options": None},
-                            {"item_number": 17, "description": "Record Amps parameters - Y", "check_type": "reading", "options": None},
-                            {"item_number": 18, "description": "Record Amps parameters - B", "check_type": "reading", "options": None},
-                            {"item_number": 19, "description": "Check earthing connections of the panel", "check_type": "status", "options": ["Tight", "Loose"]},
-                            {"item_number": 20, "description": "Check BMS integration units", "check_type": "yes_no", "options": None},
-                            {"item_number": 21, "description": "Replace defective indication lamps", "check_type": "yes_no", "options": None},
-                            {"item_number": 22, "description": "Observations / abnormality If any", "check_type": "text", "options": None},
-                        ]
-                    else:
-                        # Load from database
-                        matched = None
-                        for c in custom_checklists.data if custom_checklists.data else []:
-                            if c.get("template_name") == sel_checklist:
-                                matched = c
-                                break
-                        if matched:
-                            items_res = supabase.table("ppm_checklist_items").select("*").eq("template_id", matched["id"]).order("sort_order").execute()
-                            if items_res.data:
-                                for item in items_res.data:
-                                    opts = item.get("expected_value","").split("/") if item.get("expected_value") else None
-                                    checklist_items.append({
-                                        "item_number": item.get("item_number"),
-                                        "description": item.get("description"),
-                                        "check_type": item.get("check_type", "yes_no"),
-                                        "options": opts if len(opts) > 1 else None
-                                    })
-                    
-                    # ============================================
-                    # RENDER DYNAMIC CHECKLIST
-                    # ============================================
-                    with st.form("ppm_execution_form", clear_on_submit=True):
-                        checklist_results = []
-                        has_issues = False
-                        
-                        for item in checklist_items:
-                            item_num = item.get("item_number", len(checklist_results)+1)
-                            item_type = item.get("check_type", "yes_no")
-                            item_desc = item.get("description", "")
-                            item_opts = item.get("options")
-                            
-                            # Section headers
-                            if item_type == "section":
-                                st.markdown(f"### {item_desc}")
-                                continue
-                            
-                            st.markdown(f"**{item_num}. {item_desc}**")
-                            
-                            c1, c2 = st.columns([1, 2])
-                            
-                            if item_type == "yes_no":
-                                with c1:
-                                    result = st.selectbox("Status", ["Yes", "No"], key=f"yn_{item_num}")
-                                with c2:
-                                    comment = st.text_input("Comment", key=f"cmt_{item_num}", placeholder="Optional note...")
-                                if result == "No": has_issues = True
-                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": result, "actual_value": comment, "risk_level": "None"})
-                            
-                            elif item_type == "status" and item_opts:
-                                with c1:
-                                    result = st.selectbox("Status", item_opts, key=f"st_{item_num}")
-                                with c2:
-                                    comment = st.text_input("Comment", key=f"cmt_{item_num}", placeholder="Optional note...")
-                                if result in ["Damage", "Dirty", "Abnormal", "Loose", "Not Clear", "Fault"]: has_issues = True
-                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": result, "actual_value": comment, "risk_level": "None"})
-                            
-                            elif item_type == "reading":
-                                with c1:
-                                    reading = st.text_input("Reading", key=f"rd_{item_num}", placeholder="Enter value...")
-                                with c2:
-                                    unit = st.text_input("Unit", key=f"un_{item_num}", placeholder="°C, V, A...")
-                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": "Reading", "actual_value": f"{reading} {unit}".strip(), "risk_level": "None"})
-                            
-                            elif item_type == "text":
-                                with c1:
-                                    text_val = st.text_area("Observation", key=f"txt_{item_num}", height=60)
-                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": "Noted", "actual_value": text_val, "risk_level": "None"})
-                            
-                            else:
-                                with c1:
-                                    result = st.selectbox("Status", ["Pass", "Fail", "N/A"], key=f"df_{item_num}")
-                                with c2:
-                                    comment = st.text_input("Comment", key=f"cmt_{item_num}", placeholder="Optional note...")
-                                if result == "Fail": has_issues = True
-                                checklist_results.append({"item_number": item_num, "description": item_desc, "result": result, "actual_value": comment, "risk_level": "None"})
-                            
-                            st.markdown("---")
-                        
-                        # Mitigation section
-                        if has_issues:
-                            st.markdown("### 🚨 Mitigation Plan (Required)")
-                            mitigation_plan = st.text_area("Describe mitigation actions*", height=80, placeholder="Required when items fail...")
-                            c1, c2 = st.columns(2)
-                            with c1: mitigation_deadline = st.date_input("Mitigation Deadline", date.today() + timedelta(days=7))
-                            with c2: st.markdown("<br>", unsafe_allow_html=True)
-                        else:
-                            mitigation_plan, mitigation_deadline = "", None
-                        
-                        # Photo evidence
-                        st.markdown("### 📸 Photo Evidence (Required)")
-                        uploaded_photos = st.file_uploader("Upload photos", type=["png","jpg","jpeg"], accept_multiple_files=True, key="ppm_photos")
-                        
-                        # Schedule
-                        st.markdown("### 📅 Schedule")
-                        c1, c2, c3 = st.columns(3)
-                        with c1: execution_date = st.date_input("Execution Date", date.today())
-                        with c2: execution_time = st.time_input("Execution Time", datetime.now().time())
-                        with c3:
-                            is_early = st.checkbox("Early Execution (requires approval)")
-                            ppm_type = st.selectbox("PPM Type", ["Scheduled PPM", "Daily Checklist", "Hourly Checklist"], key="ppm_type_select")
-                        
-                        early_reason = ""
-                        if is_early:
-                            early_reason = st.text_area("Reason for Early Execution*", height=60)
-                        
-                        execution_comments = st.text_area("Execution Notes", height=60)
-                        
-                        submitted = st.form_submit_button("✅ SUBMIT PPM EXECUTION", use_container_width=True, type="primary")
-                        
-                        if submitted:
-                            errors = []
-                            if not uploaded_photos: errors.append("Photo evidence is required")
-                            if has_issues and not mitigation_plan: errors.append("Mitigation plan required")
-                            if is_early and not early_reason: errors.append("Reason required for early execution")
-                            
-                            if errors:
-                                for e in errors: st.error(f"⚠️ {e}")
-                            else:
-                                exec_data = {
-                                    "facility_code": fc,
-                                    "executed_by_name": user_name,
-                                    "execution_date": str(execution_date),
-                                    "status": "submitted",
-                                    "created_at": datetime.now().isoformat()
-                                }
-                                
-                                exec_result = supabase.table("ppm_executions").insert(exec_data).execute()
-                                if exec_result.data:
-                                    exec_result = exec_result.data[0]
-                                else:
-                                    exec_result = None
-                                
-                                if exec_result:
-                                    execution_id = exec_result["id"]
-                                    for item_result in checklist_results:
-                                        supabase.table("ppm_execution_items").insert({
-                                            "execution_id": execution_id,
-                                            "item_number": int(item_result.get("item_number", 1)),
-                                            "description": str(item_result.get("description", "N/A")),
-                                            "result": str(item_result.get("result", "pass")),
-                                            "actual_value": str(item_result.get("actual_value", "")),
-                                            "created_at": datetime.now().isoformat()
-                                        }).execute()
-                                    
-                                    supabase.table("ppm_approvals").insert({
-                                        "execution_id": execution_id,
-                                        "approval_level": "team_lead",
-                                        "status": "pending",
-                                        "created_at": datetime.now().isoformat()
-                                    }).execute()
-                                    supabase.table("ppm_approvals").insert({
-                                        "execution_id": execution_id,
-                                        "approval_level": "manager",
-                                        "status": "pending",
-                                        "created_at": datetime.now().isoformat()
-                                    }).execute()
-
-
-                                    
-                                    st.success("✅ PPM Execution submitted!")
-                                    st.balloons()
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Failed to submit.")
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Show timeline
+                timeline = supabase.table("wo_timeline").select("*").eq("wo_id", wo_id).order("created_at").execute()
+                if timeline.data:
+                    with st.expander(f"📋 Timeline ({len(timeline.data)} events)"):
+                        for t in timeline.data:
+                            icon = {"open":"🔵","in_progress":"🟡","on_hold":"🟣","completed":"🟢","cancelled":"🔴","closed":"⚫"}.get(t.get("status_to",""),"📝")
+                            st.caption(f"{icon} {str(t.get('created_at',''))[:16]} | {t.get('changed_by','')} | {t.get('status_from','')} → {t.get('status_to','')} | {t.get('comment','No comment')[:80]}")
+                
+                # ACTIONS
+                # Assign (Team Lead)
+                if status == "open" and (is_super or is_admin or is_team_lead):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        all_users = DB.get_users()
+                        tech_names = [u.get("name","") for u in all_users]
+                        current_tech = wo.get("technician_name","")
+                        default_idx = tech_names.index(current_tech) if current_tech in tech_names else 0
+                        assign_to = st.selectbox("Assign to", tech_names, index=default_idx, key=f"assign_{wo_id}", label_visibility="collapsed")
+                    with c2:
+                        if st.button("👤 Assign", key=f"assign_btn_{wo_id}", use_container_width=True):
+                            supabase.table("work_orders").update({"technician_name": assign_to}).eq("id", wo_id).execute()
+                            supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"open","status_to":"open","changed_by":user_name,"comment":f"Assigned to {assign_to}","created_at":wat_now.isoformat()}).execute()
+                            st.success(f"✅ Assigned to {assign_to}!"); st.rerun()
+                
+                # Accept & Start (Assigned Technician)
+                if status == "open" and wo.get("technician_name") == user_name:
+                    if st.button("✅ Accept & Start Work", key=f"accept_{wo_id}", use_container_width=True, type="primary"):
+                        st.session_state.starting_wo = wo_id; st.rerun()
+                
+                # Complete / On Hold / Cancel (In Progress)
+                if status == "in_progress" and (wo.get("technician_name") == user_name or is_super or is_admin):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        if st.button("✅ Complete", key=f"comp_{wo_id}", use_container_width=True):
+                            st.session_state.completing_wo = wo_id; st.rerun()
+                    with c2:
+                        if st.button("⏸️ On Hold", key=f"hold_{wo_id}", use_container_width=True):
+                            st.session_state.holding_wo = wo_id; st.rerun()
+                    with c3:
+                        if st.button("❌ Cancel", key=f"cancel_{wo_id}", use_container_width=True):
+                            st.session_state.cancelling_wo = wo_id; st.rerun()
+                
+                # Resume (On Hold)
+                if status == "on_hold" and (wo.get("technician_name") == user_name or is_super or is_admin):
+                    if st.button("▶ Resume", key=f"resume_{wo_id}", use_container_width=True):
+                        st.session_state.resuming_wo = wo_id; st.rerun()
+    
+    # ============================================
+    # ACTION FORMS (Outside the loop)
+    # ============================================
+    
+    # Start Work form
+    if "starting_wo" in st.session_state and st.session_state.starting_wo:
+        wo_id = st.session_state.starting_wo
+        st.markdown("---")
+        with st.form("start_wo_form"):
+            st.markdown("### ✅ Accept & Start Work")
+            start_comment = st.text_area("Initial Assessment/Comment*", height=80, placeholder="e.g., Arrived on site, assessed the issue, starting repairs...")
+            start_attachment = st.file_uploader("📎 Attach Photo (Optional)", type=["png","jpg","jpeg"], key="start_attach")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.form_submit_button("✅ CONFIRM START", use_container_width=True, type="primary"):
+                    if start_comment:
+                        supabase.table("work_orders").update({"status":"in_progress","actual_start":wat_now.isoformat(),"acknowledged_by":user_name,"acknowledged_at":wat_now.isoformat()}).eq("id",wo_id).execute()
+                        supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"open","status_to":"in_progress","changed_by":user_name,"comment":start_comment,"created_at":wat_now.isoformat()}).execute()
+                        st.success("✅ Work started!"); st.session_state.starting_wo = None; st.rerun()
+                    else: st.error("⚠️ Comment required")
+            with c2:
+                if st.form_submit_button("❌ CANCEL", use_container_width=True):
+                    st.session_state.starting_wo = None; st.rerun()
+    
+    # On Hold form
+    if "holding_wo" in st.session_state and st.session_state.holding_wo:
+        wo_id = st.session_state.holding_wo
+        st.markdown("---")
+        with st.form("hold_wo_form"):
+            st.markdown("### ⏸️ Put Work Order On Hold")
+            hold_reason = st.text_area("Reason for Hold*", height=80, placeholder="e.g., Awaiting parts, Waiting for tenant access...")
+            hold_attachment = st.file_uploader("📎 Attach Supporting Document (Optional)", type=["pdf","png","jpg","jpeg"], key="hold_attach")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.form_submit_button("⏸️ CONFIRM HOLD", use_container_width=True, type="primary"):
+                    if hold_reason:
+                        supabase.table("work_orders").update({"status":"on_hold"}).eq("id",wo_id).execute()
+                        comment_text = hold_reason
+                        if hold_attachment:
+                            comment_text += f" [Attachment: {hold_attachment.name}]"
+                        supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"in_progress","status_to":"on_hold","changed_by":user_name,"comment":comment_text,"created_at":wat_now.isoformat()}).execute()
+                        st.success("⏸️ On Hold!"); st.session_state.holding_wo = None; st.rerun()
+                    else: st.error("⚠️ Reason required")
+            with c2:
+                if st.form_submit_button("❌ CANCEL", use_container_width=True):
+                    st.session_state.holding_wo = None; st.rerun()
+    
+    # Cancel form
+    if "cancelling_wo" in st.session_state and st.session_state.cancelling_wo:
+        wo_id = st.session_state.cancelling_wo
+        st.markdown("---")
+        with st.form("cancel_wo_form"):
+            st.markdown("### ❌ Cancel Work Order")
+            cancel_reason = st.text_area("Reason for Cancellation*", height=80)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.form_submit_button("❌ CONFIRM CANCEL", use_container_width=True, type="primary"):
+                    if cancel_reason:
+                        supabase.table("work_orders").update({"status":"cancelled"}).eq("id",wo_id).execute()
+                        supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"in_progress","status_to":"cancelled","changed_by":user_name,"comment":cancel_reason,"created_at":wat_now.isoformat()}).execute()
+                        st.error("❌ Cancelled!"); st.session_state.cancelling_wo = None; st.rerun()
+                    else: st.error("⚠️ Reason required")
+            with c2:
+                if st.form_submit_button("CANCEL", use_container_width=True):
+                    st.session_state.cancelling_wo = None; st.rerun()
+    
+    # Resume form
+    if "resuming_wo" in st.session_state and st.session_state.resuming_wo:
+        wo_id = st.session_state.resuming_wo
+        st.markdown("---")
+        with st.form("resume_wo_form"):
+            st.markdown("### ▶ Resume Work Order")
+            resume_comment = st.text_area("Reason for Resume*", height=80, placeholder="e.g., Parts received, tenant access granted...")
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.form_submit_button("▶ CONFIRM RESUME", use_container_width=True, type="primary"):
+                    if resume_comment:
+                        supabase.table("work_orders").update({"status":"in_progress"}).eq("id",wo_id).execute()
+                        supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"on_hold","status_to":"in_progress","changed_by":user_name,"comment":resume_comment,"created_at":wat_now.isoformat()}).execute()
+                        st.success("▶ Resumed!"); st.session_state.resuming_wo = None; st.rerun()
+                    else: st.error("⚠️ Comment required")
+            with c2:
+                if st.form_submit_button("❌ CANCEL", use_container_width=True):
+                    st.session_state.resuming_wo = None; st.rerun()
     
     # ============================================
     # TAB 1: DAILY CHECKLIST
