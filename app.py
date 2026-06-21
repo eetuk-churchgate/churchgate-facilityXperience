@@ -8156,8 +8156,9 @@ def page_wo():
         else:
             c1, c2, c3, c4 = st.columns(4)
             with c1: wo_type_filter = st.selectbox("Type", ["All", "Reactive", "Preventive", "Corrective", "New Installation", "Inspection", "Emergency Repair"], key="wo_type")
-            with c2: wo_status_filter = st.selectbox("Status", ["All", "open", "in_progress", "completed", "verified", "closed"], key="wo_status")
-            with c3: wo_priority_filter = st.selectbox("Priority", ["All", "Emergency", "High", "Medium", "Low"], key="wo_pri")
+            with c2: wo_status_filter = st.selectbox("Status", ["All", "open", "in_progress", "on_hold", "completed", "cancelled", "closed"], key="wo_status")
+
+            with c3: wo_priority_filter = st.selectbox("Priority", ["All", "emergency", "high", "medium", "low"], key="wo_pri")
             with c4: wo_search = st.text_input("🔍 Search", key="wo_search", placeholder="WO# or title...")
             
             display_wo = wo_df.copy()
@@ -8173,7 +8174,7 @@ def page_wo():
                 status = wo.get("status", "open")
                 priority = wo.get("priority", "Medium")
                 wo_type = wo.get("type", "Reactive")
-                sc = {"open": "#3B82F6", "in_progress": "#F59E0B", "completed": "#10B981", "verified": "#06B6D4", "closed": "#6B7280"}.get(status, "#3B82F6")
+                sc = {"open": "#3B82F6", "in_progress": "#F59E0B", "on_hold": "#8B5CF6", "completed": "#10B981", "cancelled": "#EF4444", "closed": "#6B7280"}.get(status, "#3B82F6")
                 pc = {"Emergency": "#EF4444", "High": "#F59E0B", "Medium": "#3B82F6", "Low": "#10B981"}.get(priority, "#3B82F6")
                 
                 st.markdown(f"""
@@ -8287,7 +8288,7 @@ def page_wo():
                     
                     supabase.table("work_orders").insert({
                         "facility_code": fc, "wo_number": wo_number, "title": wo_title,
-                        "description": wo_description, "type": wo_type, "priority": wo_priority,
+                        "description": wo_description, "type": wo_type, "priority": wo_priority.lower(),
                         "status": "open", "category": wo_category, "failure_class": wo_failure_class,
                         "assigned_team": wo_team, "estimated_hours": wo_est_hours,
                         "estimated_cost": wo_est_cost, "sla_due_date": sla_deadline,
