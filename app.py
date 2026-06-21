@@ -8955,7 +8955,7 @@ td{{padding:8px;border-bottom:1px solid #eee}}
 </div>
 <div class="insight-box"><b>SLA Performance:</b> {period_sla}% compliance. {period_sla_breach} WOs breached. {'Immediate attention required.' if period_sla_breach > 0 else 'All WOs within SLA.'}</div>
 <div class="insight-box green"><b>Cost Efficiency:</b> ₦{period_spend:,.0f} total. ₦{round(period_spend/max(period_total,1)):,.0f}/WO. Labour: ₦{period_labour:,.0f} | Parts: ₦{period_parts:,.0f}</div>
-<div class="insight-box"><b>Firefighting Index:</b> {pm_count} PM ({pm_ratio}%) vs {reactive_count} Reactive ({reactive_ratio}%). {'World-class PM ratio.' if pm_ratio >= 60 else 'Increase PM to reduce reactive work.'}</div>
+<div class="insight-box"><b>🏥 PM Health Index:</b> {proactive_count} Planned ({round((proactive_count/max(period_total,1))*100)}%) vs {reactive_count} Reactive ({round((reactive_count/max(period_total,1))*100)}%). {'World-class PM ratio.' if pm_ratio >= 60 else 'Increase planned maintenance to reduce emergency work.'}</div>
 <h2>Work Order Details</h2>
 <table><tr><th>WO#</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Tech</th><th>SLA</th><th>Cost</th></tr>{wo_rows}</table>
 <div class="footer">Churchgate Group | facilityXperience | AI-Generated Intelligence Report | {today.strftime('%d %B %Y')}</div>
