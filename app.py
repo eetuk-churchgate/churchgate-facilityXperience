@@ -8561,7 +8561,7 @@ def page_ppm_activities():
 
     
     # ============================================
-    # TAB 0: WO QUEUE WITH FULL ACTION FORMS
+    # TAB 0: WO QUEUE — COMPLETE WITH ALL FORMS
     # ============================================
     with tabs[0]:
         st.markdown("### 📋 Work Order Queue")
@@ -8613,7 +8613,7 @@ def page_ppm_activities():
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Show timeline
+                # Timeline
                 timeline = supabase.table("wo_timeline").select("*").eq("wo_id", wo_id).order("created_at").execute()
                 if timeline.data:
                     with st.expander(f"📋 Timeline ({len(timeline.data)} events)"):
@@ -8621,7 +8621,10 @@ def page_ppm_activities():
                             icon = {"open":"🔵","in_progress":"🟡","on_hold":"🟣","completed":"🟢","cancelled":"🔴","closed":"⚫"}.get(t.get("status_to",""),"📝")
                             st.caption(f"{icon} {str(t.get('created_at',''))[:16]} | {t.get('changed_by','')} | {t.get('status_from','')} → {t.get('status_to','')} | {t.get('comment','No comment')[:80]}")
                 
-                # ACTIONS
+                # ============================================
+                # ACTION BUTTONS (SET SESSION STATE ONLY)
+                # ============================================
+                
                 # Assign (Team Lead)
                 if status == "open" and (is_super or is_admin or is_team_lead):
                     c1, c2 = st.columns(2)
@@ -8635,36 +8638,41 @@ def page_ppm_activities():
                         if st.button("👤 Assign", key=f"assign_btn_{wo_id}", use_container_width=True):
                             supabase.table("work_orders").update({"technician_name": assign_to}).eq("id", wo_id).execute()
                             supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"open","status_to":"open","changed_by":user_name,"comment":f"Assigned to {assign_to}","created_at":wat_now.isoformat()}).execute()
-                            st.success(f"✅ Assigned to {assign_to}!"); st.rerun()
+                            st.success(f"✅ Assigned!"); st.rerun()
                 
-                # Accept & Start (Assigned Technician)
+                # Accept & Start
                 if status == "open" and wo.get("technician_name") == user_name:
                     if st.button("✅ Accept & Start Work", key=f"accept_{wo_id}", use_container_width=True, type="primary"):
-                        st.session_state.starting_wo = wo_id; st.rerun()
+                        st.session_state.starting_wo = wo_id
+                        st.rerun()
                 
-                # Complete / On Hold / Cancel (In Progress)
+                # Complete / On Hold / Cancel
                 if status == "in_progress" and (wo.get("technician_name") == user_name or is_super or is_admin):
                     c1, c2, c3 = st.columns(3)
                     with c1:
                         if st.button("✅ Complete", key=f"comp_{wo_id}", use_container_width=True):
-                            st.session_state.completing_wo = wo_id; st.rerun()
+                            st.session_state.completing_wo = wo_id
+                            st.rerun()
                     with c2:
                         if st.button("⏸️ On Hold", key=f"hold_{wo_id}", use_container_width=True):
-                            st.session_state.holding_wo = wo_id; st.rerun()
+                            st.session_state.holding_wo = wo_id
+                            st.rerun()
                     with c3:
                         if st.button("❌ Cancel", key=f"cancel_{wo_id}", use_container_width=True):
-                            st.session_state.cancelling_wo = wo_id; st.rerun()
+                            st.session_state.cancelling_wo = wo_id
+                            st.rerun()
                 
-                # Resume (On Hold)
+                # Resume
                 if status == "on_hold" and (wo.get("technician_name") == user_name or is_super or is_admin):
                     if st.button("▶ Resume", key=f"resume_{wo_id}", use_container_width=True):
-                        st.session_state.resuming_wo = wo_id; st.rerun()
+                        st.session_state.resuming_wo = wo_id
+                        st.rerun()
     
     # ============================================
-    # ACTION FORMS (Outside the loop)
+    # ALL ACTION FORMS (OUTSIDE THE LOOP)
     # ============================================
     
-    # Start Work form
+    # START WORK FORM
     if "starting_wo" in st.session_state and st.session_state.starting_wo:
         wo_id = st.session_state.starting_wo
         st.markdown("---")
@@ -8684,7 +8692,7 @@ def page_ppm_activities():
                 if st.form_submit_button("❌ CANCEL", use_container_width=True):
                     st.session_state.starting_wo = None; st.rerun()
     
-    # On Hold form
+    # ON HOLD FORM
     if "holding_wo" in st.session_state and st.session_state.holding_wo:
         wo_id = st.session_state.holding_wo
         st.markdown("---")
@@ -8698,8 +8706,7 @@ def page_ppm_activities():
                     if hold_reason:
                         supabase.table("work_orders").update({"status":"on_hold"}).eq("id",wo_id).execute()
                         comment_text = hold_reason
-                        if hold_attachment:
-                            comment_text += f" [Attachment: {hold_attachment.name}]"
+                        if hold_attachment: comment_text += f" [Attachment: {hold_attachment.name}]"
                         supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"in_progress","status_to":"on_hold","changed_by":user_name,"comment":comment_text,"created_at":wat_now.isoformat()}).execute()
                         st.success("⏸️ On Hold!"); st.session_state.holding_wo = None; st.rerun()
                     else: st.error("⚠️ Reason required")
@@ -8707,7 +8714,7 @@ def page_ppm_activities():
                 if st.form_submit_button("❌ CANCEL", use_container_width=True):
                     st.session_state.holding_wo = None; st.rerun()
     
-    # Cancel form
+    # CANCEL FORM
     if "cancelling_wo" in st.session_state and st.session_state.cancelling_wo:
         wo_id = st.session_state.cancelling_wo
         st.markdown("---")
@@ -8726,7 +8733,7 @@ def page_ppm_activities():
                 if st.form_submit_button("CANCEL", use_container_width=True):
                     st.session_state.cancelling_wo = None; st.rerun()
     
-    # Resume form
+    # RESUME FORM
     if "resuming_wo" in st.session_state and st.session_state.resuming_wo:
         wo_id = st.session_state.resuming_wo
         st.markdown("---")
@@ -8745,6 +8752,55 @@ def page_ppm_activities():
                 if st.form_submit_button("❌ CANCEL", use_container_width=True):
                     st.session_state.resuming_wo = None; st.rerun()
     
+    # COMPLETE FORM
+    if "completing_wo" in st.session_state and st.session_state.completing_wo:
+        wo_id = st.session_state.completing_wo
+        wo = wo_df[wo_df["id"] == wo_id].iloc[0] if len(wo_df[wo_df["id"] == wo_id]) > 0 else None
+        if wo is not None:
+            st.markdown("---")
+            st.markdown(f"### ✅ Complete: {wo.get('wo_number','')} — {wo.get('title','')[:60]}")
+            with st.form("complete_wo_form"):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    actual_hours = st.number_input("Actual Hours*", min_value=0.0, value=float(wo.get("estimated_hours",1)), step=0.5)
+                    labour_cost = st.number_input("Labour Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
+                with c2:
+                    parts_cost = st.number_input("Parts Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
+                    contractor_cost = st.number_input("Contractor Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
+                with c3:
+                    resolution_code = st.selectbox("Resolution*", ["Repaired","Replaced","Adjusted","Deferred","No Fault Found"])
+                    first_time_fix = st.checkbox("First-Time Fix?", value=True)
+                
+                complete_attachment = st.file_uploader("📎 Attach Completion Photo/Document (Optional)", type=["png","jpg","jpeg","pdf"], key="complete_attach")
+                root_cause = st.text_area("Root Cause*", height=60, placeholder="What caused this issue?")
+                resolution_notes = st.text_area("Resolution Notes*", height=60, placeholder="Describe what was done to resolve...")
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.form_submit_button("✅ SUBMIT COMPLETION", use_container_width=True, type="primary"):
+                        if root_cause and resolution_notes:
+                            total_cost = parts_cost + labour_cost + contractor_cost
+                            supabase.table("work_orders").update({
+                                "status":"completed","actual_end":wat_now.isoformat(),"actual_hours":actual_hours,
+                                "labour_hours":actual_hours,"parts_cost":parts_cost,"labour_cost":labour_cost,
+                                "contractor_cost":contractor_cost,"total_cost":total_cost,
+                                "resolution_code":resolution_code,"first_time_fix":first_time_fix,
+                                "root_cause":root_cause,"resolution_notes":resolution_notes
+                            }).eq("id",wo_id).execute()
+                            
+                            comment_text = f"Resolution: {resolution_code} | Root Cause: {root_cause} | Notes: {resolution_notes}"
+                            if complete_attachment: comment_text += f" [Attachment: {complete_attachment.name}]"
+                            supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"in_progress","status_to":"completed","changed_by":user_name,"comment":comment_text,"created_at":wat_now.isoformat()}).execute()
+                            
+                            try:
+                                send_email_notification("eetuk@churchgate.com", f"✅ WO Completed — {wo.get('wo_number','')}", f"<h3>WO Completed</h3><p><b>WO:</b> {wo.get('wo_number','')}</p><p><b>By:</b> {user_name}</p><p><b>Cost:</b> ₦{total_cost:,.0f}</p><p>Please review and close.</p>")
+                            except: pass
+                            
+                            st.success("✅ Completed! Team Lead notified."); st.session_state.completing_wo = None; st.rerun()
+                        else: st.error("⚠️ Root Cause and Resolution Notes are required")
+                with c2:
+                    if st.form_submit_button("❌ CANCEL", use_container_width=True):
+                        st.session_state.completing_wo = None; st.rerun() 
     # ============================================
     # TAB 1: DAILY CHECKLIST
     # ============================================
