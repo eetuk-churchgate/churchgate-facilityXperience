@@ -8192,57 +8192,37 @@ def page_wo():
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Action buttons based on status
-                c1, c2, c3, c4 = st.columns(4)
                 wo_id = wo["id"]
-                
+                c1, c2, c3, c4 = st.columns(4)
                 with c1:
                     if status == "open" and (is_admin or is_team_lead):
                         if st.button("🔧 Assign/Start", key=f"start_{wo_id}", use_container_width=True):
-                            supabase.table("work_orders").update({
-                                "status": "in_progress", "actual_start": wat_now.isoformat(),
-                                "technician_name": user_name, "acknowledged_by": user_name,
-                                "acknowledged_at": wat_now.isoformat()
-                            }).eq("id", wo_id).execute()
+                            supabase.table("work_orders").update({"status": "in_progress", "actual_start": wat_now.isoformat(), "technician_name": user_name, "acknowledged_by": user_name, "acknowledged_at": wat_now.isoformat()}).eq("id", wo_id).execute()
                             st.success("✅ Work started!"); st.rerun()
-                
                 with c2:
                     if status == "in_progress":
                         if st.button("✅ Complete", key=f"complete_{wo_id}", use_container_width=True):
                             st.session_state.completing_wo = wo_id
                             st.rerun()
-                
                 with c3:
                     if status == "completed" and (is_admin or is_team_lead):
                         if st.button("🔍 Verify", key=f"verify_{wo_id}", use_container_width=True):
-                            supabase.table("work_orders").update({
-                                "status": "verified", "verified_by": user_name, "verified_at": wat_now.isoformat()
-                            }).eq("id", wo_id).execute()
+                            supabase.table("work_orders").update({"status": "verified", "verified_by": user_name, "verified_at": wat_now.isoformat()}).eq("id", wo_id).execute()
                             st.success("✅ Verified!"); st.rerun()
-                
-               with c4:
+                with c4:
                     if status in ["verified", "completed"] and is_manager:
                         if st.button("🔒 Close", key=f"close_{wo_id}", use_container_width=True):
-                            supabase.table("work_orders").update({
-                                "status": "closed", "closed_by": user_name, "closed_at": wat_now.isoformat()
-                            }).eq("id", wo_id).execute()
+                            supabase.table("work_orders").update({"status": "closed", "closed_by": user_name, "closed_at": wat_now.isoformat()}).eq("id", wo_id).execute()
                             st.success("🔒 Closed!"); st.rerun()
                 
-                # Show attachments if any
+                # Show attachments
                 if wo.get("attachments") and len(wo.get("attachments", [])) > 0:
                     import base64 as b64
                     for att in wo["attachments"]:
                         if isinstance(att, dict) and att.get("data"):
                             try:
                                 file_bytes = b64.b64decode(att["data"])
-                                st.download_button(
-                                    f"📎 {att.get('name','Download')}",
-                                    file_bytes,
-                                    att.get('name','attachment'),
-                                    mime=att.get('type','application/octet-stream'),
-                                    key=f"att_{wo_id}_{att.get('name','')[:20]}",
-                                    use_container_width=True
-                                )
+                                st.download_button(f"📎 {att.get('name','Download')}", file_bytes, att.get('name','attachment'), mime=att.get('type','application/octet-stream'), key=f"att_{wo_id}_{att.get('name','')[:20]}", use_container_width=True)
                             except:
                                 st.caption(f"📎 {att.get('name','Attachment')} (unavailable)")
     
