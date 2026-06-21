@@ -8077,13 +8077,423 @@ def page_ic():
 
 
 # ============================================
-# WORK ORDERS (STUB)
+# WORK ORDER INTELLIGENCE — FULL LIFECYCLE COMMAND CENTER
 # ============================================
 def page_wo():
-    fc=st.session_state.get("facility","WTC")
-    info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 📋 Work Orders — {info.get("full_name",fc)}')
-    st.info("🚧 Work Orders module — full deployment in progress.")
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    user_name = st.session_state.get("user_name", "Technician")
+    is_admin = user_role in ["admin", "approver", "super_admin"]
+    is_team_lead = user_role in ["team_lead", "manager", "sr_manager", "sr_management", "admin", "super_admin"]
+    is_manager = user_role in ["manager", "sr_manager", "sr_management", "admin", "super_admin"]
+    
+    st.markdown(f'## 🔧 Work Order Intelligence — {info.get("full_name", fc)}')
+    
+    from datetime import timezone, timedelta
+    wat_now = datetime.now(timezone(timedelta(hours=1)))
+    today = wat_now.date()
+    
+    wo_data = supabase.table("work_orders").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(500).execute()
+    wo_df = pd.DataFrame(wo_data.data) if wo_data.data else pd.DataFrame()
+    
+    total_wo = len(wo_df)
+    open_wo = len(wo_df[wo_df["status"] == "open"]) if total_wo > 0 else 0
+    in_progress = len(wo_df[wo_df["status"] == "in_progress"]) if total_wo > 0 else 0
+    completed = len(wo_df[wo_df["status"] == "completed"]) if total_wo > 0 else 0
+    verified = len(wo_df[wo_df["status"] == "verified"]) if total_wo > 0 else 0
+    closed = len(wo_df[wo_df["status"] == "closed"]) if total_wo > 0 else 0
+    
+    overdue = len(wo_df[(pd.to_datetime(wo_df["sla_due_date"], errors='coerce').dt.date < today) & (~wo_df["status"].isin(["completed","verified","closed"]))]) if "sla_due_date" in wo_df.columns and total_wo > 0 else 0
+    
+    total_parts = wo_df["parts_cost"].sum() if "parts_cost" in wo_df.columns else 0
+    total_labour = wo_df["labour_cost"].sum() if "labour_cost" in wo_df.columns else 0
+    total_spend = total_parts + total_labour
+    
+    ftf_count = len(wo_df[wo_df["first_time_fix"] == True]) if "first_time_fix" in wo_df.columns and total_wo > 0 else 0
+    ftf_rate = round((ftf_count / total_wo) * 100) if total_wo > 0 else 0
+    
+    pm_total = len(wo_df[wo_df["type"] == "Preventive"]) if total_wo > 0 else 0
+    pm_completed = len(wo_df[(wo_df["type"] == "Preventive") & (wo_df["status"].isin(["completed","verified","closed"]))]) if total_wo > 0 else 0
+    pm_compliance = round((pm_completed / pm_total) * 100) if pm_total > 0 else 0
+    
+    # ============================================
+    # 🟦 TOP RIBBON
+    # ============================================
+    st.markdown("### 🟦 Operational Health Ribbon")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        color = "#10B981" if overdue == 0 else "#F59E0B" if overdue < 5 else "#EF4444"
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:4px solid {color};box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Open WOs</div><div style="font-size:1.5rem;font-weight:800;color:{color};">{open_wo}</div><div style="font-size:0.5rem;color:#888;">{overdue} Overdue</div></div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:4px solid #F59E0B;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">In Progress</div><div style="font-size:1.5rem;font-weight:800;color:#F59E0B;">{in_progress}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:4px solid #10B981;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Completed</div><div style="font-size:1.5rem;font-weight:800;color:#10B981;">{completed}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        color = "#10B981" if ftf_rate >= 80 else "#F59E0B" if ftf_rate >= 60 else "#EF4444"
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:4px solid {color};box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">First-Time Fix</div><div style="font-size:1.5rem;font-weight:800;color:{color};">{ftf_rate}%</div></div>""", unsafe_allow_html=True)
+    with c5:
+        color = "#10B981" if pm_compliance >= 90 else "#F59E0B" if pm_compliance >= 70 else "#EF4444"
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:4px solid {color};box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">PM Compliance</div><div style="font-size:1.5rem;font-weight:800;color:{color};">{pm_compliance}%</div></div>""", unsafe_allow_html=True)
+    with c6:
+        st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:4px solid #CC0000;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Total Spend</div><div style="font-size:1.5rem;font-weight:800;color:#CC0000;">₦{total_spend:,.0f}</div></div>""", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TABS
+    # ============================================
+    tabs = st.tabs(["📋 WO Queue", "➕ Create WO", "🔧 My Tasks", "✅ Verify/Close", "👥 Team Performance", "📊 Reports"])
+    
+    # ============================================
+    # TAB 0: WO QUEUE WITH FULL ACTIONS
+    # ============================================
+    with tabs[0]:
+        st.markdown("### 📋 Work Order Queue")
+        
+        if total_wo == 0:
+            st.info("No work orders yet.")
+        else:
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: wo_type_filter = st.selectbox("Type", ["All", "Reactive", "Preventive", "Corrective"], key="wo_type")
+            with c2: wo_status_filter = st.selectbox("Status", ["All", "open", "in_progress", "completed", "verified", "closed"], key="wo_status")
+            with c3: wo_priority_filter = st.selectbox("Priority", ["All", "Emergency", "High", "Medium", "Low"], key="wo_pri")
+            with c4: wo_search = st.text_input("🔍 Search", key="wo_search", placeholder="WO# or title...")
+            
+            display_wo = wo_df.copy()
+            if wo_type_filter != "All": display_wo = display_wo[display_wo["type"] == wo_type_filter]
+            if wo_status_filter != "All": display_wo = display_wo[display_wo["status"] == wo_status_filter]
+            if wo_priority_filter != "All": display_wo = display_wo[display_wo["priority"] == wo_priority_filter]
+            if wo_search:
+                display_wo = display_wo[display_wo["wo_number"].str.contains(wo_search, case=False, na=False) | display_wo["title"].str.contains(wo_search, case=False, na=False)]
+            
+            st.caption(f"📋 {len(display_wo)} work orders")
+            
+            for _, wo in display_wo.head(20).iterrows():
+                status = wo.get("status", "open")
+                priority = wo.get("priority", "Medium")
+                wo_type = wo.get("type", "Reactive")
+                sc = {"open": "#3B82F6", "in_progress": "#F59E0B", "completed": "#10B981", "verified": "#06B6D4", "closed": "#6B7280"}.get(status, "#3B82F6")
+                pc = {"Emergency": "#EF4444", "High": "#F59E0B", "Medium": "#3B82F6", "Low": "#10B981"}.get(priority, "#3B82F6")
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>{wo.get('wo_number','N/A')}</b> — {wo.get('title','N/A')[:80]}
+                            <br><span style="font-size:0.65rem;color:#666;">👤 {wo.get('assigned_team','Unassigned')} | 📅 {str(wo.get('created_at',''))[:10]} | 🕐 SLA: {str(wo.get('sla_due_date','N/A'))[:10]}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status.upper()}</span>
+                            <br><span style="background:{pc};color:white;padding:2px 8px;border-radius:12px;font-size:0.55rem;">{priority.upper()}</span>
+                            <span style="background:#f0f0f0;color:#666;padding:2px 8px;border-radius:12px;font-size:0.55rem;">{wo_type.upper()}</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Action buttons based on status
+                c1, c2, c3, c4 = st.columns(4)
+                wo_id = wo["id"]
+                
+                with c1:
+                    if status == "open" and (is_admin or is_team_lead):
+                        if st.button("🔧 Assign/Start", key=f"start_{wo_id}", use_container_width=True):
+                            supabase.table("work_orders").update({
+                                "status": "in_progress", "actual_start": wat_now.isoformat(),
+                                "technician_name": user_name, "acknowledged_by": user_name,
+                                "acknowledged_at": wat_now.isoformat()
+                            }).eq("id", wo_id).execute()
+                            st.success("✅ Work started!"); st.rerun()
+                
+                with c2:
+                    if status == "in_progress":
+                        if st.button("✅ Complete", key=f"complete_{wo_id}", use_container_width=True):
+                            st.session_state.completing_wo = wo_id
+                            st.rerun()
+                
+                with c3:
+                    if status == "completed" and (is_admin or is_team_lead):
+                        if st.button("🔍 Verify", key=f"verify_{wo_id}", use_container_width=True):
+                            supabase.table("work_orders").update({
+                                "status": "verified", "verified_by": user_name, "verified_at": wat_now.isoformat()
+                            }).eq("id", wo_id).execute()
+                            st.success("✅ Verified!"); st.rerun()
+                
+                with c4:
+                    if status in ["verified", "completed"] and is_manager:
+                        if st.button("🔒 Close", key=f"close_{wo_id}", use_container_width=True):
+                            supabase.table("work_orders").update({
+                                "status": "closed", "closed_by": user_name, "closed_at": wat_now.isoformat()
+                            }).eq("id", wo_id).execute()
+                            st.success("🔒 Closed!"); st.rerun()
+    
+    # ============================================
+    # TAB 1: CREATE WO
+    # ============================================
+    with tabs[1]:
+        st.markdown("### ➕ Create New Work Order")
+        
+        all_assets_list = DB.get_assets(fc, 50000)
+        assets_df = pd.DataFrame(all_assets_list) if all_assets_list else pd.DataFrame()
+        
+        with st.form("create_wo_form"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                wo_title = st.text_input("Title*", placeholder="Brief description of work required")
+                wo_type = st.selectbox("Type*", ["Reactive", "Preventive", "Corrective"])
+            with c2:
+                wo_priority = st.selectbox("Priority*", ["Emergency", "High", "Medium", "Low"])
+                wo_category = st.selectbox("Category", ["HVAC", "Electrical", "Plumbing", "Elevator", "Fire Safety", "Civil/Structural", "BMS", "ELV", "General"])
+            with c3:
+                wo_failure_class = st.selectbox("Failure Class", ["Mechanical", "Electrical", "User Error", "Wear & Tear", "Design Issue", "Unknown"])
+                wo_team = st.selectbox("Assigned Team", ["Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing", "Facility Management — Hard Services", "Technology Group"])
+            
+            c1, c2 = st.columns(2)
+            with c1: wo_location_bldg = st.selectbox("Building", ["CT — Office Tower", "SAT — Residential Tower", "IP — Intermediate Parking", "RC — Recreation Center", "External"])
+            with c2: wo_location_floor = st.text_input("Floor/Zone", placeholder="e.g., Floor 13, Basement 2")
+            
+            wo_description = st.text_area("Description", height=80)
+            
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: wo_est_hours = st.number_input("Estimated Hours", min_value=0.0, value=1.0, step=0.5)
+            with c2: wo_est_cost = st.number_input("Estimated Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
+            with c3: wo_sla_hours = st.number_input("SLA Hours", min_value=1, value=24)
+            with c4:
+                if len(assets_df) > 0:
+                    asset_options = ["None"] + [f"{a['name'][:50]} ({a['asset_tag']})" for _, a in assets_df.head(200).iterrows()]
+                    wo_asset_sel = st.selectbox("Asset", asset_options)
+                else:
+                    wo_asset_sel = "None"
+            
+            wo_tenant_impact = st.checkbox("Tenant Impact?")
+            wo_tenant_name = st.text_input("Tenant Name") if wo_tenant_impact else ""
+            
+            if st.form_submit_button("➕ CREATE WORK ORDER", use_container_width=True, type="primary"):
+                if wo_title:
+                    wo_count = total_wo + 1
+                    wo_number = f"WO-{fc}-{today.strftime('%Y%m%d')}-{str(wo_count).zfill(4)}"
+                    sla_deadline = (wat_now + timedelta(hours=wo_sla_hours)).isoformat()
+                    
+                    supabase.table("work_orders").insert({
+                        "facility_code": fc, "wo_number": wo_number, "title": wo_title,
+                        "description": wo_description, "type": wo_type, "priority": wo_priority,
+                        "status": "open", "category": wo_category, "failure_class": wo_failure_class,
+                        "assigned_team": wo_team, "estimated_hours": wo_est_hours,
+                        "estimated_cost": wo_est_cost, "sla_due_date": sla_deadline,
+                        "location_building": wo_location_bldg, "location_floor": wo_location_floor,
+                        "tenant_impact": wo_tenant_impact,
+                        "tenant_name": wo_tenant_name if wo_tenant_impact else None,
+                        "created_at": wat_now.isoformat()
+                    }).execute()
+                    
+                    st.success(f"✅ WO {wo_number} created!"); st.balloons(); st.rerun()
+                else:
+                    st.error("⚠️ Title is required")
+    
+    # ============================================
+    # COMPLETE WO FORM (triggered from queue)
+    # ============================================
+    if "completing_wo" in st.session_state and st.session_state.completing_wo:
+        wo_id = st.session_state.completing_wo
+        wo = wo_df[wo_df["id"] == wo_id].iloc[0] if len(wo_df[wo_df["id"] == wo_id]) > 0 else None
+        
+        if wo is not None:
+            st.markdown("---")
+            st.markdown(f"### ✅ Complete Work Order: {wo.get('wo_number','')}")
+            st.markdown(f"**{wo.get('title','')}**")
+            
+            with st.form("complete_wo_form"):
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    actual_hours = st.number_input("Actual Hours*", min_value=0.0, value=float(wo.get("estimated_hours", 1)), step=0.5)
+                    labour_cost = st.number_input("Labour Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
+                with c2:
+                    parts_cost = st.number_input("Parts Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
+                    contractor_cost = st.number_input("Contractor Cost (₦)", min_value=0.0, value=0.0, step=1000.0)
+                with c3:
+                    resolution_code = st.selectbox("Resolution*", ["Repaired", "Replaced", "Adjusted", "Deferred", "No Fault Found"])
+                    first_time_fix = st.checkbox("First-Time Fix?", value=True)
+                
+                root_cause = st.text_area("Root Cause", height=60)
+                resolution_notes = st.text_area("Resolution Notes", height=60)
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.form_submit_button("✅ SUBMIT COMPLETION", use_container_width=True, type="primary"):
+                        total_cost = parts_cost + labour_cost + contractor_cost
+                        supabase.table("work_orders").update({
+                            "status": "completed", "actual_end": wat_now.isoformat(),
+                            "actual_hours": actual_hours, "labour_hours": actual_hours,
+                            "parts_cost": parts_cost, "labour_cost": labour_cost,
+                            "contractor_cost": contractor_cost, "total_cost": total_cost,
+                            "resolution_code": resolution_code, "first_time_fix": first_time_fix,
+                            "root_cause": root_cause, "resolution_notes": resolution_notes,
+                            "technician_name": user_name
+                        }).eq("id", wo_id).execute()
+                        st.success("✅ WO Completed!"); st.session_state.completing_wo = None; st.rerun()
+                with c2:
+                    if st.form_submit_button("❌ CANCEL", use_container_width=True):
+                        st.session_state.completing_wo = None; st.rerun()
+    
+    # ============================================
+    # TAB 2: MY TASKS
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 🔧 My Assigned Tasks")
+        
+        my_tasks = wo_df[(wo_df["technician_name"] == user_name) | (wo_df["assigned_team"].str.contains(user_name, na=False))] if total_wo > 0 else pd.DataFrame()
+        
+        if len(my_tasks) == 0:
+            st.info("No tasks assigned to you.")
+        else:
+            for _, wo in my_tasks.head(20).iterrows():
+                status = wo.get("status", "open")
+                sc = {"open": "#3B82F6", "in_progress": "#F59E0B", "completed": "#10B981", "verified": "#06B6D4", "closed": "#6B7280"}.get(status, "#3B82F6")
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <b>{wo.get('wo_number','')}</b> — {wo.get('title','')[:80]}
+                    <br><span style="font-size:0.65rem;color:#666;">📍 {wo.get('location_building','')} | 🕐 SLA: {str(wo.get('sla_due_date',''))[:10]}</span>
+                    <span style="float:right;background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;">{status.upper()}</span>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ============================================
+    # TAB 3: VERIFY/CLOSE
+    # ============================================
+    with tabs[3]:
+        st.markdown("### ✅ Verify & Close Work Orders")
+        
+        if not is_team_lead:
+            st.info("This section is for Team Leads and Managers.")
+        else:
+            completed_wos = wo_df[wo_df["status"].isin(["completed", "verified"])] if total_wo > 0 else pd.DataFrame()
+            
+            if len(completed_wos) == 0:
+                st.success("✅ No work orders awaiting verification.")
+            else:
+                for _, wo in completed_wos.head(20).iterrows():
+                    status = wo.get("status", "completed")
+                    sc = {"completed": "#10B981", "verified": "#06B6D4"}.get(status, "#10B981")
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid {sc};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                        <b>{wo.get('wo_number','')}</b> — {wo.get('title','')[:80]}
+                        <br><span style="font-size:0.65rem;color:#666;">👤 {wo.get('technician_name','N/A')} | 🕐 {wo.get('actual_hours','')}hrs | 💰 ₦{wo.get('total_cost',0):,.0f}</span>
+                        <br><span style="font-size:0.6rem;color:#888;">Resolution: {wo.get('resolution_code','N/A')} | Root Cause: {wo.get('root_cause','N/A')[:60]}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        if status == "completed":
+                            if st.button("🔍 Verify", key=f"vfy_{wo['id']}", use_container_width=True):
+                                supabase.table("work_orders").update({"status": "verified", "verified_by": user_name, "verified_at": wat_now.isoformat()}).eq("id", wo["id"]).execute()
+                                st.success("✅ Verified!"); st.rerun()
+                    with c2:
+                        if is_manager:
+                            if st.button("🔒 Close", key=f"cls_{wo['id']}", use_container_width=True):
+                                supabase.table("work_orders").update({"status": "closed", "closed_by": user_name, "closed_at": wat_now.isoformat()}).eq("id", wo["id"]).execute()
+                                st.success("🔒 Closed!"); st.rerun()
+                    with c3:
+                        if st.button("❌ Reject", key=f"rej_{wo['id']}", use_container_width=True):
+                            st.session_state.rejecting_wo = wo["id"]
+                            st.rerun()
+    
+    # Rejection form
+    if "rejecting_wo" in st.session_state and st.session_state.rejecting_wo:
+        wo_id = st.session_state.rejecting_wo
+        st.markdown("---")
+        with st.form("reject_wo_form"):
+            st.markdown("### ❌ Reject Work Order")
+            reject_reason = st.text_area("Rejection Reason*", height=80)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.form_submit_button("❌ REJECT", use_container_width=True, type="primary"):
+                    if reject_reason:
+                        supabase.table("work_orders").update({"status": "open", "rejection_reason": reject_reason, "revisit_count": wo_df[wo_df["id"]==wo_id]["revisit_count"].iloc[0] + 1 if len(wo_df[wo_df["id"]==wo_id]) > 0 else 1}).eq("id", wo_id).execute()
+                        st.error("❌ Rejected!"); st.session_state.rejecting_wo = None; st.rerun()
+            with c2:
+                if st.form_submit_button("CANCEL", use_container_width=True):
+                    st.session_state.rejecting_wo = None; st.rerun()
+    
+    # ============================================
+    # TAB 4: TEAM PERFORMANCE
+    # ============================================
+    with tabs[4]:
+        st.markdown("### 👥 Team Performance Command")
+        
+        if total_wo == 0:
+            st.info("No work order data yet.")
+        elif "assigned_team" in wo_df.columns:
+            team_summary = wo_df.groupby("assigned_team").agg(Total=("id","count"), Completed=("status", lambda x: (x.isin(["completed","verified","closed"])).sum()), Avg_Hours=("actual_hours","mean"), Total_Cost=("total_cost","sum")).reset_index()
+            team_summary["Completion_Rate"] = round((team_summary["Completed"]/team_summary["Total"])*100)
+            
+            st.dataframe(team_summary, use_container_width=True, hide_index=True)
+            
+            fig = px.bar(team_summary, x="assigned_team", y="Total", color="Completion_Rate", title="Team Workload & Completion", color_continuous_scale=["#EF4444","#F59E0B","#10B981"])
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # ============================================
+    # TAB 5: REPORTS
+    # ============================================
+    with tabs[5]:
+        st.markdown("### 📊 Work Order Reports")
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("📋 Total WOs", total_wo)
+        with c2: st.metric("💰 Total Spend", f"₦{total_spend:,.0f}")
+        with c3: st.metric("🔧 First-Time Fix", f"{ftf_rate}%")
+        
+        st.markdown("---")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("📄 Generate HTML Report", key="wo_html_btn", use_container_width=True, type="primary"):
+                logo_b64 = get_logo_base64()
+                logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="30">' if logo_b64 else ''
+                html_report = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Work Order Intelligence Report</title><style>body{{font-family:'Segoe UI',Arial,sans-serif;margin:20px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:960px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}.header{{border-bottom:3px solid #CC0000;padding-bottom:15px}}h1{{color:#CC0000;margin:0}}.kpi-row{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:20px;font-weight:800;color:#CC0000}}.kpi .lbl{{font-size:9px;color:#888}}table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:10px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}.footer{{text-align:center;font-size:8px;color:#999;margin-top:20px;border-top:1px solid #eee;padding-top:15px}}</style></head><body><div class="container"><div class="header">{logo_img}<h1>Work Order Intelligence Report</h1><p>{info.get('full_name',fc)} | {today.strftime('%d %B %Y')}</p></div><div class="kpi-row"><div class="kpi"><div class="val">{total_wo}</div><div class="lbl">Total</div></div><div class="kpi"><div class="val">{open_wo}</div><div class="lbl">Open</div></div><div class="kpi"><div class="val">{in_progress}</div><div class="lbl">In Progress</div></div><div class="kpi"><div class="val">{completed}</div><div class="lbl">Completed</div></div><div class="kpi"><div class="val">{ftf_rate}%</div><div class="lbl">First-Time Fix</div></div><div class="kpi"><div class="val">₦{total_spend:,.0f}</div><div class="lbl">Total Spend</div></div></div><h2>Work Orders</h2><table><tr><th>WO#</th><th>Title</th><th>Type</th><th>Status</th><th>Team</th><th>Resolution</th></tr>"""
+                for _, wo in wo_df.head(40).iterrows():
+                    html_report += f"<tr><td>{wo.get('wo_number','')}</td><td>{wo.get('title','')[:60]}</td><td>{wo.get('type','')}</td><td>{wo.get('status','')}</td><td>{wo.get('assigned_team','')}</td><td>{wo.get('resolution_code','')}</td></tr>"
+                html_report += "</table><div class='footer'>Churchgate Group | facilityXperience</div></div></body></html>"
+                st.download_button("📥 Download HTML", html_report, f"wo_report_{today}.html", "text/html", use_container_width=True)
+        
+        with c2:
+            if st.button("📕 Generate PDF Report", key="wo_pdf_btn", use_container_width=True):
+                try:
+                    from fpdf import FPDF
+                    pdf = FPDF('L','mm','A4'); pdf.add_page()
+                    pdf.set_font('Helvetica','B',16); pdf.set_text_color(204,0,0)
+                    pdf.cell(0,10,safe_text('Work Order Intelligence Report'),0,1)
+                    pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
+                    pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {today.strftime("%d %B %Y")}'),0,1); pdf.ln(5)
+                    pdf.set_font('Helvetica','B',7); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
+                    for h,w in zip(['WO#','Title','Type','Status','Team','Resolution'],[35,65,25,22,55,50]): pdf.cell(w,5,h,1,0,'C',True)
+                    pdf.ln(); pdf.set_font('Helvetica','',7); pdf.set_text_color(0,0,0)
+                    for _,wo in wo_df.head(40).iterrows():
+                        pdf.cell(35,4,safe_text(wo.get('wo_number','')),1,0)
+                        pdf.cell(65,4,safe_text(str(wo.get('title',''))[:28]),1,0)
+                        pdf.cell(25,4,safe_text(wo.get('type','')),1,0)
+                        pdf.cell(22,4,safe_text(wo.get('status','')),1,0)
+                        pdf.cell(55,4,safe_text(str(wo.get('assigned_team',''))[:24]),1,0)
+                        pdf.cell(50,4,safe_text(str(wo.get('resolution_code',''))[:22]),1,0)
+                        pdf.ln()
+                    pdf_file = f"/tmp/wo_report_{today}.pdf"; pdf.output(pdf_file)
+                    with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"wo_report_{today}.pdf", "application/pdf", use_container_width=True)
+                except Exception as e: st.error(f"PDF: {str(e)[:80]}")
+        
+        # AI Insights
+        st.markdown("---")
+        st.markdown("### 🤖 AI Insights")
+        insights = []
+        if overdue > 0: insights.append(f"🔴 **{overdue}** WOs past SLA. Immediate attention required.")
+        if ftf_rate < 70: insights.append(f"⚠️ First-time fix at **{ftf_rate}%**. Training review recommended.")
+        if pm_compliance < 90: insights.append(f"⚠️ PM compliance at **{pm_compliance}%**. Reactive work increases 3x when PM is skipped.")
+        if total_wo == 0: insights.append("📝 No work orders yet. Create your first WO.")
+        for insight in insights:
+            st.markdown(f"""<div style="background:white;border-left:4px solid #CC0000;border-radius:8px;padding:0.7rem;margin:0.2rem 0;">{insight}</div>""", unsafe_allow_html=True)
 
 # ============================================
 # HOTO CHECK (STUB)
