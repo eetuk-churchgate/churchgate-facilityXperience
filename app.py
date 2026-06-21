@@ -8231,6 +8231,9 @@ def page_wo():
     # ============================================
     # TAB 1: CREATE WO
     # ============================================
+    # ============================================
+    # TAB 1: CREATE WO
+    # ============================================
     with tabs[1]:
         st.markdown("### ➕ Create New Work Order")
         
@@ -8239,14 +8242,14 @@ def page_wo():
         
         with st.form("create_wo_form"):
             c1, c2, c3 = st.columns(3)
-           with c1:
+            with c1:
                 wo_title = st.text_input("Title*", placeholder="Brief description of work required")
                 wo_type = st.selectbox("Type*", ["Reactive", "Preventive", "Corrective", "New Installation", "Inspection", "Emergency Repair"])
             with c2:
                 wo_priority = st.selectbox("Priority*", ["Emergency", "High", "Medium", "Low"])
-                wo_category = st.selectbox("Category", ["HVAC", "Electrical", "Plumbing", "Elevator", "Fire Safety", "Civil/Structural", "BMS", "ELV", "General"])
+                wo_category = st.selectbox("Category", ["HVAC", "Electrical", "Plumbing", "Elevator", "Fire Safety", "Civil/Structural", "BMS", "ELV", "Technology", "General"])
             with c3:
-               wo_failure_class = st.selectbox("Failure Class", ["Mechanical", "Electrical", "User Error", "Wear & Tear", "Design Issue", "Technology", "Software/Firmware", "Network/Connectivity", "Unknown"])
+                wo_failure_class = st.selectbox("Failure Class", ["Mechanical", "Electrical", "User Error", "Wear & Tear", "Design Issue", "Technology", "Software/Firmware", "Network/Connectivity", "Unknown"])
                 wo_team = st.selectbox("Assigned Team", ["Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing", "Facility Management — Hard Services", "Technology Group"])
             
             c1, c2 = st.columns(2)
