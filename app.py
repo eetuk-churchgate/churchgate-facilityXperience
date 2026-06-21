@@ -8418,17 +8418,18 @@ def page_wo():
                 
                 if status == "in_progress":
                     c1, c2, c3 = st.columns(3)
-                    with c1:
+                   with c1:
                         if st.button("✅ Complete", key=f"mytask_comp_{wo_id}", use_container_width=True):
-                            st.session_state.completing_wo = wo_id; st.rerun()
+                            st.session_state.completing_wo = wo_id
+                            st.rerun()
                     with c2:
                         if st.button("⏸️ On Hold", key=f"mytask_hold_{wo_id}", use_container_width=True):
-                            supabase.table("work_orders").update({"status":"on_hold"}).eq("id",wo_id).execute()
-                            supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"in_progress","status_to":"on_hold","changed_by":user_name,"created_at":wat_now.isoformat()}).execute()
-                            st.success("⏸️ On Hold"); st.rerun()
+                            st.session_state.holding_wo = wo_id
+                            st.rerun()
                     with c3:
                         if st.button("❌ Cancel", key=f"mytask_cancel_{wo_id}", use_container_width=True):
-                            supabase.table("work_orders").update({"status":"cancelled"}).eq("id",wo_id).execute()
+                            st.session_state.cancelling_wo = wo_id
+                            st.rerun()
                             supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"in_progress","status_to":"cancelled","changed_by":user_name,"created_at":wat_now.isoformat()}).execute()
                             st.error("❌ Cancelled"); st.rerun()
                 
