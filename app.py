@@ -8608,17 +8608,159 @@ def page_wo():
                 else: st.error("⚠️ Title required")
     
     # ============================================
-    # TAB 4: TEAM PERFORMANCE
+    # TAB 4: ASSIGNMENT CONSOLE & ANALYTICS
     # ============================================
     with tabs[4]:
-        st.markdown("### 👥 Team Performance")
-        if total_wo > 0 and "assigned_team" in wo_df.columns:
-            team_summary = wo_df.groupby("assigned_team").agg(Total=("id","count"),Completed=("status",lambda x:(x.isin(["completed","closed"])).sum()),Avg_Hours=("actual_hours","mean"),Total_Cost=("total_cost","sum")).reset_index()
-            team_summary["Rate"] = round((team_summary["Completed"]/team_summary["Total"])*100)
-            st.dataframe(team_summary, use_container_width=True, hide_index=True)
-            fig = px.bar(team_summary, x="assigned_team", y="Total", color="Rate", title="Team Workload & Completion", color_continuous_scale=["#EF4444","#F59E0B","#10B981"])
-            fig.update_layout(height=400); st.plotly_chart(fig, use_container_width=True)
-        else: st.info("No data yet.")
+        st.markdown("### 👥 Work Order Assignment Console")
+        
+        if total_wo == 0:
+            st.info("No work orders yet.")
+        else:
+            # KPIs
+            assigned_count = len(wo_df[wo_df["technician_name"].notna() & (wo_df["technician_name"] != "")]) if "technician_name" in wo_df.columns else 0
+            unassigned_count = len(wo_df[~(wo_df["technician_name"].notna() & (wo_df["technician_name"] != ""))]) if "technician_name" in wo_df.columns else total_wo
+            
+            c1, c2, c3, c4 = st.columns(4)
+            with c1: st.metric("📋 Total WOs", total_wo)
+            with c2: st.metric("👤 Assigned", assigned_count)
+            with c3: st.metric("⚠️ Unassigned", unassigned_count)
+            with c4: st.metric("✅ Completed Today", len(wo_df[(wo_df["status"].isin(["completed","closed"])) & (pd.to_datetime(wo_df["updated_at"], errors='coerce').dt.date == today)]) if "updated_at" in wo_df.columns else 0)
+            
+            st.markdown("---")
+            
+            # Filters
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                console_status = st.selectbox("Status", ["All","open","in_progress","on_hold","completed","closed"], key="console_status")
+            with c2:
+                all_techs = sorted(wo_df["technician_name"].dropna().unique().tolist()) if "technician_name" in wo_df.columns else []
+                console_tech = st.selectbox("Technician", ["All"] + all_techs, key="console_tech")
+            with c3:
+                console_search = st.text_input("🔍 Search", key="console_search", placeholder="WO# or title...")
+            
+            # Filter
+            console_df = wo_df.copy()
+            if console_status != "All": console_df = console_df[console_df["status"] == console_status]
+            if console_tech != "All": console_df = console_df[console_df["technician_name"] == console_tech]
+            if console_search:
+                console_df = console_df[console_df["wo_number"].str.contains(console_search, case=False, na=False) | console_df["title"].str.contains(console_search, case=False, na=False)]
+            
+            st.caption(f"📋 {len(console_df)} work orders")
+            
+            for _, wo in console_df.head(30).iterrows():
+                status = wo.get("status", "open")
+                sc = {"open":"#3B82F6","in_progress":"#F59E0B","on_hold":"#8B5CF6","completed":"#10B981","cancelled":"#EF4444","closed":"#6B7280"}.get(status,"#3B82F6")
+                wo_id = wo["id"]
+                tech_name = wo.get("technician_name","Unassigned")
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>{wo.get('wo_number','')}</b> — {wo.get('title','')[:80]}
+                            <br><span style="font-size:0.65rem;color:#666;">👤 <b>{tech_name}</b> | 🏢 {wo.get('assigned_team','')} | 📅 Created: {str(wo.get('created_at',''))[:10]}</span>
+                            <br><span style="font-size:0.6rem;color:#888;">🕐 SLA: {str(wo.get('sla_due_date','N/A'))[:10]} | ⏱️ Started: {str(wo.get('actual_start','Not started'))[:10]}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="background:{sc};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status.upper()}</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Reassign button (for Team Leads/Admin)
+                if (is_super or is_admin or is_team_lead) and status not in ["closed","cancelled"]:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        all_users = DB.get_users()
+                        tech_names = sorted([u.get("name","") for u in all_users if u.get("name")])
+                        current_tech = wo.get("technician_name","")
+                        default_idx = tech_names.index(current_tech) if current_tech in tech_names else 0
+                        new_assign = st.selectbox("Reassign to", tech_names, index=default_idx, key=f"reassign_{wo_id}", label_visibility="collapsed")
+                    with c2:
+                        if st.button("🔄 Reassign", key=f"reassign_btn_{wo_id}", use_container_width=True):
+                            if new_assign != current_tech:
+                                supabase.table("work_orders").update({"technician_name": new_assign}).eq("id", wo_id).execute()
+                                supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":status,"status_to":status,"changed_by":user_name,"comment":f"Reassigned from {current_tech} to {new_assign}","created_at":wat_now.isoformat()}).execute()
+                                
+                                # Email new technician
+                                new_user = next((u for u in all_users if u.get("name") == new_assign), None)
+                                if new_user and new_user.get("email"):
+                                    try:
+                                        send_email_notification(new_user["email"], f"🔧 WO Reassigned — {wo.get('wo_number','')}", f"<h3>Work Order Reassigned to You</h3><p><b>WO:</b> {wo.get('wo_number','')}</p><p><b>Title:</b> {wo.get('title','')}</p><p>Please check facilityXperience.</p>")
+                                    except: pass
+                                
+                                st.success(f"✅ Reassigned to {new_assign}!"); st.rerun()
+                            else:
+                                st.info("Same technician selected.")
+                
+                # Show timeline summary
+                wo_timeline = supabase.table("wo_timeline").select("*").eq("wo_id", wo_id).order("created_at").execute()
+                if wo_timeline.data:
+                    last_action = wo_timeline.data[-1]
+                    last_time = str(last_action.get("created_at",""))[:16]
+                    last_comment = str(last_action.get("comment",""))[:60]
+                    st.caption(f"📝 Last action: {last_time} — {last_comment}")
+        
+        st.markdown("---")
+        
+        # ============================================
+        # AI ANALYTICS — PER TECHNICIAN
+        # ============================================
+        st.markdown("### 📊 Technician Performance Analytics")
+        
+        if "technician_name" in wo_df.columns and total_wo > 0:
+            tech_stats = wo_df.groupby("technician_name").agg(
+                Total_WOs=("id","count"),
+                Completed=("status",lambda x:(x.isin(["completed","closed"])).sum()),
+                On_Hold=("status",lambda x:(x=="on_hold").sum()),
+                Avg_Hours=("actual_hours","mean"),
+                Total_Cost=("total_cost","sum"),
+                FTF=("first_time_fix","sum")
+            ).reset_index()
+            
+            tech_stats = tech_stats[tech_stats["technician_name"].notna() & (tech_stats["technician_name"] != "")]
+            tech_stats["Completion_Rate"] = round((tech_stats["Completed"]/tech_stats["Total_WOs"])*100)
+            tech_stats["FTF_Rate"] = round((tech_stats["FTF"]/tech_stats["Total_WOs"])*100)
+            
+            st.dataframe(tech_stats, use_container_width=True, hide_index=True)
+            
+            # Chart
+            fig = px.bar(tech_stats.sort_values("Total_WOs"), x="technician_name", y="Total_WOs", color="Completion_Rate", title="Technician Workload & Completion Rate", color_continuous_scale=["#EF4444","#F59E0B","#10B981"])
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Department breakdown
+            st.markdown("---")
+            st.markdown("### 🏢 Department Performance")
+            
+            if "assigned_team" in wo_df.columns:
+                dept_stats = wo_df.groupby("assigned_team").agg(
+                    Total=("id","count"),
+                    Completed=("status",lambda x:(x.isin(["completed","closed"])).sum()),
+                    Avg_Hours=("actual_hours","mean"),
+                    Total_Cost=("total_cost","sum")
+                ).reset_index()
+                dept_stats["Rate"] = round((dept_stats["Completed"]/dept_stats["Total"])*100)
+                
+                fig2 = px.bar(dept_stats.sort_values("Total"), x="assigned_team", y="Total", color="Rate", title="Department Workload", color_continuous_scale=["#EF4444","#F59E0B","#10B981"])
+                fig2.update_layout(height=350)
+                st.plotly_chart(fig2, use_container_width=True)
+        
+        # Export
+        st.markdown("---")
+        st.markdown("### 📥 Export Analytics")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("📄 HTML Performance Report", key="perf_html_btn", use_container_width=True):
+                logo_b64 = get_logo_base64()
+                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Technician Performance Report</title><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}</style></head><body><h1>Technician Performance Report</h1><p>{info.get('full_name',fc)} | {today}</p><table><tr><th>Technician</th><th>Total</th><th>Completed</th><th>Rate</th><th>FTF</th><th>Avg Hrs</th></tr>"""
+                for _,t in tech_stats.iterrows(): html += f"<tr><td>{t['technician_name']}</td><td>{t['Total_WOs']}</td><td>{t['Completed']}</td><td>{t['Completion_Rate']}%</td><td>{t['FTF_Rate']}%</td><td>{round(t['Avg_Hours'],1)}</td></tr>"
+                html += "</table></body></html>"
+                st.download_button("📥 Download HTML", html, f"tech_performance_{today}.html", "text/html", use_container_width=True)
+        with c2:
+            if tech_stats is not None:
+                st.download_button("📥 Download CSV", tech_stats.to_csv(index=False), f"tech_performance_{today}.csv", "text/csv", use_container_width=True)
     
     # ============================================
     # TAB 5: REPORTS
