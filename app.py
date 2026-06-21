@@ -8201,27 +8201,62 @@ def page_wo():
                 """, unsafe_allow_html=True)
                 
                 wo_id = wo["id"]
-                c1, c2, c3, c4 = st.columns(4)
-                with c1:
-                    if status == "open" and (is_admin or is_team_lead):
-                        if st.button("🔧 Assign/Start", key=f"start_{wo_id}", use_container_width=True):
-                            supabase.table("work_orders").update({"status": "in_progress", "actual_start": wat_now.isoformat(), "technician_name": user_name, "acknowledged_by": user_name, "acknowledged_at": wat_now.isoformat()}).eq("id", wo_id).execute()
-                            st.success("✅ Work started!"); st.rerun()
-                with c2:
-                    if status == "in_progress":
-                        if st.button("✅ Complete", key=f"complete_{wo_id}", use_container_width=True):
-                            st.session_state.completing_wo = wo_id
+                
+                # Step 2: Assign (Team Lead only, status=open)
+                if status == "open" and (is_admin or is_team_lead):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        all_users = DB.get_users()
+                        tech_names = [u.get("name","") for u in all_users if u.get("role","") in ["team_member", "technician", "staff"]]
+                        if not tech_names: tech_names = ["Select technician..."]
+                        assign_to = st.selectbox("Assign to", tech_names, key=f"assign_{wo_id}")
+                    with c2:
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        if st.button("👤 Assign", key=f"assign_btn_{wo_id}", use_container_width=True):
+                            supabase.table("work_orders").update({
+                                "technician_name": assign_to, "status": "open"
+                            }).eq("id", wo_id).execute()
+                            st.success(f"✅ Assigned to {assign_to}!"); st.rerun()
+                
+                # Step 3-4: Accept & Start (Technician, status=open, assigned to them)
+                if status == "open" and wo.get("technician_name") == user_name:
+                    if st.button("✅ Accept & Start", key=f"start_{wo_id}", use_container_width=True, type="primary"):
+                        supabase.table("work_orders").update({
+                            "status": "in_progress", "actual_start": wat_now.isoformat(),
+                            "acknowledged_by": user_name, "acknowledged_at": wat_now.isoformat()
+                        }).eq("id", wo_id).execute()
+                        st.success("✅ Work started!"); st.rerun()
+                
+                # Step 5: Complete (Technician, status=in_progress)
+                if status == "in_progress" and wo.get("technician_name") == user_name:
+                    if st.button("✅ Complete Work", key=f"complete_{wo_id}", use_container_width=True, type="primary"):
+                        st.session_state.completing_wo = wo_id
+                        st.rerun()
+                
+                # Step 6: Verify (Team Lead, status=completed)
+                if status == "completed" and (is_admin or is_team_lead):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("✅ Verify", key=f"verify_{wo_id}", use_container_width=True, type="primary"):
+                            supabase.table("work_orders").update({
+                                "status": "closed", "verified_by": user_name, "verified_at": wat_now.isoformat(),
+                                "closed_by": user_name, "closed_at": wat_now.isoformat()
+                            }).eq("id", wo_id).execute()
+                            st.success("✅ Verified & Closed!"); st.rerun()
+                    with c2:
+                        if st.button("❌ Reject", key=f"reject_{wo_id}", use_container_width=True):
+                            st.session_state.rejecting_wo = wo_id
                             st.rerun()
-                with c3:
-                    if status == "completed" and (is_admin or is_team_lead):
-                        if st.button("🔍 Verify", key=f"verify_{wo_id}", use_container_width=True):
-                            supabase.table("work_orders").update({"status": "verified", "verified_by": user_name, "verified_at": wat_now.isoformat()}).eq("id", wo_id).execute()
-                            st.success("✅ Verified!"); st.rerun()
-                with c4:
-                    if status in ["verified", "completed"] and is_manager:
-                        if st.button("🔒 Close", key=f"close_{wo_id}", use_container_width=True):
-                            supabase.table("work_orders").update({"status": "closed", "closed_by": user_name, "closed_at": wat_now.isoformat()}).eq("id", wo_id).execute()
-                            st.success("🔒 Closed!"); st.rerun()
+                
+                # On Hold (Technician or Team Lead)
+                if status == "in_progress":
+                    if st.button("⏸️ Put On Hold", key=f"hold_{wo_id}", use_container_width=True):
+                        supabase.table("work_orders").update({"status": "on_hold"}).eq("id", wo_id).execute()
+                        st.success("⏸️ On Hold"); st.rerun()
+                if status == "on_hold":
+                    if st.button("▶ Resume", key=f"resume_{wo_id}", use_container_width=True):
+                        supabase.table("work_orders").update({"status": "in_progress"}).eq("id", wo_id).execute()
+                        st.success("▶ Resumed!"); st.rerun()
                 
                 # Show attachments
                 if wo.get("attachments") and len(wo.get("attachments", [])) > 0:
