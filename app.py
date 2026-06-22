@@ -9052,13 +9052,575 @@ td{{padding:8px;border-bottom:1px solid #eee}}
                         st.error(f"PDF error: {str(e)[:80]}")
 
 # ============================================
-# HOTO CHECK (STUB)
+# HOTO INTELLIGENCE — CUSTODY TRANSFER COMMAND CENTER
+# WITH FULL APPROVAL WORKFLOW & ALERT ARCHITECTURE
 # ============================================
 def page_hot():
-    fc=st.session_state.get("facility","WTC")
-    info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 🔄 HOTO Check — {info.get("full_name",fc)}')
-    st.info("🚧 HOTO (Handover-Takeover) module — full deployment in progress.")
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    user_name = st.session_state.get("user_name", "User")
+    user_email = st.session_state.get("user", {}).get("email", "")
+    is_admin = user_role in ["admin", "approver", "super_admin"]
+    is_fm_director = user_role in ["admin", "super_admin", "sr_management"]
+    is_dept_manager = user_role in ["manager", "sr_manager", "admin", "super_admin"]
+    is_shift_lead = user_role in ["team_lead", "manager", "sr_manager", "admin", "super_admin"]
+    
+    st.markdown(f'## 🔄 HOTO Intelligence — {info.get("full_name", fc)}')
+    st.caption("Custody Transfer Command Center — Governed. Auditable. Legally Defensible.")
+    
+    from datetime import timezone, timedelta
+    wat_now = datetime.now(timezone(timedelta(hours=1)))
+    today = wat_now.date()
+    
+    hoto_data = supabase.table("hoto_records").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(200).execute()
+    hoto_df = pd.DataFrame(hoto_data.data) if hoto_data.data else pd.DataFrame()
+    
+    total_hoto = len(hoto_df)
+    active_hoto = len(hoto_df[~hoto_df["status"].isin(["closed","disputed"])]) if total_hoto > 0 else 0
+    
+    # Punch list counts
+    punch_open = 0
+    punch_safety = 0
+    if total_hoto > 0:
+        for _, h in hoto_df.iterrows():
+            punch = supabase.table("hoto_punch_list").select("*").eq("hoto_id", h["id"]).execute()
+            if punch.data:
+                for p in punch.data:
+                    if p.get("status") in ["open", "in_progress"]:
+                        punch_open += 1
+                        if p.get("severity") == "safety":
+                            punch_safety += 1
+    
+    # DLP expiring
+    dlp_expiring = 0
+    dlp_critical = 0
+    if "defect_liability_end" in hoto_df.columns and total_hoto > 0:
+        for _, h in hoto_df.iterrows():
+            try:
+                dlp_end = pd.to_datetime(h["defect_liability_end"]).date()
+                days_left = (dlp_end - today).days
+                if 0 < days_left <= 30:
+                    dlp_expiring += 1
+                    if days_left <= 7:
+                        dlp_critical += 1
+            except: pass
+    
+    # Overdue shift handovers
+    overdue_shifts = 0
+    shift_logs = supabase.table("shift_handover_logs").select("*").eq("facility_code", fc).eq("status", "pending").execute()
+    if shift_logs.data:
+        for log in shift_logs.data:
+            try:
+                log_time = pd.to_datetime(str(log.get("handover_date","")) + " " + str(log.get("handover_time","")))
+                if wat_now > log_time + timedelta(minutes=30):
+                    overdue_shifts += 1
+            except: pass
+    
+    # ============================================
+    # 🟦 TOP RIBBON
+    # ============================================
+    st.markdown("### 🟦 HOTO Governance Ribbon")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Active HOTOs</div><div style="font-size:1.3rem;font-weight:800;color:#CC0000;">{active_hoto}</div></div>""", unsafe_allow_html=True)
+    with c2:
+        color = "#EF4444" if dlp_critical > 0 else "#F59E0B" if dlp_expiring > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">DLP Expiring ≤30d</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{dlp_expiring}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        color = "#EF4444" if punch_safety > 0 else "#F59E0B"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Open Punch Items</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{punch_open}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        color = "#EF4444" if overdue_shifts > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Overdue Shifts</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{overdue_shifts}</div></div>""", unsafe_allow_html=True)
+    with c5:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Total HOTOs</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6;">{total_hoto}</div></div>""", unsafe_allow_html=True)
+    with c6:
+        pending_approvals = 0
+        try:
+            pa = supabase.table("hoto_approvals").select("id", count="exact").eq("status", "pending").execute()
+            pending_approvals = pa.count or 0
+        except: pass
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Pending Approvals</div><div style="font-size:1.3rem;font-weight:800;color:#8B5CF6;">{pending_approvals}</div></div>""", unsafe_allow_html=True)
+    
+    # Critical alerts
+    if dlp_critical > 0:
+        st.error(f"🚨 **CRITICAL:** {dlp_critical} DLP(s) expiring within 7 days. Immediate action required to preserve warranty rights.")
+    if punch_safety > 0:
+        st.error(f"🔴 **SAFETY:** {punch_safety} safety-related punch items open. These must be resolved before HOTO acceptance.")
+    if overdue_shifts > 0:
+        st.warning(f"⚠️ **OVERDUE:** {overdue_shifts} shift handovers are overdue. Department managers notified.")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TABS
+    # ============================================
+    tabs = st.tabs(["📋 All HOTOs", "➕ New HOTO", "🔧 Shift Handover", "✅ Approvals", "📊 Punch List", "📄 Reports"])
+    
+    # ============================================
+    # TAB 0: ALL HOTO RECORDS WITH STATUS
+    # ============================================
+    with tabs[0]:
+        st.markdown("### 📋 HOTO Records")
+        
+        if total_hoto == 0:
+            st.info("No HOTO records yet.")
+        else:
+            c1, c2 = st.columns(2)
+            with c1: hoto_filter_type = st.selectbox("Type", ["All","tenant_move_in","tenant_move_out","asset_commissioning","contractor_transition","shift_engineering","shift_security","shift_cctv","cross_functional"], format_func=lambda x: x.replace("_"," ").title() if x != "All" else "All", key="hoto_filter")
+            with c2: hoto_filter_status = st.selectbox("Status", ["All","initiated","pre_inspection","joint_inspection","punch_list","acceptance","closed","disputed"], key="hoto_status_filter")
+            
+            display_hoto = hoto_df.copy()
+            if hoto_filter_type != "All": display_hoto = display_hoto[display_hoto["hoto_type"] == hoto_filter_type]
+            if hoto_filter_status != "All": display_hoto = display_hoto[display_hoto["status"] == hoto_filter_status]
+            
+            st.caption(f"📋 {len(display_hoto)} records")
+            
+            for _, h in display_hoto.head(20).iterrows():
+                status = h.get("status","initiated")
+                hoto_type = h.get("hoto_type","").replace("_"," ").title()
+                tier = h.get("tier","").replace("_"," ").title()
+                sc = {"initiated":"#3B82F6","pre_inspection":"#F59E0B","joint_inspection":"#8B5CF6","punch_list":"#EF4444","acceptance":"#10B981","closed":"#6B7280","disputed":"#DC2626"}.get(status,"#3B82F6")
+                hoto_id = h["id"]
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>{h.get('hoto_number','N/A')}</b> — {h.get('title','')[:80]}
+                            <br><span style="font-size:0.65rem;color:#666;">🔄 {h.get('transferor_name','?')} → {h.get('transferee_name','?')}</span>
+                            <br><span style="font-size:0.6rem;color:#888;">🏷️ {hoto_type} | 📊 {tier} | 📅 {str(h.get('created_at',''))[:10]}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="background:{sc};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status.upper()}</span>
+                            {f'<br><span style="font-size:0.5rem;color:#EF4444;">DLP: {str(h.get("defect_liability_end",""))[:10]}</span>' if h.get("defect_liability_end") else ''}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Approval actions
+                approvals = supabase.table("hoto_approvals").select("*").eq("hoto_id", hoto_id).order("approval_level").execute()
+                if approvals.data:
+                    with st.expander(f"🔐 Approvals ({len(approvals.data)})"):
+                        for app in approvals.data:
+                            app_status = app.get("status","pending")
+                            app_color = "#10B981" if app_status == "approved" else "#EF4444" if app_status == "rejected" else "#F59E0B"
+                            st.markdown(f"""
+                            <div style="background:#f9fafb;border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;border-left:3px solid {app_color};">
+                                <b>Level {app.get('approval_level','')}</b> — {app.get('approver_role','').replace('_',' ').title()}
+                                <br>Status: <span style="color:{app_color};font-weight:700;">{app_status.upper()}</span>
+                                {f" | {app.get('comments','')[:60]}" if app.get('comments') else ''}
+                            </div>
+                            """, unsafe_allow_html=True)
+                
+                # Quick approve/reject for authorized users
+                if status not in ["closed","disputed"] and (is_admin or is_fm_director):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        if st.button("✅ Approve", key=f"app_{hoto_id}", use_container_width=True):
+                            supabase.table("hoto_approvals").insert({
+                                "hoto_id": hoto_id, "approval_level": 1, "approver_role": "fm_director",
+                                "approver_name": user_name, "approver_email": user_email,
+                                "status": "approved", "comments": "Approved by FM Director",
+                                "action_date": wat_now.isoformat(), "created_at": wat_now.isoformat()
+                            }).execute()
+                            st.success("✅ Approved!"); st.rerun()
+                    with c2:
+                        if st.button("❌ Reject", key=f"rej_{hoto_id}", use_container_width=True):
+                            st.session_state.rejecting_hoto = hoto_id; st.rerun()
+                    with c3:
+                        if status == "initiated":
+                            if st.button("▶ Start Inspection", key=f"start_{hoto_id}", use_container_width=True):
+                                supabase.table("hoto_records").update({"status":"pre_inspection"}).eq("id",hoto_id).execute()
+                                st.success("▶ Pre-Inspection started!"); st.rerun()
+                        elif status == "pre_inspection":
+                            if st.button("🔍 Joint Inspection", key=f"joint_{hoto_id}", use_container_width=True):
+                                supabase.table("hoto_records").update({"status":"joint_inspection"}).eq("id",hoto_id).execute()
+                                st.success("🔍 Joint Inspection phase!"); st.rerun()
+                        elif status in ["joint_inspection","punch_list"]:
+                            if st.button("✅ Accept & Close", key=f"close_{hoto_id}", use_container_width=True):
+                                supabase.table("hoto_records").update({"status":"acceptance","acceptance_date":str(today)}).eq("id",hoto_id).execute()
+                                try:
+                                    send_email_notification(user_email, f"✅ HOTO Closed — {h.get('hoto_number','')}", f"<h3>HOTO Accepted & Closed</h3><p><b>HOTO:</b> {h.get('hoto_number','')}</p><p><b>Title:</b> {h.get('title','')}</p><p>Acceptance Date: {today}</p>")
+                                except: pass
+                                st.success("✅ HOTO Accepted & Closed!"); st.balloons(); st.rerun()
+    
+    # Rejection form
+    if "rejecting_hoto" in st.session_state and st.session_state.rejecting_hoto:
+        hoto_id = st.session_state.rejecting_hoto
+        st.markdown("---")
+        with st.form("reject_hoto_form"):
+            st.markdown("### ❌ Reject HOTO")
+            reject_reason = st.text_area("Rejection Reason*", height=80)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.form_submit_button("❌ REJECT", use_container_width=True, type="primary"):
+                    if reject_reason:
+                        supabase.table("hoto_approvals").insert({
+                            "hoto_id": hoto_id, "approval_level": 1, "approver_role": "fm_director",
+                            "approver_name": user_name, "approver_email": user_email,
+                            "status": "rejected", "comments": reject_reason,
+                            "action_date": wat_now.isoformat(), "created_at": wat_now.isoformat()
+                        }).execute()
+                        supabase.table("hoto_records").update({"status":"disputed"}).eq("id",hoto_id).execute()
+                        st.error("❌ Rejected!"); st.session_state.rejecting_hoto = None; st.rerun()
+            with c2:
+                if st.form_submit_button("CANCEL", use_container_width=True):
+                    st.session_state.rejecting_hoto = None; st.rerun()
+    
+    # ============================================
+    # TAB 1: NEW HOTO
+    # ============================================
+    with tabs[1]:
+        st.markdown("### ➕ Initiate New HOTO")
+        
+        hoto_type = st.selectbox("HOTO Type*", [
+            "tenant_move_in", "tenant_move_out", "asset_commissioning", 
+            "contractor_transition", "shift_engineering", "shift_security", 
+            "shift_cctv", "cross_functional"
+        ], format_func=lambda x: x.replace("_"," ").title())
+        
+        if hoto_type in ["tenant_move_in","tenant_move_out","contractor_transition"]:
+            tier = "strategic"
+        elif hoto_type in ["asset_commissioning"]:
+            tier = "asset"
+        elif hoto_type in ["shift_engineering","shift_security","shift_cctv"]:
+            tier = "operational_shift"
+        else:
+            tier = "cross_functional"
+        
+        with st.form("new_hoto_form"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                hoto_title = st.text_input("Title*", placeholder="e.g., Tenant X Move-Out Inspection")
+                transferor = st.text_input("Transferor (From)*")
+            with c2:
+                transferee = st.text_input("Transferee (To)*")
+                witness = st.text_input("Witness/Verifier", value=user_name)
+            with c3:
+                hoto_location_bldg = st.selectbox("Building", ["CT — Office Tower","SAT — Residential Tower","IP — Intermediate Parking","RC — Recreation Center","External"])
+                hoto_location_floor = st.text_input("Floor/Zone")
+            
+            hoto_desc = st.text_area("Scope Description", height=80)
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                dlp_start = st.date_input("DLP Start (if applicable)", today)
+                retention = st.number_input("Retention Amount (₦)", min_value=0.0, value=0.0, step=10000.0)
+            with c2:
+                dlp_end = st.date_input("DLP End (if applicable)", today + timedelta(days=365))
+            
+            # Auto-create approval records based on tier
+            st.markdown("---")
+            st.markdown("**🔐 Approval Requirements**")
+            if tier == "operational_shift":
+                st.caption("Level 1: Shift Leads (Digital Signature) | Level 2: Department Manager | Level 3: FM Director")
+            elif tier == "asset":
+                st.caption("Level 1: FM Supervisor + Contractor | Level 2: FM Engineering Manager | Level 3: FM Director + Landlord")
+            elif tier == "strategic":
+                st.caption("Level 1: FM Coordinator + Tenant/Contractor Rep | Level 2: FM Ops Manager | Level 3: Landlord + Legal")
+            else:
+                st.caption("Level 1: All Team Leads | Level 2: Incident Commander | Level 3: FM Director")
+            
+            if st.form_submit_button("➕ INITIATE HOTO", use_container_width=True, type="primary"):
+                if hoto_title and transferor and transferee:
+                    hoto_count = total_hoto + 1
+                    hoto_number = f"HOTO-{fc}-{today.strftime('%Y%m%d')}-{str(hoto_count).zfill(4)}"
+                    
+                    result = supabase.table("hoto_records").insert({
+                        "facility_code": fc, "hoto_number": hoto_number, "title": hoto_title,
+                        "hoto_type": hoto_type, "tier": tier, "description": hoto_desc,
+                        "transferor_name": transferor, "transferee_name": transferee,
+                        "witness_name": witness, "location_building": hoto_location_bldg,
+                        "location_floor": hoto_location_floor, "status": "initiated",
+                        "defect_liability_start": str(dlp_start), "defect_liability_end": str(dlp_end),
+                        "retention_amount": retention, "created_by": user_name,
+                        "created_at": wat_now.isoformat()
+                    }).execute()
+                    
+                    if result.data:
+                        hoto_id = result.data[0]["id"]
+                        # Create approval records
+                        for level in range(1, 4):
+                            supabase.table("hoto_approvals").insert({
+                                "hoto_id": hoto_id, "approval_level": level,
+                                "approver_role": ["shift_lead","dept_manager","fm_director"][level-1] if tier == "operational_shift" else ["fm_supervisor","fm_manager","fm_director"][level-1],
+                                "status": "pending", "created_at": wat_now.isoformat()
+                            }).execute()
+                        
+                        # Send email notification
+                        try:
+                            send_email_notification(user_email, f"🔄 New HOTO Initiated — {hoto_number}", f"<h3>HOTO Initiated</h3><p><b>HOTO:</b> {hoto_number}</p><p><b>Type:</b> {hoto_type.replace('_',' ').title()}</p><p><b>Transferor:</b> {transferor}</p><p><b>Transferee:</b> {transferee}</p><p>Approvals pending.</p>")
+                        except: pass
+                        
+                        st.success(f"✅ HOTO {hoto_number} initiated with approval workflow!"); st.balloons(); st.rerun()
+                else:
+                    st.error("⚠️ Title, Transferor, and Transferee are required")
+    
+    # ============================================
+    # TAB 2: SHIFT HANDOVER
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 🔧 Operational Shift Handover")
+        
+        shift_type = st.selectbox("Shift Type", ["engineering", "security", "cctv"], format_func=lambda x: x.upper())
+        
+        with st.form("shift_handover_form"):
+            st.markdown(f"#### {shift_type.upper()} Shift Handover")
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                outgoing_lead = st.text_input("Outgoing Shift Lead*", value=user_name)
+                outgoing_shift = st.selectbox("Outgoing Shift", ["Shift A (Night)", "Shift B (Day)", "Shift C (Afternoon)"])
+            with c2:
+                incoming_lead = st.text_input("Incoming Shift Lead*")
+                incoming_shift = st.selectbox("Incoming Shift", ["Shift B (Day)", "Shift C (Afternoon)", "Shift A (Night)"])
+            with c3:
+                handover_date = st.date_input("Date*", today)
+                handover_time = st.time_input("Time*", wat_now.time())
+            
+            st.markdown("---")
+            equipment_status = st.text_area("Equipment/System Status", height=80, placeholder="Chiller #1: Running\nChiller #2: Standby\nGenerator: Ready")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                open_wos = st.text_area("Open Work Orders", height=60)
+                critical_incidents = st.text_area("Critical Incidents", height=60)
+            with c2:
+                key_readings = st.text_area("Key Readings", height=60)
+                actions_pending = st.text_area("Actions Pending", height=60)
+            
+            # Digital signature acknowledgment
+            st.markdown("---")
+            st.markdown("**✍️ Digital Acknowledgment**")
+            st.caption("By submitting, both parties acknowledge the accuracy of this handover. This record is legally auditable.")
+            
+            if st.form_submit_button("✅ SUBMIT & SIGN SHIFT HANDOVER", use_container_width=True, type="primary"):
+                if outgoing_lead and incoming_lead:
+                    supabase.table("shift_handover_logs").insert({
+                        "facility_code": fc, "shift_type": shift_type,
+                        "outgoing_shift": outgoing_shift, "incoming_shift": incoming_shift,
+                        "outgoing_lead": outgoing_lead, "incoming_lead": incoming_lead,
+                        "handover_date": str(handover_date), "handover_time": str(handover_time),
+                        "equipment_status": {"data": equipment_status},
+                        "open_work_orders": open_wos, "critical_incidents": critical_incidents,
+                        "key_readings": {"data": key_readings}, "actions_pending": actions_pending,
+                        "digital_signature_outgoing": user_name,
+                        "digital_signature_incoming": incoming_lead,
+                        "status": "completed", "created_at": wat_now.isoformat()
+                    }).execute()
+                    
+                    # Email incoming lead
+                    try:
+                        incoming_user = next((u for u in DB.get_users() if u.get("name") == incoming_lead), None)
+                        if incoming_user and incoming_user.get("email"):
+                            send_email_notification(incoming_user["email"], f"🔧 Shift Handover — {shift_type.upper()}", f"<h3>Shift Handover Ready for Review</h3><p>Outgoing: {outgoing_lead}</p><p>Actions Pending: {actions_pending[:200]}</p>")
+                    except: pass
+                    
+                    st.success("✅ Shift handover logged & signed!"); st.balloons(); st.rerun()
+                else:
+                    st.error("⚠️ Both shift leads are required")
+        
+        # Recent shift logs
+        st.markdown("---")
+        st.markdown("### 📋 Recent Shift Handovers")
+        shift_logs_display = supabase.table("shift_handover_logs").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(10).execute()
+        if shift_logs_display.data:
+            for log in shift_logs_display.data:
+                status = log.get("status","completed")
+                sc = "#10B981" if status == "completed" else "#F59E0B" if status == "pending" else "#EF4444"
+                st.markdown(f"""
+                <div style="background:white;border-left:3px solid {sc};border-radius:6px;padding:0.5rem;margin:0.2rem 0;font-size:0.7rem;">
+                    <b>{log.get('shift_type','').upper()}</b> | {log.get('outgoing_shift','')} → {log.get('incoming_shift','')}
+                    <br>👤 {log.get('outgoing_lead','')} → {log.get('incoming_lead','')} | 📅 {log.get('handover_date','')} {log.get('handover_time','')}
+                    <br><span style="font-size:0.6rem;color:#888;">Actions: {str(log.get('actions_pending',''))[:80]}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No shift handovers recorded yet.")
+    
+    # ============================================
+    # TAB 3: APPROVALS DASHBOARD
+    # ============================================
+    with tabs[3]:
+        st.markdown("### ✅ Approval Dashboard")
+        
+        all_approvals = supabase.table("hoto_approvals").select("*, hoto_records!inner(hoto_number, title, hoto_type, transferor_name, transferee_name)").eq("status", "pending").order("created_at").execute()
+        
+        if all_approvals.data and len(all_approvals.data) > 0:
+            for app in all_approvals.data:
+                h_info = app.get("hoto_records", {})
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid #F59E0B;border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <b>{h_info.get('hoto_number','N/A')}</b> — {h_info.get('title','')[:80]}
+                    <br><span style="font-size:0.65rem;">Level {app.get('approval_level','')} — {app.get('approver_role','').replace('_',' ').title()}</span>
+                    <br><span style="font-size:0.6rem;color:#888;">🔄 {h_info.get('transferor_name','')} → {h_info.get('transferee_name','')}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button("✅ Approve", key=f"appr_{app['id']}", use_container_width=True):
+                        supabase.table("hoto_approvals").update({"status":"approved","approver_name":user_name,"approver_email":user_email,"comments":"Approved","action_date":wat_now.isoformat()}).eq("id",app["id"]).execute()
+                        # Check if all levels approved
+                        hoto_apps = supabase.table("hoto_approvals").select("*").eq("hoto_id",app["hoto_id"]).execute()
+                        all_approved = all(a.get("status") == "approved" for a in hoto_apps.data)
+                        if all_approved:
+                            supabase.table("hoto_records").update({"status":"acceptance","acceptance_date":str(today)}).eq("id",app["hoto_id"]).execute()
+                        st.success("✅ Approved!"); st.rerun()
+                with c2:
+                    if st.button("❌ Reject", key=f"rejr_{app['id']}", use_container_width=True):
+                        st.session_state.rejecting_approval = app["id"]; st.rerun()
+        else:
+            st.success("✅ No pending approvals.")
+    
+    # Reject approval form
+    if "rejecting_approval" in st.session_state and st.session_state.rejecting_approval:
+        app_id = st.session_state.rejecting_approval
+        st.markdown("---")
+        with st.form("reject_approval_form"):
+            st.markdown("### ❌ Reject Approval")
+            reject_reason = st.text_area("Reason*", height=80)
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.form_submit_button("❌ REJECT", use_container_width=True, type="primary"):
+                    if reject_reason:
+                        supabase.table("hoto_approvals").update({"status":"rejected","approver_name":user_name,"comments":reject_reason,"action_date":wat_now.isoformat()}).eq("id",app_id).execute()
+                        st.error("❌ Rejected!"); st.session_state.rejecting_approval = None; st.rerun()
+            with c2:
+                if st.form_submit_button("CANCEL", use_container_width=True):
+                    st.session_state.rejecting_approval = None; st.rerun()
+    
+    # ============================================
+    # TAB 4: PUNCH LIST
+    # ============================================
+    with tabs[4]:
+        st.markdown("### 📊 Punch List Tracker")
+        
+        if total_hoto == 0:
+            st.info("No HOTO records yet.")
+        else:
+            # Add punch item
+            with st.expander("➕ Add Punch List Item"):
+                with st.form("add_punch_form"):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        punch_hoto = st.selectbox("HOTO Record", [f"{h.get('hoto_number','')} — {h.get('title','')[:50]}" for _, h in hoto_df.iterrows()])
+                        punch_desc = st.text_input("Item Description*")
+                    with c2:
+                        punch_severity = st.selectbox("Severity", ["safety", "functional", "cosmetic"])
+                        punch_responsible = st.text_input("Responsible Party")
+                    
+                    c1, c2 = st.columns(2)
+                    with c1: punch_due = st.date_input("Due Date", today + timedelta(days=7))
+                    with c2: punch_hold = st.number_input("Financial Hold (₦)", min_value=0.0, value=0.0, step=1000.0)
+                    
+                    if st.form_submit_button("➕ Add Punch Item", use_container_width=True):
+                        if punch_desc:
+                            hoto_idx = [i for i, h in enumerate(hoto_df.iterrows()) if f"{h[1].get('hoto_number','')} — {h[1].get('title','')[:50]}" == punch_hoto][0]
+                            selected_hoto_id = hoto_df.iloc[hoto_idx]["id"]
+                            supabase.table("hoto_punch_list").insert({
+                                "hoto_id": selected_hoto_id, "item_description": punch_desc,
+                                "severity": punch_severity, "responsible_party": punch_responsible,
+                                "due_date": str(punch_due), "financial_hold": punch_hold > 0,
+                                "hold_amount": punch_hold, "status": "open", "created_at": wat_now.isoformat()
+                            }).execute()
+                            st.success("✅ Punch item added!"); st.rerun()
+            
+            # Display all punch items
+            all_punch = []
+            for _, h in hoto_df.iterrows():
+                punch_items = supabase.table("hoto_punch_list").select("*").eq("hoto_id", h["id"]).order("created_at").execute()
+                if punch_items.data:
+                    for p in punch_items.data:
+                        p["hoto_number"] = h.get("hoto_number","")
+                        p["hoto_title"] = h.get("title","")
+                        all_punch.append(p)
+            
+            if all_punch:
+                punch_df = pd.DataFrame(all_punch)
+                st.caption(f"📋 {len(punch_df)} punch items")
+                
+                for _, p in punch_df.iterrows():
+                    severity = p.get("severity","cosmetic")
+                    sev_color = "#EF4444" if severity == "safety" else "#F59E0B" if severity == "functional" else "#3B82F6"
+                    status = p.get("status","open")
+                    st_color = "#EF4444" if status == "open" else "#F59E0B" if status == "in_progress" else "#10B981"
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid {sev_color};border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                        <div style="display:flex;justify-content:space-between;">
+                            <div>
+                                <b>{p.get('hoto_number','')}</b> — {p.get('item_description','')[:80]}
+                                <br><span style="font-size:0.6rem;">👤 {p.get('responsible_party','')} | 📅 Due: {p.get('due_date','')}</span>
+                                {f'<br><span style="font-size:0.55rem;color:#EF4444;">💰 Hold: ₦{p.get("hold_amount",0):,.0f}</span>' if p.get('financial_hold') else ''}
+                            </div>
+                            <div style="text-align:right;">
+                                <span style="background:{sev_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;">{severity.upper()}</span>
+                                <br><span style="background:{st_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;">{status.upper()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    if status in ["open","in_progress"]:
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            if st.button("✅ Resolve", key=f"res_{p['id']}", use_container_width=True):
+                                supabase.table("hoto_punch_list").update({"status":"resolved","resolved_by":user_name,"resolved_date":str(today)}).eq("id",p["id"]).execute()
+                                st.success("✅ Resolved!"); st.rerun()
+                        with c2:
+                            if st.button("🔄 In Progress", key=f"prog_{p['id']}", use_container_width=True):
+                                supabase.table("hoto_punch_list").update({"status":"in_progress"}).eq("id",p["id"]).execute()
+                                st.success("🔄 In Progress!"); st.rerun()
+            else:
+                st.success("✅ No punch list items.")
+    
+    # ============================================
+    # TAB 5: REPORTS
+    # ============================================
+    with tabs[5]:
+        st.markdown("### 📄 HOTO Reports")
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("Total HOTOs", total_hoto)
+        with c2: st.metric("Active", active_hoto)
+        with c3: st.metric("Punch Items", punch_open)
+        
+        st.markdown("---")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("📄 HTML Report", key="hoto_html_btn", use_container_width=True, type="primary"):
+                logo_b64 = get_logo_base64()
+                logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="30">' if logo_b64 else ''
+                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>HOTO Intelligence Report</title><style>body{{font-family:'Segoe UI',Arial,sans-serif;margin:20px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:960px;margin:0 auto;background:white;border-radius:12px;padding:30px}}.header{{border-bottom:3px solid #CC0000;padding-bottom:15px}}h1{{color:#CC0000;margin:0}}.kpi-row{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:20px;font-weight:800;color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:10px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}.footer{{text-align:center;font-size:8px;color:#999;margin-top:20px;border-top:1px solid #eee;padding-top:15px}}</style></head><body><div class="container"><div class="header">{logo_img}<h1>HOTO Intelligence Report</h1><p>{info.get('full_name',fc)} | {today.strftime('%d %B %Y')}</p></div><div class="kpi-row"><div class="kpi"><div class="val">{total_hoto}</div>Total</div><div class="kpi"><div class="val">{active_hoto}</div>Active</div><div class="kpi"><div class="val">{punch_open}</div>Punch</div><div class="kpi"><div class="val">{dlp_expiring}</div>DLP</div><div class="kpi"><div class="val">{pending_approvals}</div>Approvals</div><div class="kpi"><div class="val">{overdue_shifts}</div>Overdue</div></div><h2>HOTO Records</h2><table><tr><th>HOTO#</th><th>Title</th><th>Type</th><th>Status</th><th>From</th><th>To</th></tr>"""
+                for _,h in hoto_df.head(30).iterrows():
+                    html += f"<tr><td>{h.get('hoto_number','')}</td><td>{h.get('title','')[:50]}</td><td>{h.get('hoto_type','')}</td><td>{h.get('status','')}</td><td>{h.get('transferor_name','')}</td><td>{h.get('transferee_name','')}</td></tr>"
+                html += "</table><div class='footer'>Churchgate Group | facilityXperience | HOTO Intelligence</div></div></body></html>"
+                st.download_button("📥 Download HTML", html, f"hoto_report_{today}.html", "text/html", use_container_width=True)
+        with c2:
+            if st.button("📕 PDF Report", key="hoto_pdf_btn", use_container_width=True):
+                try:
+                    from fpdf import FPDF
+                    pdf = FPDF('L','mm','A4'); pdf.add_page()
+                    pdf.set_font('Helvetica','B',16); pdf.set_text_color(204,0,0)
+                    pdf.cell(0,10,safe_text('HOTO Intelligence Report'),0,1)
+                    pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
+                    pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {today.strftime("%d %B %Y")}'),0,1); pdf.ln(4)
+                    pdf.set_font('Helvetica','B',7); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
+                    for h,w in zip(['HOTO#','Title','Type','Status','From','To'],[35,65,30,22,55,55]): pdf.cell(w,5,h,1,0,'C',True)
+                    pdf.ln(); pdf.set_font('Helvetica','',7); pdf.set_text_color(0,0,0)
+                    for _,h in hoto_df.head(30).iterrows():
+                        pdf.cell(35,4,safe_text(h.get('hoto_number','')),1,0); pdf.cell(65,4,safe_text(str(h.get('title',''))[:28]),1,0)
+                        pdf.cell(30,4,safe_text(h.get('hoto_type','')),1,0); pdf.cell(22,4,safe_text(h.get('status','')),1,0)
+                        pdf.cell(55,4,safe_text(str(h.get('transferor_name',''))[:24]),1,0); pdf.cell(55,4,safe_text(str(h.get('transferee_name',''))[:24]),1,0)
+                        pdf.ln()
+                    pdf_file = f"/tmp/hoto_report_{today}.pdf"; pdf.output(pdf_file)
+                    with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"hoto_report_{today}.pdf", "application/pdf", use_container_width=True)
+                except Exception as e: st.error(f"PDF: {str(e)[:80]}")
 
 # ============================================
 # MONTHLY MIS (STUB)
