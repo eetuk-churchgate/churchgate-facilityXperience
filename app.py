@@ -720,7 +720,7 @@ def sidebar():
         # Navigation — Role-based
         user_perms = safe_parse_permissions(st.session_state.get("user", {}).get("extra_permissions", []))
         user_role = st.session_state.get("user_role", "staff")
-        is_admin = user_role in ["admin", "approver"]
+        is_admin = user_role in ["admin", "approver", "super_admin"]
         
         all_nav = [
             ("🏠 COMMAND", [("🌐 Command Center", "cc"), ("📊 PPM Dashboard", "ppm")], ["Command Center", "PPM Dashboard"]),
@@ -1778,7 +1778,7 @@ def page_ar():
         
         user_depts = safe_parse_permissions(st.session_state.get("user", {}).get("department_permissions", []))
         user_role = st.session_state.get("user_role", "staff")
-        is_admin = user_role in ["admin", "approver"]
+        is_admin = user_role in ["admin", "approver", "super_admin"]
         
         # Filters
         st.markdown("### 🔍 Filters")
@@ -2438,7 +2438,7 @@ def page_wp():
     
     user_perms = safe_parse_permissions(st.session_state.get("user", {}).get("extra_permissions", []))
     user_role = st.session_state.get("user_role", "staff")
-    is_admin = user_role in ["admin", "approver"]
+    is_admin = user_role in ["admin", "approver", "super_admin"]
     can_authorize = is_admin or "Authorize Permit" in user_perms or len(user_perms) == 0
     can_confirm = is_admin or "Confirm Permit" in user_perms or len(user_perms) == 0
     can_approve = is_admin or "Approve Permit" in user_perms or len(user_perms) == 0
@@ -3249,7 +3249,7 @@ def page_helpdesk_queue():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
     user_role = st.session_state.get("user_role", "staff")
-    is_admin = user_role in ["admin", "approver"]
+    is_admin = user_role in ["admin", "approver", "super_admin"]
     
     st.markdown(f'## 💬 Helpdesk — {info.get("full_name", fc)}')
     
@@ -5495,7 +5495,7 @@ def page_feedback():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
     user_role = st.session_state.get("user_role", "staff")
-    is_admin = user_role in ["admin", "approver"]
+    is_admin = user_role in ["admin", "approver", "super_admin"]
     
     st.markdown(f'## ⭐ Voice of Customer — {info.get("full_name", fc)}')
     
@@ -10018,7 +10018,7 @@ def page_ppm_activities():
     user_role = st.session_state.get("user_role", "staff")
     user_name = st.session_state.get("user_name", "Team Member")
     user_depts = safe_parse_permissions(st.session_state.get("user", {}).get("department_permissions", []))
-    is_admin = user_role in ["admin", "approver"]
+    is_admin = user_role in ["admin", "approver", "super_admin"]
     
     st.markdown(f'## 🔧 PPM Execution Center — {info.get("full_name", fc)}')
     
