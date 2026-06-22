@@ -5873,7 +5873,24 @@ def page_fo():
                         pdf.ln()
                     pdf_file = f"/tmp/risk_report_{today}.pdf"; pdf.output(pdf_file)
                     with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"risk_report_{today}.pdf", "application/pdf", use_container_width=True)
-                except Exception as e: st.error(f"PDF: {str(e)[:80]}")
+                except Exception as e: st.error(f"PDF: {str(e)[:80]}"
+
+# ============================================
+# OBSERVATIONS & ALERTS (FULL)
+# ============================================
+def page_oa():
+    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
+    st.markdown(f'## ✅ Observations & Alerts — {info.get("full_name",fc)}')
+    inc=DB.get_all("incidents",fc,30)
+    if inc:
+        for i in inc:
+            sev=i.get("severity","low")
+            badge="badge-critical" if sev in ["critical","high"] else "badge-warning" if sev=="medium" else "badge-info"
+            with st.expander(f"{i.get('incident_number','')} — {i.get('title','')} — {sev.upper()}"):
+                st.write(f"**Type:** {i.get('type','')} | **Status:** {i.get('status','')}")
+                st.write(f"**Description:** {i.get('description','')}")
+                if i.get("immediate_actions"):st.write(f"**Actions:** {i['immediate_actions']}")
+    else:st.success("✅ No open alerts")
 
 # ============================================
 # AUDIT & GOVERNANCE — COMMAND CENTER
