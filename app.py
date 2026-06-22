@@ -9161,8 +9161,13 @@ def page_hot():
     # ============================================
     # TAB 0: ALL HOTO RECORDS WITH STATUS
     # ============================================
-    with tabs[0]:
+   with tabs[0]:
         st.markdown("### 📋 HOTO Records")
+        
+        if st.session_state.get("hoto_created", False):
+            st.success(f"✅ HOTO {st.session_state.get('hoto_number_created','')} initiated with approval workflow!")
+            st.balloons()
+            st.session_state.hoto_created = False
         
         if total_hoto == 0:
             st.info("No HOTO records yet.")
@@ -9355,7 +9360,9 @@ def page_hot():
                             send_email_notification(user_email, f"🔄 New HOTO Initiated — {hoto_number}", f"<h3>HOTO Initiated</h3><p><b>HOTO:</b> {hoto_number}</p><p><b>Type:</b> {hoto_type.replace('_',' ').title()}</p><p><b>Transferor:</b> {transferor}</p><p><b>Transferee:</b> {transferee}</p><p>Approvals pending.</p>")
                         except: pass
                         
-                        st.success(f"✅ HOTO {hoto_number} initiated with approval workflow!"); st.balloons(); st.rerun()
+                         st.session_state.hoto_created = True
+                        st.session_state.hoto_number_created = hoto_number
+                        st.rerun()
                 else:
                     st.error("⚠️ Title, Transferor, and Transferee are required")
     
