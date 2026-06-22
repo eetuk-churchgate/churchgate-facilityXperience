@@ -5873,7 +5873,7 @@ def page_fo():
                         pdf.ln()
                     pdf_file = f"/tmp/risk_report_{today}.pdf"; pdf.output(pdf_file)
                     with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"risk_report_{today}.pdf", "application/pdf", use_container_width=True)
-                except Exception as e: st.error(f"PDF: {str(e)[:80]}"
+                except Exception as e: st.error(f"PDF: {str(e)[:80]}")
 
 # ============================================
 # OBSERVATIONS & ALERTS (FULL)
