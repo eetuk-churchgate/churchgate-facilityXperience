@@ -8186,7 +8186,7 @@ def page_ic():
     tabs = st.tabs(["📋 Active Incidents", "➕ Report Incident", "📊 All Incidents", "📈 Analytics", "⚙️ Escalation Settings", "📄 Reports"])
     
     # ============================================
-    # TAB 0: ACTIVE INCIDENTS WITH DETAIL VIEW
+    # TAB 0: ACTIVE INCIDENTS WITH FULL WORKFLOW
     # ============================================
     with tabs[0]:
         st.markdown("### 📋 Active Incident Queue")
@@ -8200,7 +8200,7 @@ def page_ic():
                 status = inc.get("status","created")
                 severity = inc.get("severity","minor")
                 sev_color = "#EF4444" if severity == "critical" else "#F59E0B" if severity == "major" else "#3B82F6" if severity == "minor" else "#6B7280"
-                sc = {"created":"#3B82F6","acknowledged":"#F59E0B","responding":"#8B5CF6","contained":"#06B6D4","resolving":"#F59E0B","closed":"#10B981"}.get(status,"#3B82F6")
+                sc = {"created":"#3B82F6","acknowledged":"#F59E0B","responding":"#8B5CF6","contained":"#06B6D4","closed":"#10B981"}.get(status,"#3B82F6")
                 inc_id = inc["id"]
                 
                 elapsed = ""
@@ -8284,38 +8284,22 @@ def page_ic():
                                 }).execute()
                                 st.success("✅ Uploaded!"); st.rerun()
                 
-                # Action buttons with proper role-based access
-                c1, c2, c3, c4 = st.columns(4)
-                
-                # Acknowledge: Safety Officer, Security Officer, HSSE Coordinator, Admin
+                # ============================================
+                # ACTION BUTTONS — ROLE-BASED WORKFLOW
+                # ============================================
                 can_acknowledge = user_role in ["safety_officer", "security_officer", "hsse_coordinator", "team_lead", "manager", "admin", "super_admin"]
-                
-                # Respond: Safety Officer, Security Officer, HSSE Coordinator, Admin
                 can_respond = user_role in ["safety_officer", "security_officer", "hsse_coordinator", "team_lead", "manager", "admin", "super_admin"]
-                
-                # Contain: HSSE Coordinator, Team Lead, Manager, Admin
                 can_contain = user_role in ["hsse_coordinator", "team_lead", "manager", "sr_manager", "admin", "super_admin"]
-                
-                # Close: HSSE Coordinator, Facility Manager, Security Chief, Manager, Admin
                 can_close = user_role in ["hsse_coordinator", "manager", "sr_manager", "admin", "super_admin"]
                 
+                c1, c2, c3, c4 = st.columns(4)
                 with c1:
                     if status == "created" and can_acknowledge:
                         if st.button("✅ Acknowledge", key=f"ack_{inc_id}", use_container_width=True):
                             supabase.table("incidents").update({"status":"acknowledged","acknowledged_at":wat_now.isoformat(),"acknowledged_by":user_name}).eq("id",inc_id).execute()
-                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"acknowledged","description":f"Incident acknowledged by {user_name} ({user_role})","performed_by":user_name}).execute()
+                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"acknowledged","description":f"Acknowledged by {user_name} ({user_role})","performed_by":user_name}).execute()
                             _send_incident_escalation(fc, inc_id, severity, 1, inc.get('title',''))
-                            
-                            # Email HSSE Coordinator
-                            try:
-                                hss_emails = supabase.table("incident_escalation").select("escalate_to_email").eq("facility_code",fc).eq("severity",severity).eq("escalation_level",2).execute()
-                                if hss_emails.data:
-                                    for e in hss_emails.data:
-                                        send_email_notification(e["escalate_to_email"], f"🚨 Incident Acknowledged — {inc.get('incident_number','')}", f"<h3>Incident Acknowledged</h3><p><b>By:</b> {user_name} ({user_role})</p><p><b>Title:</b> {inc.get('title','')}</p><p>Please prepare to respond.</p>")
-                            except: pass
-                            
                             st.success("✅ Acknowledged!"); st.rerun()
-                
                 with c2:
                     if status in ["acknowledged","created"] and can_respond:
                         if st.button("🚀 Respond", key=f"resp_{inc_id}", use_container_width=True):
@@ -8323,31 +8307,56 @@ def page_ic():
                             supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"responding","description":f"Response initiated by {user_name} ({user_role})","performed_by":user_name}).execute()
                             _send_incident_escalation(fc, inc_id, severity, 2, inc.get('title',''))
                             st.success("🚀 Responding!"); st.rerun()
-                
                 with c3:
                     if status == "responding" and can_contain:
-                        if st.button("🛡️ Contain", key=f"cont_{inc_id}", use_container_width=True):
-                            supabase.table("incidents").update({"status":"contained","contained_at":wat_now.isoformat(),"contained_by":user_name}).eq("id",inc_id).execute()
-                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"contained","description":f"Incident contained by {user_name} ({user_role})","performed_by":user_name}).execute()
-                            
-                            # Email Facility Manager/Security Chief for closure review
-                            try:
-                                close_emails = supabase.table("incident_escalation").select("escalate_to_email").eq("facility_code",fc).eq("severity",severity).eq("escalation_level",4).execute()
-                                if close_emails.data:
-                                    for e in close_emails.data:
-                                        send_email_notification(e["escalate_to_email"], f"🛡️ Incident Contained — {inc.get('incident_number','')}", f"<h3>Incident Contained - Ready for Closure Review</h3><p><b>By:</b> {user_name}</p><p><b>Title:</b> {inc.get('title','')}</p><p>Please review and close if satisfactory.</p>")
-                            except: pass
-                            
-                            st.success("🛡️ Contained!"); st.rerun()
-                
+                        if st.button("✅ Confirm & Contain", key=f"cont_{inc_id}", use_container_width=True):
+                            st.session_state.containing_incident = inc_id
+                            st.rerun()
                 with c4:
                     if status in ["contained","responding"] and can_close:
-                        if st.button("✅ Close Incident", key=f"close_{inc_id}", use_container_width=True):
+                        if st.button("🔒 Close Incident", key=f"close_{inc_id}", use_container_width=True):
                             st.session_state.closing_incident = inc_id
                             st.rerun()
     
     # ============================================
-    # CLOSE INCIDENT FORM (Outside the loop)
+    # CONTAIN/CONFIRM INCIDENT FORM
+    # ============================================
+    if "containing_incident" in st.session_state and st.session_state.containing_incident:
+        inc_id = st.session_state.containing_incident
+        inc = inc_df[inc_df["id"] == inc_id].iloc[0] if len(inc_df[inc_df["id"] == inc_id]) > 0 else None
+        
+        if inc is not None:
+            st.markdown("---")
+            with st.form("contain_incident_form"):
+                st.markdown(f"### ✅ Confirm & Contain: {inc.get('incident_number','')} — {inc.get('title','')[:80]}")
+                containment_status = st.text_area("Containment Status*", height=80, placeholder="Describe how the incident has been contained...")
+                containment_attachment = st.file_uploader("📎 Attach Evidence (Optional)", type=["png","jpg","jpeg","pdf"], key="contain_attach")
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.form_submit_button("✅ CONFIRM CONTAINMENT", use_container_width=True, type="primary"):
+                        if containment_status:
+                            supabase.table("incidents").update({"status":"contained","contained_at":wat_now.isoformat(),"contained_by":user_name,"containment_status":containment_status}).eq("id",inc_id).execute()
+                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"contained","description":f"Contained by {user_name}: {containment_status[:100]}","performed_by":user_name}).execute()
+                            if containment_attachment:
+                                import base64 as b64
+                                file_bytes = containment_attachment.read()
+                                file_b64 = b64.b64encode(file_bytes).decode()
+                                supabase.table("incident_attachments").insert({"incident_id":inc_id,"file_name":containment_attachment.name,"file_type":containment_attachment.type,"file_size":len(file_bytes),"file_data":file_b64,"uploaded_by":user_name}).execute()
+                            try:
+                                close_emails = supabase.table("incident_escalation").select("escalate_to_email").eq("facility_code",fc).eq("severity",inc.get('severity','major')).eq("escalation_level",4).execute()
+                                if close_emails.data:
+                                    for e in close_emails.data:
+                                        send_email_notification(e["escalate_to_email"], f"🛡️ Incident Contained — {inc.get('incident_number','')}", f"<h3>Ready for Closure</h3><p><b>By:</b> {user_name}</p><p>{inc.get('title','')}</p>")
+                            except: pass
+                            st.success("✅ Contained! Facility Manager notified."); st.session_state.containing_incident = None; st.rerun()
+                        else:
+                            st.error("⚠️ Containment Status is required")
+                with c2:
+                    if st.form_submit_button("❌ CANCEL", use_container_width=True):
+                        st.session_state.containing_incident = None; st.rerun()
+    
+    # ============================================
+    # CLOSE INCIDENT FORM
     # ============================================
     if "closing_incident" in st.session_state and st.session_state.closing_incident:
         inc_id = st.session_state.closing_incident
@@ -8356,46 +8365,29 @@ def page_ic():
         if inc is not None:
             st.markdown("---")
             with st.form("close_incident_form"):
-                st.markdown(f"### ✅ Close Incident: {inc.get('incident_number','')} — {inc.get('title','')[:80]}")
-                
+                st.markdown(f"### 🔒 Close Incident: {inc.get('incident_number','')} — {inc.get('title','')[:80]}")
                 c1, c2 = st.columns(2)
                 with c1:
                     resolution_summary = st.text_area("Resolution Summary*", height=80, placeholder="Describe how the incident was resolved...")
-                    root_cause = st.text_area("Root Cause", height=60, placeholder="What caused this incident?")
+                    root_cause = st.text_area("Root Cause*", height=60, placeholder="What caused this incident?")
                 with c2:
                     preventive_actions = st.text_area("Preventive Actions", height=60, placeholder="What will prevent recurrence?")
                     closure_attachment = st.file_uploader("📎 Attach Closure Evidence (Optional)", type=["png","jpg","jpeg","pdf"], key="close_attach")
-                
                 c1, c2 = st.columns(2)
                 with c1:
-                    if st.form_submit_button("✅ CONFIRM CLOSURE", use_container_width=True, type="primary"):
-                        if resolution_summary:
-                            supabase.table("incidents").update({
-                                "status":"closed","closed_at":wat_now.isoformat(),"closed_by":user_name,
-                                "resolution_notes":resolution_summary,"root_cause":root_cause
-                            }).eq("id",inc_id).execute()
-                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"closed","description":f"Closed by {user_name} ({user_role}): {resolution_summary[:100]}","performed_by":user_name}).execute()
-                            
-                            # Save attachment
+                    if st.form_submit_button("🔒 CONFIRM CLOSURE", use_container_width=True, type="primary"):
+                        if resolution_summary and root_cause:
+                            supabase.table("incidents").update({"status":"closed","closed_at":wat_now.isoformat(),"closed_by":user_name,"resolution_notes":resolution_summary,"root_cause":root_cause}).eq("id",inc_id).execute()
+                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"closed","description":f"Closed by {user_name}: {resolution_summary[:100]}","performed_by":user_name}).execute()
                             if closure_attachment:
                                 import base64 as b64
                                 file_bytes = closure_attachment.read()
                                 file_b64 = b64.b64encode(file_bytes).decode()
-                                supabase.table("incident_attachments").insert({
-                                    "incident_id":inc_id,"file_name":closure_attachment.name,
-                                    "file_type":closure_attachment.type,"file_size":len(file_bytes),
-                                    "file_data":file_b64,"uploaded_by":user_name
-                                }).execute()
-                            
-                            # Email all stakeholders
-                            try:
-                                send_email_notification(user_email, f"✅ Incident Closed — {inc.get('incident_number','')}", f"<h3>Incident Closed</h3><p><b>Title:</b> {inc.get('title','')}</p><p><b>Resolution:</b> {resolution_summary}</p><p><b>Closed by:</b> {user_name} ({user_role})</p>")
-                            except: pass
-                            
+                                supabase.table("incident_attachments").insert({"incident_id":inc_id,"file_name":closure_attachment.name,"file_type":closure_attachment.type,"file_size":len(file_bytes),"file_data":file_b64,"uploaded_by":user_name}).execute()
                             st.success("✅ Incident Closed!"); st.balloons()
                             st.session_state.closing_incident = None; st.rerun()
                         else:
-                            st.error("⚠️ Resolution summary is required")
+                            st.error("⚠️ Resolution Summary and Root Cause are required")
                 with c2:
                     if st.form_submit_button("❌ CANCEL", use_container_width=True):
                         st.session_state.closing_incident = None; st.rerun()
