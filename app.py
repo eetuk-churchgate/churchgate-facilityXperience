@@ -2861,6 +2861,8 @@ def page_wp():
         st.markdown("### ⚙️ Workflow Configuration")
         st.caption("Manage who authorizes, confirms, and approves work permits")
         
+        import json
+        
         for level in [1, 2, 3]:
             level_names = {1: "Level 1 — Authorization (Team Lead/Supervisor)", 
                           2: "Level 2 — Confirmation (HSE Coordinator)", 
@@ -2872,6 +2874,9 @@ def page_wp():
             if people:
                 for p in people:
                     dept_filter = p.get("department_filter", [])
+                    if isinstance(dept_filter, str):
+                        try: dept_filter = json.loads(dept_filter)
+                        except: dept_filter = ["All Departments"]
                     if dept_filter == ["All Departments"] or not dept_filter:
                         dept_str = "All Departments"
                     else:
@@ -2918,9 +2923,14 @@ def page_wp():
                             format_func=lambda x: {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}[x])
                     with c2:
                         edit_user = st.selectbox("Select Person", user_options_wp2, index=default_idx)
+                    
                     current_depts = wf.get("department_filter", ["All Departments"])
+                    if isinstance(current_depts, str):
+                        try: current_depts = json.loads(current_depts)
+                        except: current_depts = ["All Departments"]
                     if current_depts == ["All Departments"]:
                         current_depts = []
+                    
                     all_departments2 = [
                         "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
                         "Engineering — Vertical Transportation (Lifts)", "Engineering — Fire Fighting",
@@ -2944,7 +2954,7 @@ def page_wp():
                                     "level_name": {1: "Authorizer", 2: "Confirmer", 3: "Approver"}[edit_level],
                                     "person_name": new_name,
                                     "person_email": new_email,
-                                    "department_filter": edit_depts if edit_depts else ["All Departments"]
+                                    "department_filter": json.dumps(edit_depts if edit_depts else ["All Departments"])
                                 })
                                 st.success("✅ Updated!"); st.session_state.editing_wf = None; st.rerun()
                     with c2:
@@ -2957,7 +2967,7 @@ def page_wp():
             all_users_wp = DB.get_users()
             user_options_wp = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users_wp if u.get('name') and u.get('email')]
             user_options_wp = sorted(user_options_wp)
-
+            
             c1, c2 = st.columns(2)
             with c1:
                 new_level = st.selectbox("Level", [1, 2, 3], 
@@ -2965,6 +2975,7 @@ def page_wp():
             with c2:
                 selected_users_wp = st.multiselect("Select Person(s)*", user_options_wp, key="wf_select_users",
                     placeholder="Select one or more people...")
+            
             all_departments = [
                 "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
                 "Engineering — Vertical Transportation (Lifts)", "Engineering — Fire Fighting",
@@ -2975,7 +2986,9 @@ def page_wp():
                 "Security — Man Guarding Operations",
                 "Contractor — Clyde Engineering", "Contractor — Gates and Shield"
             ]
-            new_depts = st.multiselect("Department Access (leave empty for All Departments)", all_departments, placeholder="Choose departments or leave empty for All")
+            new_depts = st.multiselect("Department Access (leave empty for All Departments)", all_departments,
+                placeholder="Choose departments or leave empty for All")
+            
             if st.form_submit_button("➕ Add Person(s) to Workflow", use_container_width=True, type="primary"):
                 if selected_users_wp:
                     added_count = 0
@@ -2987,24 +3000,25 @@ def page_wp():
                             dept_filter = new_depts if new_depts else ["All Departments"]
                             
                             try:
-                                result = DB.insert("workflow_config", {
-                                    "facility_code": fc, "workflow_type": "work_permit",
+                                result = supabase.table("workflow_config").insert({
+                                    "facility_code": fc,
+                                    "workflow_type": "work_permit",
                                     "level_number": new_level,
                                     "level_name": {1: "Authorizer", 2: "Confirmer", 3: "Approver"}[new_level],
-                                    "person_name": new_name, "person_email": new_email,
-                                    "department_filter": dept_filter
-                                })
-                                if result:
+                                    "person_name": new_name,
+                                    "person_email": new_email,
+                                    "department_filter": json.dumps(dept_filter),
+                                    "is_active": True
+                                }).execute()
+                                if result.data:
                                     added_count += 1
-                                else:
-                                    st.error(f"Failed to add {new_name}")
                             except Exception as e:
-                                st.error(f"Error adding {new_name}: {str(e)}")
+                                st.error(f"Error adding {new_name}: {str(e)[:100]}")
                     
                     if added_count > 0:
-                        st.success(f"✅ {added_count} person(s) added!"); st.balloons()
+                        st.success(f"✅ {added_count} person(s) added!"); st.balloons(); st.rerun()
                     else:
-                        st.error("Failed to add anyone. Check database permissions.")
+                        st.error("Failed to add. Check database permissions.")
                 else:
                     st.error("⚠️ Please select at least one person")
 
