@@ -9447,11 +9447,14 @@ def page_hot():
     with tabs[3]:
         st.markdown("### ✅ Approval Dashboard")
         
-        all_approvals = supabase.table("hoto_approvals").select("*, hoto_records!inner(hoto_number, title, hoto_type, transferor_name, transferee_name)").eq("status", "pending").order("created_at").execute()
+        all_approvals = supabase.table("hoto_approvals").select("*").eq("status", "pending").order("created_at").execute()
         
         if all_approvals.data and len(all_approvals.data) > 0:
             for app in all_approvals.data:
-                h_info = app.get("hoto_records", {})
+                h_info = {}
+                hoto_lookup = hoto_df[hoto_df["id"] == app["hoto_id"]]
+                if len(hoto_lookup) > 0:
+                    h_info = hoto_lookup.iloc[0].to_dict()
                 st.markdown(f"""
                 <div style="background:white;border-left:4px solid #F59E0B;border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                     <b>{h_info.get('hoto_number','N/A')}</b> — {h_info.get('title','')[:80]}
