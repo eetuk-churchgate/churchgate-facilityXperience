@@ -5711,7 +5711,7 @@ def page_fo():
     # ============================================
     # TABS
     # ============================================
-    tabs = st.tabs(["📊 Risk Matrix", "➕ Register Risk", "🔧 Treatments & Controls", "📋 Reviews", "📄 Reports"])
+    tabs = st.tabs(["📊 Risk Matrix", "➕ Register Risk", "🏗️ Asset Risk (FMECA)", "🔧 Treatments & Controls", "📋 Reviews", "📄 Reports"])
     
     # ============================================
     # TAB 0: RISK MATRIX
@@ -5911,10 +5911,202 @@ def page_fo():
                 else:
                     st.error("⚠️ Title, Owner, and Description are required")
     
-    # ============================================
-    # TAB 2: TREATMENTS & CONTROLS
+    
+# ============================================
+    # TAB 2: ASSET RISK ASSESSMENT (FMECA)
     # ============================================
     with tabs[2]:
+        st.markdown("### 🏗️ Asset Criticality & FMECA — IEC 60812 / ISO 55000")
+        
+        fmeca_data = supabase.table("asset_fmeca").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(200).execute()
+        fmeca_df = pd.DataFrame(fmeca_data.data) if fmeca_data.data else pd.DataFrame()
+        
+        total_fmeca = len(fmeca_df)
+        tier1_count = len(fmeca_df[fmeca_df["asset_criticality"] == "Tier1"]) if total_fmeca > 0 else 0
+        tier2_count = len(fmeca_df[fmeca_df["asset_criticality"] == "Tier2"]) if total_fmeca > 0 else 0
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("Total FMECA Assessments", total_fmeca)
+        with c2: st.metric("Tier 1 (Critical)", tier1_count)
+        with c3: st.metric("Tier 2 (Essential)", tier2_count)
+        
+        st.markdown("---")
+        
+        fmeca_subtabs = st.tabs(["📋 FMECA Register", "➕ New FMECA", "📊 Asset Risk Matrix"])
+        
+        # FMECA Register
+        with fmeca_subtabs[0]:
+            if total_fmeca == 0:
+                st.info("No FMECA assessments yet.")
+            else:
+                for _, fm in fmeca_df.head(20).iterrows():
+                    rating = fm.get("residual_rating", 5)
+                    if rating >= 16: zone = "Extreme"; color = "#EF4444"
+                    elif rating >= 10: zone = "High"; color = "#F59E0B"
+                    elif rating >= 5: zone = "Medium"; color = "#3B82F6"
+                    else: zone = "Low"; color = "#10B981"
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid {color};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                        <b>{fm.get('failure_mode_id','N/A')}</b> — {fm.get('asset_name','')} | {fm.get('failure_mode_description','')[:80]}
+                        <br><span style="font-size:0.65rem;color:#666;">🏷️ {fm.get('asset_criticality','')} | RPN: {fm.get('rpn_score','')} | 💰 ₦{fm.get('fmeca_financial',0):,.0f}</span>
+                        <span style="float:right;background:{color};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;">{zone.upper()} ({rating}/25)</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+        
+        # New FMECA
+        with fmeca_subtabs[1]:
+            st.markdown("#### ➕ New FMECA Assessment — IEC 60812 Standard")
+            
+            # Get assets for selection
+            all_assets_fm = DB.get_assets(fc, 50000)
+            asset_options = [f"{a.get('name','')} ({a.get('asset_tag','')})" for a in (all_assets_fm or []) if a.get('name')]
+            asset_options.insert(0, "Select Asset...")
+            
+            with st.form("new_fmeca_form"):
+                st.markdown("**Section A: Asset Identification**")
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    selected_asset = st.selectbox("Select Asset*", asset_options)
+                    fm_criticality = st.selectbox("Asset Criticality*", ["Tier1","Tier2","Tier3"])
+                with c2:
+                    fm_manufacturer = st.text_input("Manufacturer")
+                    fm_model = st.text_input("Model")
+                with c3:
+                    fm_install_date = st.date_input("Installation Date", today - timedelta(days=365*10))
+                    fm_design_life = st.number_input("Design Life (Years)", value=20, min_value=1)
+                
+                c1, c2 = st.columns(2)
+                with c1:
+                    fm_condition_score = st.slider("Current Condition Score (0-100)", 0, 100, 50)
+                    fm_remaining_life = st.number_input("Remaining Useful Life (Years)", value=5, min_value=0)
+                with c2:
+                    fm_replacement_cost = st.number_input("Replacement Cost (₦)", min_value=0.0, value=0.0, step=1000000.0)
+                    fm_statutory = st.checkbox("Statutory Inspection Required?")
+                
+                fm_linked_risk = st.text_input("Linked Master Risk ID (if any)", placeholder="e.g., RISK-2026-0042")
+                
+                st.markdown("---")
+                st.markdown("**Section B: Failure Mode Identification**")
+                fm_failure_desc = st.text_area("Failure Mode Description*", height=60, placeholder="What specifically fails? Component + Failure Type.")
+                c1, c2 = st.columns(2)
+                with c1:
+                    fm_causes = st.text_area("Failure Causes", height=60)
+                    fm_effect_local = st.text_input("Failure Effect (Local)")
+                with c2:
+                    fm_effect_system = st.text_input("Failure Effect (System)")
+                    fm_effect_building = st.text_area("Failure Effect (Building/Tenants)", height=60)
+                
+                st.markdown("---")
+                st.markdown("**Section C: Inherent Risk Assessment**")
+                c1, c2, c3, c4, c5 = st.columns(5)
+                with c1: fm_safety = st.selectbox("Safety", [1,2,3,4,5], key="fm_safety")
+                with c2: fm_financial = st.number_input("Financial (₦)", min_value=0.0, value=0.0, step=1000000.0, key="fm_financial")
+                with c3: fm_operational = st.selectbox("Operational", [1,2,3,4,5], key="fm_oper")
+                with c4: fm_reputational = st.selectbox("Reputational", [1,2,3,4,5], key="fm_rep")
+                with c5: fm_regulatory = st.selectbox("Regulatory", [1,2,3,4,5], key="fm_reg")
+                
+                fm_overall = max(fm_safety, fm_operational, fm_reputational, fm_regulatory)
+                st.caption(f"Overall Consequence (Highest): {fm_overall}")
+                
+                c1, c2 = st.columns(2)
+                with c1: fm_inh_likelihood = st.selectbox("Inherent Likelihood", [1,2,3,4,5], format_func=lambda x: {1:"Rare",2:"Unlikely",3:"Possible",4:"Likely",5:"Almost Certain"}[x])
+                with c2: pass
+                
+                inh_rating_fm = fm_inh_likelihood * fm_overall
+                zone_fm = "Extreme" if inh_rating_fm >= 16 else "High" if inh_rating_fm >= 10 else "Medium" if inh_rating_fm >= 5 else "Low"
+                st.caption(f"Inherent Rating: {inh_rating_fm}/25 — {zone_fm.upper()}")
+                
+                st.markdown("---")
+                st.markdown("**Section D: Existing Controls & Residual Risk**")
+                fm_controls = st.text_area("Existing Controls & Detection Methods", height=80)
+                
+                c1, c2 = st.columns(2)
+                with c1: fm_res_likelihood = st.selectbox("Residual Likelihood", [1,2,3,4,5], format_func=lambda x: {1:"Rare",2:"Unlikely",3:"Possible",4:"Likely",5:"Almost Certain"}[x], index=min(fm_inh_likelihood-1, 4))
+                with c2: fm_res_consequence = st.selectbox("Residual Consequence", [1,2,3,4,5], index=min(fm_overall-1, 4))
+                
+                res_rating_fm = fm_res_likelihood * fm_res_consequence
+                
+                fm_rpn = fm_overall * fm_inh_likelihood * 3
+                st.caption(f"RPN Score: {fm_rpn} | Residual Rating: {res_rating_fm}/25")
+                
+                st.markdown("---")
+                st.markdown("**Section E: Treatment & Decision**")
+                fm_treatment = st.text_area("Recommended Additional Controls (Treatment Plan)", height=60)
+                fm_decision = st.text_area("Criticality Decision", height=40, placeholder="e.g., UNACCEPTABLE in long term. Asset requires replacement within 24 months.")
+                c1, c2 = st.columns(2)
+                with c1: fm_review_freq = st.selectbox("Review Frequency", ["Monthly","Quarterly","Bi-Annual","Annual"])
+                with c2: fm_approved_by = st.text_input("Approved By", value=user_name)
+                
+                if st.form_submit_button("➕ CREATE FMECA ASSESSMENT", use_container_width=True, type="primary"):
+                    if selected_asset != "Select Asset..." and fm_failure_desc:
+                        fm_count = total_fmeca + 1
+                        fm_id = f"FMECA-{fc}-{today.strftime('%Y%m%d')}-{str(fm_count).zfill(4)}"
+                        
+                        asset_name = selected_asset.split(" (")[0] if "(" in selected_asset else selected_asset
+                        
+                        supabase.table("asset_fmeca").insert({
+                            "facility_code":fc,"failure_mode_id":fm_id,
+                            "asset_name":asset_name,"asset_criticality":fm_criticality,
+                            "failure_mode_description":fm_failure_desc,
+                            "failure_causes":fm_causes,"failure_effect_local":fm_effect_local,
+                            "failure_effect_system":fm_effect_system,"failure_effect_building":fm_effect_building,
+                            "fmeca_safety":fm_safety,"fmeca_financial":fm_financial,
+                            "fmeca_operational":fm_operational,"fmeca_reputational":fm_reputational,
+                            "fmeca_regulatory":fm_regulatory,"fmeca_overall_consequence":fm_overall,
+                            "inherent_likelihood":fm_inh_likelihood,"inherent_rating":inh_rating_fm,
+                            "existing_controls":fm_controls,"residual_likelihood":fm_res_likelihood,
+                            "residual_consequence":fm_res_consequence,"residual_rating":res_rating_fm,
+                            "rpn_score":fm_rpn,"treatment_actions":fm_treatment,
+                            "criticality_decision":fm_decision,"review_frequency":fm_review_freq,
+                            "approved_by":fm_approved_by,"approved_date":str(today),
+                            "manufacturer":fm_manufacturer,"model":fm_model,
+                            "installation_date":str(fm_install_date),"design_life":fm_design_life,
+                            "remaining_useful_life":fm_remaining_life,"condition_score":fm_condition_score,
+                            "replacement_cost":fm_replacement_cost,"statutory_inspection":fm_statutory,
+                            "linked_risk_id":fm_linked_risk if fm_linked_risk else None,
+                            "status":"active","created_by":user_name,"created_at":wat_now.isoformat()
+                        }).execute()
+                        
+                        st.success(f"✅ FMECA {fm_id} created!"); st.balloons(); st.rerun()
+                    else:
+                        st.error("⚠️ Asset and Failure Mode Description are required")
+        
+        # Asset Risk Matrix
+        with fmeca_subtabs[2]:
+            st.markdown("#### 📊 Asset Risk Matrix — Top 10 Riskiest Assets")
+            
+            if total_fmeca > 0:
+                top_risks = fmeca_df.nlargest(10, "residual_rating") if "residual_rating" in fmeca_df.columns else fmeca_df.head(10)
+                
+                for _, fm in top_risks.iterrows():
+                    rating = fm.get("residual_rating", 5)
+                    if rating >= 16: zone = "Extreme"; color = "#EF4444"
+                    elif rating >= 10: zone = "High"; color = "#F59E0B"
+                    elif rating >= 5: zone = "Medium"; color = "#3B82F6"
+                    else: zone = "Low"; color = "#10B981"
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid {color};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                        <b>{fm.get('asset_name','')}</b> — {fm.get('failure_mode_description','')[:80]}
+                        <br><span style="font-size:0.65rem;color:#666;">🏷️ {fm.get('asset_criticality','')} | RPN: {fm.get('rpn_score','')} | Condition: {fm.get('condition_score','')}/100</span>
+                        <span style="float:right;background:{color};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;">{zone.upper()} ({rating}/25)</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Bar chart
+                if len(top_risks) >= 2:
+                    fig = px.bar(top_risks, x="residual_rating", y="asset_name", orientation='h', title="Top 10 Riskiest Assets", color="residual_rating", color_continuous_scale=["#10B981","#F59E0B","#EF4444"])
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No FMECA assessments yet.")
+
+
+# ============================================
+    # TAB 3: TREATMENTS & CONTROLS
+    # ============================================
+    with tabs[3]:
         st.markdown("### 🔧 Risk Treatments & Controls")
         
         if total_risks == 0:
@@ -5986,9 +6178,9 @@ def page_fo():
                                 st.success("✅ Control added!"); st.rerun()
     
     # ============================================
-    # TAB 3: REVIEWS
+    # TAB 4: REVIEWS
     # ============================================
-    with tabs[3]:
+    with tabs[4]:
         st.markdown("### 📋 Risk Reviews")
         
         if total_risks == 0:
@@ -6023,43 +6215,182 @@ def page_fo():
                         st.success("✅ Review recorded!"); st.rerun()
     
     # ============================================
-    # TAB 4: REPORTS
+    # TAB 5: AI-POWERED EXECUTIVE REPORTS
     # ============================================
-    with tabs[4]:
-        st.markdown("### 📄 Risk Reports")
-        c1, c2, c3 = st.columns(3)
-        with c1: st.metric("Total Risks", total_risks)
-        with c2: st.metric("Extreme Risks", extreme_risks)
-        with c3: st.metric("Residual Exposure", f"₦{total_exposure:,.0f}")
+    with tabs[5]:
+        st.markdown("### 📄 AI-Powered Risk Intelligence Reports")
+        
+        # Period selector
+        report_period = st.selectbox("📅 Report Period", ["Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly", "Custom"], key="risk_period")
+        
+        if report_period == "Weekly":
+            start_date = today - timedelta(days=7)
+            end_date = today
+        elif report_period == "Monthly":
+            start_date = today.replace(day=1)
+            end_date = today
+        elif report_period == "Quarterly":
+            q_month = ((today.month - 1) // 3) * 3 + 1
+            start_date = date(today.year, q_month, 1)
+            end_date = today
+        elif report_period == "Half-Yearly":
+            h_month = 1 if today.month <= 6 else 7
+            start_date = date(today.year, h_month, 1)
+            end_date = today
+        elif report_period == "Yearly":
+            start_date = date(today.year, 1, 1)
+            end_date = today
+        else:
+            c1, c2 = st.columns(2)
+            with c1: start_date = st.date_input("From", today - timedelta(days=30))
+            with c2: end_date = st.date_input("To", today)
+        
+        # Filter data for period
+        period_risks = risk_df[(pd.to_datetime(risk_df["created_at"], errors='coerce').dt.date >= start_date) & (pd.to_datetime(risk_df["created_at"], errors='coerce').dt.date <= end_date)] if total_risks > 0 else pd.DataFrame()
+        period_total = len(period_risks)
+        period_extreme = len(period_risks[(period_risks["residual_level"] == "Extreme") & (period_risks["risk_status"] != "closed")]) if period_total > 0 else 0
+        period_high = len(period_risks[(period_risks["residual_level"] == "High") & (period_risks["risk_status"] != "closed")]) if period_total > 0 else 0
+        period_exposure = period_risks[(period_risks["residual_level"].isin(["High","Extreme"]))]["inherent_cons_financial"].sum() if period_total > 0 else 0
+        period_treatments = 0
+        period_fmeca = len(fmeca_df[(pd.to_datetime(fmeca_df["created_at"], errors='coerce').dt.date >= start_date) & (pd.to_datetime(fmeca_df["created_at"], errors='coerce').dt.date <= end_date)]) if total_fmeca > 0 else 0
+        
+        st.caption(f"📅 {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')} | {period_total} risks | {period_fmeca} FMECA assessments")
+        
+        # Period KPIs
+        c1, c2, c3, c4, c5 = st.columns(5)
+        with c1: st.metric("📋 Period Risks", period_total)
+        with c2: st.metric("🔴 Extreme", period_extreme)
+        with c3: st.metric("🟠 High", period_high)
+        with c4: st.metric("💰 Exposure", f"₦{period_exposure:,.0f}")
+        with c5: st.metric("🏗️ FMECA", period_fmeca)
         
         st.markdown("---")
+        
+        # Charts
+        if period_total > 0:
+            c1, c2 = st.columns(2)
+            with c1:
+                # Risk by Category
+                if "risk_category" in period_risks.columns:
+                    cat_counts = period_risks["risk_category"].value_counts().head(10)
+                    cat_names_clean = [risk_categories.get(c, c).replace("_"," ").title()[:30] for c in cat_counts.index]
+                    fig1 = px.bar(x=cat_counts.values, y=cat_names_clean, orientation='h', title="Risks by Category", color=cat_counts.values, color_continuous_scale=["#10B981","#F59E0B","#EF4444"])
+                    fig1.update_layout(height=400)
+                    st.plotly_chart(fig1, use_container_width=True)
+            with c2:
+                # Risk by Level
+                level_counts = period_risks["residual_level"].value_counts()
+                level_colors = {"Extreme":"#EF4444","High":"#F59E0B","Medium":"#3B82F6","Low":"#10B981"}
+                pie_colors = [level_colors.get(l,"#999") for l in level_counts.index]
+                fig2 = px.pie(values=level_counts.values, names=level_counts.index, title="Risk Level Distribution", color_discrete_sequence=pie_colors, hole=0.5)
+                fig2.update_layout(height=400)
+                st.plotly_chart(fig2, use_container_width=True)
+            
+            # FMECA Chart
+            if period_fmeca > 0:
+                st.markdown("---")
+                fmeca_period = fmeca_df[(pd.to_datetime(fmeca_df["created_at"], errors='coerce').dt.date >= start_date) & (pd.to_datetime(fmeca_df["created_at"], errors='coerce').dt.date <= end_date)] if total_fmeca > 0 else pd.DataFrame()
+                if len(fmeca_period) > 0:
+                    fig3 = px.scatter(fmeca_period, x="condition_score", y="residual_rating", size="rpn_score", color="asset_criticality", hover_name="asset_name", title="Asset Risk Matrix — Condition vs Residual Risk", color_discrete_map={"Tier1":"#EF4444","Tier2":"#F59E0B","Tier3":"#3B82F6"})
+                    fig3.update_layout(height=400)
+                    st.plotly_chart(fig3, use_container_width=True)
+        
+        # AI Executive Summary
+        st.markdown("---")
+        st.markdown("### 🤖 AI Executive Summary")
+        
+        insights = []
+        if period_extreme > 0:
+            insights.append(f"🔴 **CRITICAL:** {period_extreme} Extreme risks require immediate board attention. Total exposure: ₦{period_exposure:,.0f}.")
+        if period_high > 0:
+            insights.append(f"🟠 **HIGH:** {period_high} High risks are being actively managed. Review treatment progress monthly.")
+        if period_total > 0 and period_extreme == 0:
+            insights.append("✅ No Extreme risks in this period. Risk posture is within acceptable thresholds.")
+        if period_fmeca > 0:
+            tier1_fmeca = len(fmeca_period[fmeca_period["asset_criticality"]=="Tier1"]) if len(fmeca_period) > 0 else 0
+            insights.append(f"🏗️ {period_fmeca} FMECA assessments conducted ({tier1_fmeca} Tier 1 Critical Assets).")
+        if overdue_treatments > 0:
+            insights.append(f"⚠️ {overdue_treatments} treatment actions are overdue. Immediate follow-up required.")
+        
+        for insight in insights:
+            st.markdown(f"""<div style="background:white;border-left:4px solid #CC0000;border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">{insight}</div>""", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Export
+        st.markdown("### 📥 Download Executive Reports")
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("📄 Generate Risk Report (HTML)", key="risk_html_btn", use_container_width=True, type="primary"):
+            if st.button("📄 Generate Full Intelligence Report (HTML)", key="risk_html_full", use_container_width=True, type="primary"):
+                import io, base64 as b64
                 logo_b64 = get_logo_base64()
-                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Risk Report</title><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}.kpi-row{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:20px;font-weight:800;color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:10px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}</style></head><body><h1>Risk Management Report — ISO 31000</h1><p>{info.get('full_name',fc)} | {today}</p><div class="kpi-row"><div class="kpi"><div class="val">{ori}/100</div>ORI</div><div class="kpi"><div class="val">₦{total_exposure:,.0f}</div>Exposure</div><div class="kpi"><div class="val">{extreme_risks}</div>Extreme</div><div class="kpi"><div class="val">{high_risks}</div>High</div><div class="kpi"><div class="val">{overdue_treatments}</div>Overdue</div><div class="kpi"><div class="val">{total_risks}</div>Total</div></div><h2>Risk Register</h2><table><tr><th>ID</th><th>Title</th><th>Category</th><th>Rating</th><th>Owner</th><th>Exposure</th></tr>"""
-                for _,r in risk_df.head(30).iterrows():
-                    html += f"<tr><td>{r.get('risk_number','')}</td><td>{r.get('title','')[:50]}</td><td>{risk_categories.get(r.get('risk_category',''),r.get('risk_category',''))}</td><td>{r.get('residual_rating','')}/25</td><td>{r.get('risk_owner','')}</td><td>₦{r.get('inherent_cons_financial',0):,.0f}</td></tr>"
-                html += "</table></body></html>"
-                st.download_button("📥 Download HTML", html, f"risk_report_{today}.html", "text/html", use_container_width=True)
+                logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
+                
+                # Generate chart images
+                chart_html = ""
+                try:
+                    if period_total > 0 and "risk_category" in period_risks.columns:
+                        cat_counts = period_risks["risk_category"].value_counts().head(10)
+                        cat_names_clean = [risk_categories.get(c, c).replace("_"," ").title()[:30] for c in cat_counts.index]
+                        fig_c = px.bar(x=cat_counts.values, y=cat_names_clean, orientation='h', title="Risks by Category", color=cat_counts.values, color_continuous_scale=["#10B981","#F59E0B","#EF4444"])
+                        fig_c.update_layout(height=300, width=600)
+                        buf = io.BytesIO()
+                        fig_c.write_image(buf, format='png', engine='kaleido', scale=2)
+                        chart_html += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{b64.b64encode(buf.getvalue()).decode()}" style="max-width:100%;"></div>'
+                except: pass
+                
+                try:
+                    if period_total > 0:
+                        level_counts = period_risks["residual_level"].value_counts()
+                        fig_p = px.pie(values=level_counts.values, names=level_counts.index, title="Risk Level Distribution", hole=0.5)
+                        fig_p.update_layout(height=300, width=500)
+                        buf2 = io.BytesIO()
+                        fig_p.write_image(buf2, format='png', engine='kaleido', scale=2)
+                        chart_html += f'<div style="text-align:center;margin:15px 0;"><img src="data:image/png;base64,{b64.b64encode(buf2.getvalue()).decode()}" style="max-width:100%;"></div>'
+                except: pass
+                
+                risk_rows = "".join([f"<tr><td>{r.get('risk_number','')}</td><td>{r.get('title','')[:60]}</td><td>{risk_categories.get(r.get('risk_category',''),r.get('risk_category',''))[:25]}</td><td>{r.get('residual_rating','')}/25</td><td>{r.get('residual_level','')}</td><td>₦{r.get('inherent_cons_financial',0):,.0f}</td></tr>" for _,r in period_risks.head(30).iterrows()])
+                
+                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Risk Intelligence Report</title>
+<style>body{{font-family:'Segoe UI',Arial,sans-serif;margin:25px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:1000px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}.header{{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}h1{{color:#CC0000;margin:0;font-size:22px}}.kpi-row{{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:20px 0}}.kpi{{background:linear-gradient(135deg,#f9fafb,#fff);border-radius:10px;padding:15px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:24px;font-weight:800;color:#CC0000}}.kpi .lbl{{font-size:10px;color:#888;text-transform:uppercase}}h2{{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:25px;font-size:16px}}table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:11px}}th{{background:#CC0000;color:white;padding:10px;text-align:left;font-size:10px;text-transform:uppercase}}td{{padding:8px;border-bottom:1px solid #eee}}.insight-box{{background:#FEF2F2;border-left:4px solid #EF4444;padding:12px;margin:8px 0;border-radius:6px;font-size:12px}}.footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #eee;padding-top:15px}}</style></head><body><div class="container">
+<div class="header"><div>{logo_img}<h1>Risk Intelligence Report</h1><p>{info.get('full_name',fc)} | {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')} | {report_period}</p></div></div>
+<div class="kpi-row"><div class="kpi"><div class="val">{period_total}</div><div class="lbl">Total Risks</div></div><div class="kpi"><div class="val">{period_extreme}</div><div class="lbl">Extreme</div></div><div class="kpi"><div class="val">{period_high}</div><div class="lbl">High</div></div><div class="kpi"><div class="val">₦{period_exposure:,.0f}</div><div class="lbl">Exposure</div></div><div class="kpi"><div class="val">{period_fmeca}</div><div class="lbl">FMECA</div></div></div>
+<div class="insight-box"><b>AI Executive Summary:</b> {insights[0] if insights else 'No risks in this period.'}</div>
+{chart_html}
+<h2>Risk Register — {report_period}</h2><table><tr><th>ID</th><th>Title</th><th>Category</th><th>Rating</th><th>Level</th><th>Exposure</th></tr>{risk_rows}</table>
+<div class="footer">Churchgate Group | facilityXperience | ISO 31000 • COSO ERM • IEC 60812 | AI-Generated {today.strftime('%d %B %Y')}</div>
+</div></body></html>"""
+                
+                st.download_button("📥 Download Intelligence Report (HTML)", html, f"risk_intelligence_{start_date}_{end_date}.html", "text/html", use_container_width=True)
+        
         with c2:
-            if st.button("📕 Generate PDF Report", key="risk_pdf_btn", use_container_width=True):
+            if st.button("📕 Generate PDF Report", key="risk_pdf_full", use_container_width=True):
                 try:
                     from fpdf import FPDF; pdf = FPDF('L','mm','A4'); pdf.add_page()
-                    pdf.set_font('Helvetica','B',16); pdf.set_text_color(204,0,0)
-                    pdf.cell(0,10,safe_text('Risk Management Report'),0,1)
+                    pdf.set_font('Helvetica','B',18); pdf.set_text_color(204,0,0)
+                    pdf.cell(0,12,safe_text('Risk Intelligence Report'),0,1)
                     pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
-                    pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {today}'),0,1); pdf.ln(4)
-                    pdf.set_font('Helvetica','B',7); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
-                    for h,w in zip(['ID','Title','Category','Rating','Owner','Exposure'],[35,65,35,20,40,40]): pdf.cell(w,5,h,1,0,'C',True)
+                    pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {start_date.strftime("%d %b %Y")} - {end_date.strftime("%d %b %Y")} | {report_period}'),0,1)
+                    pdf.ln(3)
+                    pdf.set_font('Helvetica','B',10)
+                    pdf.cell(0,6,f'Total: {period_total} | Extreme: {period_extreme} | High: {period_high} | Exposure: NGN {period_exposure:,.0f} | FMECA: {period_fmeca}',0,1)
+                    pdf.ln(3)
+                    pdf.set_font('Helvetica','B',8); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
+                    for h,w in zip(['ID','Title','Category','Rating','Level','Exposure'],[30,60,35,20,25,40]): pdf.cell(w,6,h,1,0,'C',True)
                     pdf.ln(); pdf.set_font('Helvetica','',7); pdf.set_text_color(0,0,0)
-                    for _,r in risk_df.head(40).iterrows():
-                        pdf.cell(35,4,safe_text(r.get('risk_number','')),1,0); pdf.cell(65,4,safe_text(str(r.get('title',''))[:28]),1,0)
-                        pdf.cell(35,4,safe_text(r.get('risk_category','')[:15]),1,0); pdf.cell(20,4,str(r.get('residual_rating','')),1,0)
-                        pdf.cell(40,4,safe_text(str(r.get('risk_owner',''))[:18]),1,0); pdf.cell(40,4,f'N{safe_text(str(r.get("inherent_cons_financial",0)))}',1,0)
-                        pdf.ln()
-                    pdf_file = f"/tmp/risk_report_{today}.pdf"; pdf.output(pdf_file)
-                    with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"risk_report_{today}.pdf", "application/pdf", use_container_width=True)
+                    for _,r in period_risks.head(40).iterrows():
+                        pdf.cell(30,5,safe_text(r.get('risk_number','')),1,0); pdf.cell(60,5,safe_text(str(r.get('title',''))[:26]),1,0)
+                        pdf.cell(35,5,safe_text(risk_categories.get(r.get('risk_category',''),r.get('risk_category',''))[:15]),1,0)
+                        pdf.cell(20,5,str(r.get('residual_rating','')),1,0); pdf.cell(25,5,safe_text(r.get('residual_level','')),1,0)
+                        pdf.cell(40,5,f'N{safe_text(str(r.get("inherent_cons_financial",0)))}',1,0); pdf.ln()
+                    pdf.ln(4)
+                    pdf.set_font('Helvetica','B',8)
+                    pdf.cell(0,5,'AI Executive Summary:',0,1)
+                    pdf.set_font('Helvetica','',7)
+                    for ins in insights:
+                        pdf.multi_cell(0,4,safe_text(ins.replace('🔴','').replace('🟠','').replace('✅','').replace('🏗️','').replace('⚠️','').strip()),0)
+                    pdf_file = f"/tmp/risk_intel_{start_date}_{end_date}.pdf"; pdf.output(pdf_file)
+                    with open(pdf_file,"rb") as f: st.download_button("📥 Download Intelligence Report (PDF)", f.read(), f"risk_intelligence_{start_date}_{end_date}.pdf", "application/pdf", use_container_width=True)
                 except Exception as e: st.error(f"PDF: {str(e)[:80]}")
 
 
