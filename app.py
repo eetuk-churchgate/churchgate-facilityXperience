@@ -2851,8 +2851,11 @@ def page_wp():
         else:
             st.info("📋 No work permits to report yet.")
     
+    # ============================================
+    # TAB 4: WORKFLOW CONFIG
+    # ============================================
     with tab4:
-        if not is_admin:
+        if not is_admin and user_role != "super_admin":
             st.error("⛔ Admin access only")
             st.stop()
         st.markdown("### ⚙️ Workflow Configuration")
@@ -2865,68 +2868,59 @@ def page_wp():
             level_icons = {1: "🔐", 2: "✅", 3: "🟢"}
             
             st.markdown(f"**{level_icons[level]} {level_names[level]}**")
-                people = get_workflow_people(fc, level)
-                if people:
-                    for p in people:
-                        dept_filter = p.get("department_filter", [])
-                        if dept_filter == ["All Departments"] or not dept_filter:
-                            dept_str = "All Departments"
-                        else:
-                            dept_str = ", ".join(dept_filter)
-                        
-                        c1, c2, c3 = st.columns([3, 1, 1])
-                        with c1:
-                            st.markdown(f"""
-                            <div style="background:white; border:1px solid #ddd; border-radius:8px; padding:0.6rem 1rem; margin:0.3rem 0;">
-                                <div style="font-weight:600; font-size:0.85rem;">👤 {p.get('person_name','')}</div>
-                                <div style="font-size:0.7rem; color:#666;">📧 {p.get('person_email','')}</div>
-                                <div style="font-size:0.65rem; color:#888;">🏢 {dept_str}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        with c2:
-                            if st.button("✏️ Edit", key=f"edit_wf_{p['id']}", use_container_width=True):
-                                st.session_state.editing_wf = p['id']
-                                st.rerun()
-                        with c3:
-                            if st.button("🗑️ Remove", key=f"del_wf_{p['id']}", use_container_width=True):
-                                supabase.table("workflow_config").delete().eq("id", p["id"]).execute()
-                                st.warning("Removed!"); st.rerun()
-                else:
-                    st.caption("No people configured for this level")
-                st.markdown("---")
+            people = get_workflow_people(fc, level)
+            if people:
+                for p in people:
+                    dept_filter = p.get("department_filter", [])
+                    if dept_filter == ["All Departments"] or not dept_filter:
+                        dept_str = "All Departments"
+                    else:
+                        dept_str = ", ".join(dept_filter)
+                    
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    with c1:
+                        st.markdown(f"""
+                        <div style="background:white; border:1px solid #ddd; border-radius:8px; padding:0.6rem 1rem; margin:0.3rem 0;">
+                            <div style="font-weight:600; font-size:0.85rem;">👤 {p.get('person_name','')}</div>
+                            <div style="font-size:0.7rem; color:#666;">📧 {p.get('person_email','')}</div>
+                            <div style="font-size:0.65rem; color:#888;">🏢 {dept_str}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with c2:
+                        if st.button("✏️ Edit", key=f"edit_wf_{p['id']}", use_container_width=True):
+                            st.session_state.editing_wf = p['id']
+                            st.rerun()
+                    with c3:
+                        if st.button("🗑️ Remove", key=f"del_wf_{p['id']}", use_container_width=True):
+                            supabase.table("workflow_config").delete().eq("id", p["id"]).execute()
+                            st.warning("Removed!"); st.rerun()
             else:
                 st.caption("No people configured for this level")
             st.markdown("---")
         
-        # Edit existing workflow entry
+        # Edit workflow entry
         if "editing_wf" in st.session_state and st.session_state.editing_wf:
             wf_id = st.session_state.editing_wf
             wf_entry = supabase.table("workflow_config").select("*").eq("id", wf_id).single().execute()
-            
             if wf_entry.data:
                 wf = wf_entry.data
                 st.markdown("---")
                 st.markdown(f"### ✏️ Edit: {wf.get('person_name','')}")
-                
                 with st.form("edit_wf_form"):
                     all_users_wp2 = DB.get_users()
                     user_options_wp2 = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users_wp2 if u.get('name') and u.get('email')]
                     user_options_wp2 = sorted(user_options_wp2)
-                    
                     current_user_str = f"{wf.get('person_name','')} ({wf.get('person_email','')})"
                     default_idx = user_options_wp2.index(current_user_str) if current_user_str in user_options_wp2 else 0
-                    
                     c1, c2 = st.columns(2)
                     with c1:
                         edit_level = st.selectbox("Level", [1, 2, 3], index=wf.get('level_number',1)-1,
                             format_func=lambda x: {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}[x])
                     with c2:
                         edit_user = st.selectbox("Select Person", user_options_wp2, index=default_idx)
-                    
                     current_depts = wf.get("department_filter", ["All Departments"])
                     if current_depts == ["All Departments"]:
                         current_depts = []
-                    
                     all_departments2 = [
                         "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
                         "Engineering — Vertical Transportation (Lifts)", "Engineering — Fire Fighting",
@@ -2938,7 +2932,6 @@ def page_wp():
                         "Contractor — Clyde Engineering", "Contractor — Gates and Shield"
                     ]
                     edit_depts = st.multiselect("Department Access (empty = All)", all_departments2, default=current_depts)
-                    
                     c1, c2 = st.columns(2)
                     with c1:
                         if st.form_submit_button("💾 Save Changes", use_container_width=True, type="primary"):
@@ -2958,21 +2951,19 @@ def page_wp():
                         if st.form_submit_button("❌ Cancel", use_container_width=True):
                             st.session_state.editing_wf = None; st.rerun()
         
-       
+        # Add new person form
+        with st.form("wf_add_person"):
             st.markdown("### ➕ Add Person to Workflow")
-            
             all_users_wp = DB.get_users()
             user_options_wp = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users_wp if u.get('name') and u.get('email')]
             user_options_wp = sorted(user_options_wp)
             user_options_wp.insert(0, "Select User...")
-            
             c1, c2 = st.columns(2)
             with c1:
                 new_level = st.selectbox("Level", [1, 2, 3], 
                     format_func=lambda x: {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}[x])
             with c2:
                 selected_user_wp = st.selectbox("Select Person*", user_options_wp, key="wf_select_user")
-            
             all_departments = [
                 "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
                 "Engineering — Vertical Transportation (Lifts)", "Engineering — Fire Fighting",
@@ -2983,29 +2974,21 @@ def page_wp():
                 "Security — Man Guarding Operations",
                 "Contractor — Clyde Engineering", "Contractor — Gates and Shield"
             ]
-            new_depts = st.multiselect("Department Access (leave empty for All Departments)", 
-                                       all_departments,
-                                       placeholder="Choose departments or leave empty for All")
-            
+            new_depts = st.multiselect("Department Access (leave empty for All Departments)", all_departments, placeholder="Choose departments or leave empty for All")
             if st.form_submit_button("➕ Add Person to Workflow", use_container_width=True, type="primary"):
                 if selected_user_wp != "Select User..." and "(" in selected_user_wp:
                     parts = selected_user_wp.split("(")
                     new_name = parts[0].strip()
                     new_email = parts[1].replace(")","").strip()
                     dept_filter = new_depts if new_depts else ["All Departments"]
-                    
                     DB.insert("workflow_config", {
-                        "facility_code": fc,
-                        "workflow_type": "work_permit",
+                        "facility_code": fc, "workflow_type": "work_permit",
                         "level_number": new_level,
                         "level_name": {1: "Authorizer", 2: "Confirmer", 3: "Approver"}[new_level],
-                        "person_name": new_name,
-                        "person_email": new_email,
+                        "person_name": new_name, "person_email": new_email,
                         "department_filter": dept_filter
                     })
-                    st.success(f"✅ {new_name} added to Level {new_level}!")
-                    st.balloons()
-                    st.rerun()
+                    st.success(f"✅ {new_name} added to Level {new_level}!"); st.balloons(); st.rerun()
                 else:
                     st.error("⚠️ Please select a person from the dropdown")
 
