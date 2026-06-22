@@ -726,7 +726,7 @@ def sidebar():
             ("🏠 COMMAND", [("🌐 Command Center", "cc"), ("📊 PPM Dashboard", "ppm")], ["Command Center", "PPM Dashboard"]),
             ("🏗️ ASSETS & PPM", [("📋 Asset Register", "ar"), ("🔧 PPM Activities", "ppma"), ("✅ Checklist Status", "cs")], ["Asset Register", "PPM Activities", "Checklist Status"]),
             ("🔧 MAINTENANCE", [("📋 Work Orders", "wo"), ("🛡️ Work Permits", "wp")], ["Work Orders", "Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"]),
-            ("🏢 FACILITY OPS", [("📊 Operations Dashboard", "fo"), ("✅ Observations/Alerts", "oa")], ["Facility Operations"]),
+            ("🛡️ RISK MANAGEMENT", [("📊 Risk Assessment", "fo")], ["Risk Assessment"]),
             ("👥 PEOPLE", [("🛂 Visitor Management", "vm"), ("👤 User Management", "up")], ["Visitor Management", "User Management"]),
             ("💬 SERVICES", [("🎫 Raise a Ticket", "rt"), ("💬 Helpdesk", "hd"), ("⭐ Feedback", "fb")], ["Raise Ticket", "Helpdesk", "Feedback"]),
             ("✅ COMPLIANCE", [("✅ Audit Checklist", "ac"), ("🚨 Incident Check", "ic"), ("🔄 HOTO Check", "hot")], ["Audit Checklist", "Incident Report", "HOTO Check"]),
@@ -5875,22 +5875,7 @@ def page_fo():
                     with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"risk_report_{today}.pdf", "application/pdf", use_container_width=True)
                 except Exception as e: st.error(f"PDF: {str(e)[:80]}")
 
-# ============================================
-# OBSERVATIONS & ALERTS (FULL)
-# ============================================
-def page_oa():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## ✅ Observations & Alerts — {info.get("full_name",fc)}')
-    inc=DB.get_all("incidents",fc,30)
-    if inc:
-        for i in inc:
-            sev=i.get("severity","low")
-            badge="badge-critical" if sev in ["critical","high"] else "badge-warning" if sev=="medium" else "badge-info"
-            with st.expander(f"{i.get('incident_number','')} — {i.get('title','')} — {sev.upper()}"):
-                st.write(f"**Type:** {i.get('type','')} | **Status:** {i.get('status','')}")
-                st.write(f"**Description:** {i.get('description','')}")
-                if i.get("immediate_actions"):st.write(f"**Actions:** {i['immediate_actions']}")
-    else:st.success("✅ No open alerts")
+
 
 # ============================================
 # AUDIT & GOVERNANCE — COMMAND CENTER
@@ -12253,7 +12238,7 @@ def page_ppm_activities():
 # ============================================
 ROUTER={
     "cc":page_cc,"ar":page_ar,"cal":page_cal,"cs":page_cs,"ppm":page_ppm,
-    "wo":page_wo,"wp":page_wp,"fo":page_fo,"oa":page_oa,
+    "wo":page_wo,"wp":page_wp,"fo":page_fo,
     "vm": page_visitor,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb": page_feedback,
     "ac":page_ac,"ic":page_ic,"hot":page_hot,"uc":page_uc,"mis":page_mis,
     "ppma": page_ppm_activities,  # <-- ADD THIS LINE
