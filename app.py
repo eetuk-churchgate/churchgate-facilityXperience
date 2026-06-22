@@ -8179,10 +8179,45 @@ def page_ic():
             c1, c2, c3 = st.columns(3)
             with c1:
                 inc_title = st.text_input("Title*", placeholder="e.g., Water Leak - Server Room Floor 14")
-                inc_type = st.selectbox("Type*", ["Fire","Flood/Water Leak","Electrical Failure","HVAC Failure","Elevator Entrapment","Structural","Security Breach","Hazmat","Gas Leak","Power Outage","Other"])
+                inc_category = st.selectbox("Category*", [
+                    "Life Safety Incident",
+                    "Security Incident", 
+                    "Environmental Incident",
+                    "Fire & Explosion Incident",
+                    "Equipment & Asset Damage",
+                    "Health-Related Incident",
+                    "Utility & Infrastructure Failure",
+                    "Near Miss"
+                ])
             with c2:
                 inc_severity = st.selectbox("Severity*", ["critical","major","minor","monitoring"])
-                inc_category = st.selectbox("Category", ["Life Safety","Property Damage","Business Continuity","Environmental","Equipment Failure","Security","Other"])
+                inc_category = st.selectbox("Category*", [
+                    "Life Safety Incident",
+                    "Security Incident", 
+                    "Environmental Incident",
+                    "Fire & Explosion Incident",
+                    "Equipment & Asset Damage",
+                    "Health-Related Incident",
+                    "Utility & Infrastructure Failure",
+                    "Near Miss"
+                ])
+            # Incident types based on category
+            type_map = {
+                "Life Safety Incident": ["Elevator Entrapment", "Person Trapped", "Structural Collapse Risk", "Asphyxiation Risk", "Fall Hazard", "Other Life Safety"],
+                "Security Incident": ["Unauthorized Access", "Theft", "Vandalism", "Workplace Violence", "Suspicious Package", "Bomb Threat", "Civil Disturbance", "Other Security"],
+                "Environmental Incident": ["Water Leak/Flood", "Chemical Spill", "Air Quality Issue", "Noise Pollution", "Waste Contamination", "Other Environmental"],
+                "Fire & Explosion Incident": ["Fire - Electrical", "Fire - Kitchen", "Fire - Waste", "Gas Explosion", "Smoke Only (No Fire)", "Other Fire"],
+                "Equipment & Asset Damage": ["HVAC Failure", "Electrical Failure", "Plumbing Failure", "Elevator Malfunction", "BMS Failure", "Structural Damage", "Other Equipment"],
+                "Health-Related Incident": ["Injury - Slip/Fall", "Injury - Equipment", "Medical Emergency", "Food Poisoning Report", "Infectious Disease Concern", "Other Health"],
+                "Utility & Infrastructure Failure": ["Power Outage - Grid", "Power Outage - Internal", "Water Supply Failure", "Gas Supply Failure", "Internet/Connectivity Failure", "Generator Failure", "Other Utility"],
+                "Near Miss": ["Near Miss - Fire", "Near Miss - Electrical", "Near Miss - Structural", "Near Miss - Elevator", "Near Miss - Security", "Other Near Miss"]
+            }
+            
+            if inc_category in type_map:
+                inc_type = st.selectbox("Type*", type_map[inc_category])
+            else:
+                inc_type = st.text_input("Type*")
+            
             with c3:
                 inc_location_bldg = st.selectbox("Building", ["CT — Office Tower","SAT — Residential Tower","IP — Intermediate Parking","RC — Recreation Center","External"])
                 inc_location_floor = st.text_input("Floor/Zone")
@@ -8202,7 +8237,7 @@ def page_ic():
             inc_immediate = st.text_area("Immediate Actions Taken", height=60)
             
             if st.form_submit_button("🚨 REPORT INCIDENT", use_container_width=True, type="primary"):
-                if inc_title and inc_desc:
+                if inc_title and inc_desc and inc_category and inc_type:
                     inc_count = total_inc + 1
                     inc_number = f"INC-{fc}-{today.strftime('%Y%m%d')}-{str(inc_count).zfill(4)}"
                     
