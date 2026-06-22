@@ -2977,8 +2977,6 @@ def page_wp():
             ]
             new_depts = st.multiselect("Department Access (leave empty for All Departments)", all_departments, placeholder="Choose departments or leave empty for All")
             if st.form_submit_button("➕ Add Person(s) to Workflow", use_container_width=True, type="primary"):
-                st.write("DEBUG: Form submitted")  # ADD THIS
-                st.write("DEBUG: Selected users:", selected_users_wp)  # ADD THIS
                 if selected_users_wp:
                     added_count = 0
                     for user_str in selected_users_wp:
@@ -2988,15 +2986,25 @@ def page_wp():
                             new_email = parts[1].replace(")","").strip()
                             dept_filter = new_depts if new_depts else ["All Departments"]
                             
-                            DB.insert("workflow_config", {
-                                "facility_code": fc, "workflow_type": "work_permit",
-                                "level_number": new_level,
-                                "level_name": {1: "Authorizer", 2: "Confirmer", 3: "Approver"}[new_level],
-                                "person_name": new_name, "person_email": new_email,
-                                "department_filter": dept_filter
-                            })
-                            added_count += 1
-                    st.success(f"✅ {added_count} person(s) added to Level {new_level}!"); st.balloons(); st.rerun()
+                            try:
+                                result = DB.insert("workflow_config", {
+                                    "facility_code": fc, "workflow_type": "work_permit",
+                                    "level_number": new_level,
+                                    "level_name": {1: "Authorizer", 2: "Confirmer", 3: "Approver"}[new_level],
+                                    "person_name": new_name, "person_email": new_email,
+                                    "department_filter": dept_filter
+                                })
+                                if result:
+                                    added_count += 1
+                                else:
+                                    st.error(f"Failed to add {new_name}")
+                            except Exception as e:
+                                st.error(f"Error adding {new_name}: {str(e)}")
+                    
+                    if added_count > 0:
+                        st.success(f"✅ {added_count} person(s) added!"); st.balloons()
+                    else:
+                        st.error("Failed to add anyone. Check database permissions.")
                 else:
                     st.error("⚠️ Please select at least one person")
 
