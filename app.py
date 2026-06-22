@@ -8123,13 +8123,19 @@ def page_ic():
                         elapsed = f"{hours:02d}:{mins:02d}:{int(elapsed_time.total_seconds()%60):02d}"
                     except: pass
                 
+                # Build life safety line separately
+                life_safety_line = ""
+                if inc.get('life_safety_flag'):
+                    tenant = inc.get("tenant_name","")
+                    life_safety_line = f'<br><span style="font-size:0.6rem;color:#EF4444;">⚠️ Life Safety | 🏢 {tenant}</span>'
+                
                 st.markdown(f"""
                 <div style="background:white;border-left:4px solid {sev_color};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <div>
                             <b>{inc.get('incident_number','N/A')}</b> — {inc.get('title','')[:80]}
                             <br><span style="font-size:0.65rem;color:#666;">📍 {inc.get('location_building','')} / {inc.get('location_floor','')} | ⏱️ {elapsed} elapsed</span>
-                            {f'<br><span style="font-size:0.6rem;color:#EF4444;">⚠️ Life Safety | 🏢 {inc.get("tenant_name","")}</span>' if inc.get('life_safety_flag') else ''}
+                            {life_safety_line}
                         </div>
                         <div style="text-align:right;">
                             <span style="background:{sev_color};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{severity.upper()}</span>
