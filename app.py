@@ -2957,7 +2957,7 @@ def page_wp():
             all_users_wp = DB.get_users()
             user_options_wp = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users_wp if u.get('name') and u.get('email')]
             user_options_wp = sorted(user_options_wp)
-            user_options_wp.insert(0, "Select User...")
+
             c1, c2 = st.columns(2)
             with c1:
                 new_level = st.selectbox("Level", [1, 2, 3], 
@@ -2977,6 +2977,8 @@ def page_wp():
             ]
             new_depts = st.multiselect("Department Access (leave empty for All Departments)", all_departments, placeholder="Choose departments or leave empty for All")
             if st.form_submit_button("➕ Add Person(s) to Workflow", use_container_width=True, type="primary"):
+                st.write("DEBUG: Form submitted")  # ADD THIS
+                st.write("DEBUG: Selected users:", selected_users_wp)  # ADD THIS
                 if selected_users_wp:
                     added_count = 0
                     for user_str in selected_users_wp:
