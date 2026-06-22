@@ -2900,19 +2900,8 @@ def page_wp():
             with c1:
                 new_level = st.selectbox("Level", [1, 2, 3], 
                     format_func=lambda x: {1: "Level 1 — Authorization", 2: "Level 2 — Confirmation", 3: "Level 3 — Approval"}[x])
-                selected_user_wp = st.selectbox("Select Person*", user_options_wp, key="wf_select_user")
-            
             with c2:
-                if selected_user_wp != "Select User..." and "(" in selected_user_wp:
-                    parts = selected_user_wp.split("(")
-                    auto_name = parts[0].strip()
-                    auto_email = parts[1].replace(")","").strip()
-                else:
-                    auto_name = ""
-                    auto_email = ""
-                
-                new_name = st.text_input("Full Name*", value=auto_name, key="wf_name")
-                new_email = st.text_input("Email Address*", value=auto_email, key="wf_email")
+                selected_user_wp = st.selectbox("Select Person*", user_options_wp, key="wf_select_user")
             
             all_departments = [
                 "Engineering — Electrical", "Engineering — HVAC", "Engineering — Plumbing",
@@ -2929,8 +2918,12 @@ def page_wp():
                                        placeholder="Choose departments or leave empty for All")
             
             if st.form_submit_button("➕ Add Person to Workflow", use_container_width=True, type="primary"):
-                if new_name and new_email:
+                if selected_user_wp != "Select User..." and "(" in selected_user_wp:
+                    parts = selected_user_wp.split("(")
+                    new_name = parts[0].strip()
+                    new_email = parts[1].replace(")","").strip()
                     dept_filter = new_depts if new_depts else ["All Departments"]
+                    
                     DB.insert("workflow_config", {
                         "facility_code": fc,
                         "workflow_type": "work_permit",
@@ -2944,7 +2937,7 @@ def page_wp():
                     st.balloons()
                     st.rerun()
                 else:
-                    st.error("⚠️ Name and Email are required")
+                    st.error("⚠️ Please select a person from the dropdown")
 
 # ============================================
 # RAISE TICKET — AI-POWERED + MY TICKETS
