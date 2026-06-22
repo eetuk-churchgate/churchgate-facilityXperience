@@ -8035,45 +8035,286 @@ def page_cs():
 
 
 # ============================================
-# INCIDENT CHECK (FULL)
+# INCIDENT INTELLIGENCE — COMMAND & CONTROL TOWER
 # ============================================
 def page_ic():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 🚨 Incident Intelligence — {info.get("full_name",fc)}')
-    tab1,tab2=st.tabs(["📋 View Incidents","➕ Report Incident"])
-    with tab1:
-        inc=DB.get_all("incidents",fc,50)
-        if inc:st.dataframe(pd.DataFrame(inc),use_container_width=True,hide_index=True)
-        else:st.success("✅ No incidents reported")
-    with tab2:
-        with st.form("inc_form"):
-            st.markdown("### Report New Incident")
-            c1,c2=st.columns(2)
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    user_name = st.session_state.get("user_name", "User")
+    user_email = st.session_state.get("user", {}).get("email", "")
+    is_admin = user_role in ["admin", "approver", "super_admin"]
+    is_fm_director = user_role in ["admin", "super_admin", "sr_management"]
+    is_manager = user_role in ["manager", "sr_manager", "admin", "super_admin"]
+    
+    st.markdown(f'## 🚨 Incident Command — {info.get("full_name", fc)}')
+    
+    from datetime import timezone, timedelta
+    wat_now = datetime.now(timezone(timedelta(hours=1)))
+    today = wat_now.date()
+    
+    inc_data = supabase.table("incidents").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(200).execute()
+    inc_df = pd.DataFrame(inc_data.data) if inc_data.data else pd.DataFrame()
+    
+    total_inc = len(inc_df)
+    active_inc = len(inc_df[~inc_df["status"].isin(["closed","disputed"])]) if total_inc > 0 else 0
+    critical_inc = len(inc_df[(inc_df["severity"] == "critical") & (~inc_df["status"].isin(["closed","disputed"]))]) if total_inc > 0 else 0
+    life_safety = len(inc_df[(inc_df["life_safety_flag"] == True) & (~inc_df["status"].isin(["closed","disputed"]))]) if total_inc > 0 else 0
+    tenant_impacted = len(inc_df[(inc_df["tenant_impact"] == True) & (~inc_df["status"].isin(["closed","disputed"]))]) if total_inc > 0 else 0
+    
+    # ============================================
+    # 🟥 TOP RIBBON
+    # ============================================
+    st.markdown("### 🟥 Incident Pulse Ribbon")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        color = "#EF4444" if critical_inc > 0 else "#F59E0B" if active_inc > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Active</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{active_inc}</div></div>""", unsafe_allow_html=True)
+    with c2:
+        color = "#EF4444" if life_safety > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Life Safety</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{life_safety}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        color = "#EF4444" if critical_inc > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Critical</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{critical_inc}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Tenants Impacted</div><div style="font-size:1.3rem;font-weight:800;color:#8B5CF6;">{tenant_impacted}</div></div>""", unsafe_allow_html=True)
+    with c5:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Total</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6;">{total_inc}</div></div>""", unsafe_allow_html=True)
+    with c6:
+        reopened = len(inc_df[inc_df["reopened_count"] > 0]) if total_inc > 0 else 0
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Reopened</div><div style="font-size:1.3rem;font-weight:800;color:#F59E0B;">{reopened}</div></div>""", unsafe_allow_html=True)
+    
+    if life_safety > 0:
+        st.error(f"🚨 **LIFE SAFETY:** {life_safety} active incidents involve life safety risk. Immediate attention required!")
+    if critical_inc > 0:
+        st.error(f"🔴 **CRITICAL:** {critical_inc} critical incidents active.")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TABS
+    # ============================================
+    tabs = st.tabs(["📋 Active Incidents", "➕ Report Incident", "📊 All Incidents", "📈 Analytics", "📄 Reports"])
+    
+    # ============================================
+    # TAB 0: ACTIVE INCIDENTS
+    # ============================================
+    with tabs[0]:
+        st.markdown("### 📋 Active Incident Queue")
+        
+        active_df = inc_df[~inc_df["status"].isin(["closed","disputed"])] if total_inc > 0 else pd.DataFrame()
+        
+        if len(active_df) == 0:
+            st.success("✅ No active incidents.")
+        else:
+            for _, inc in active_df.iterrows():
+                status = inc.get("status","created")
+                severity = inc.get("severity","minor")
+                sev_color = "#EF4444" if severity == "critical" else "#F59E0B" if severity == "major" else "#3B82F6" if severity == "minor" else "#6B7280"
+                sc = {"created":"#3B82F6","acknowledged":"#F59E0B","responding":"#8B5CF6","contained":"#06B6D4","resolving":"#F59E0B","closed":"#10B981"}.get(status,"#3B82F6")
+                inc_id = inc["id"]
+                
+                elapsed = ""
+                if inc.get("created_at"):
+                    try:
+                        elapsed_time = wat_now - pd.to_datetime(inc["created_at"])
+                        hours = int(elapsed_time.total_seconds() // 3600)
+                        mins = int((elapsed_time.total_seconds() % 3600) // 60)
+                        elapsed = f"{hours:02d}:{mins:02d}:{int(elapsed_time.total_seconds()%60):02d}"
+                    except: pass
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sev_color};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>{inc.get('incident_number','N/A')}</b> — {inc.get('title','')[:80]}
+                            <br><span style="font-size:0.65rem;color:#666;">📍 {inc.get('location_building','')} / {inc.get('location_floor','')} | ⏱️ {elapsed} elapsed</span>
+                            {f'<br><span style="font-size:0.6rem;color:#EF4444;">⚠️ Life Safety | 🏢 {inc.get("tenant_name","")}</span>' if inc.get('life_safety_flag') else ''}
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="background:{sev_color};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{severity.upper()}</span>
+                            <br><span style="background:{sc};color:white;padding:2px 8px;border-radius:12px;font-size:0.55rem;">{status.upper()}</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Action buttons based on status
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    if status == "created" and (is_admin or is_manager):
+                        if st.button("✅ Acknowledge", key=f"ack_{inc_id}", use_container_width=True):
+                            supabase.table("incidents").update({"status":"acknowledged","acknowledged_at":wat_now.isoformat(),"acknowledged_by":user_name}).eq("id",inc_id).execute()
+                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"acknowledged","description":"Incident acknowledged","performed_by":user_name}).execute()
+                            st.success("✅ Acknowledged!"); st.rerun()
+                with c2:
+                    if status in ["acknowledged","created"] and (is_admin or is_manager):
+                        if st.button("🚀 Respond", key=f"resp_{inc_id}", use_container_width=True):
+                            supabase.table("incidents").update({"status":"responding","responded_at":wat_now.isoformat(),"responded_by":user_name}).eq("id",inc_id).execute()
+                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"responding","description":"Team responding","performed_by":user_name}).execute()
+                            st.success("🚀 Responding!"); st.rerun()
+                with c3:
+                    if status == "responding":
+                        if st.button("🛡️ Contain", key=f"cont_{inc_id}", use_container_width=True):
+                            supabase.table("incidents").update({"status":"contained","contained_at":wat_now.isoformat(),"contained_by":user_name}).eq("id",inc_id).execute()
+                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"contained","description":"Incident contained","performed_by":user_name}).execute()
+                            st.success("🛡️ Contained!"); st.rerun()
+                with c4:
+                    if status in ["contained","responding"] and (is_admin or is_manager):
+                        if st.button("✅ Close", key=f"close_{inc_id}", use_container_width=True):
+                            supabase.table("incidents").update({"status":"closed","closed_at":wat_now.isoformat(),"closed_by":user_name}).eq("id",inc_id).execute()
+                            supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"closed","description":"Incident closed","performed_by":user_name}).execute()
+                            try:
+                                send_email_notification(user_email,f"✅ Incident Closed — {inc.get('incident_number','')}",f"<h3>Incident Closed</h3><p>{inc.get('title','')}</p>")
+                            except: pass
+                            st.success("✅ Closed!"); st.balloons(); st.rerun()
+    
+    # ============================================
+    # TAB 1: REPORT INCIDENT
+    # ============================================
+    with tabs[1]:
+        st.markdown("### 🚨 Report New Incident")
+        
+        with st.form("report_incident_form"):
+            c1, c2, c3 = st.columns(3)
             with c1:
-                title=st.text_input("Title*");dept=st.selectbox("Department*",[
-    "Engineering — Civil & Structural","Engineering — Electrical","Engineering — HVAC",
-    "Engineering — Plumbing","Engineering — Vertical Transportation (Lifts)",
-    "Engineering — Fire Fighting","Engineering — Utilities & Energy",
-    "Facility Management — Hard Services","Facility Management — Soft Services (Housekeeping)",
-    "Facility Management — FM Operations & Helpdesk","Facility Management — HSSE Safety & Compliance",
-    "Technology Group — Network & Connectivity","Technology Group — Building Technology",
-    "Security — Man Guarding Operations",
-    "Contractor — Clyde Engineering","Contractor — Gates and Shield"
-])
-                itype=st.selectbox("Incident Type",["Safety","Security","Environmental","Equipment Failure","Fire","Water Leak","Power Outage","Other"])
-                sev=st.selectbox("Severity",["low","medium","high","critical"])
-                pri=st.selectbox("Priority",["low","medium","high","critical"])
+                inc_title = st.text_input("Title*", placeholder="e.g., Water Leak - Server Room Floor 14")
+                inc_type = st.selectbox("Type*", ["Fire","Flood/Water Leak","Electrical Failure","HVAC Failure","Elevator Entrapment","Structural","Security Breach","Hazmat","Gas Leak","Power Outage","Other"])
             with c2:
-                loc_b=st.text_input("Building");loc_f=st.text_input("Floor");loc_z=st.text_input("Zone")
-                idate=st.date_input("Incident Date",date.today());itime=st.time_input("Incident Time",datetime.now().time())
-                cat=st.selectbox("Category",["Property Damage","Injury","Near Miss","Environmental","Equipment","Other"])
-            desc=st.text_area("Description*");actions=st.text_area("Immediate Actions Taken")
-            root=st.text_area("Root Cause Analysis (if known)")
-            if st.form_submit_button("🚨 Report Incident",use_container_width=True):
-                if title and desc:
-                    cnt=len(DB.get_all("incidents",fc,1000))
-                    DB.insert("incidents",{"facility_code":fc,"incident_number":f"INC-{fc}-{datetime.now().year}-{str(cnt+1).zfill(4)}","title":title,"department":dept,"type":itype,"severity":sev,"priority":pri,"category":cat,"location_building":loc_b,"location_floor":loc_f,"location_zone":loc_z,"incident_date":str(idate),"incident_time":str(itime),"description":desc,"immediate_actions":actions,"root_cause":root,"status":"reported","reported_at":datetime.now().isoformat(),"reported_by_name":st.session_state.get("user_name","Staff")})
-                    st.success("Incident reported!");st.rerun()
+                inc_severity = st.selectbox("Severity*", ["critical","major","minor","monitoring"])
+                inc_category = st.selectbox("Category", ["Life Safety","Property Damage","Business Continuity","Environmental","Equipment Failure","Security","Other"])
+            with c3:
+                inc_location_bldg = st.selectbox("Building", ["CT — Office Tower","SAT — Residential Tower","IP — Intermediate Parking","RC — Recreation Center","External"])
+                inc_location_floor = st.text_input("Floor/Zone")
+            
+            inc_desc = st.text_area("Description*", height=80)
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                inc_life_safety = st.checkbox("Life Safety Risk?")
+                inc_injury = st.checkbox("Injury Reported?")
+            with c2:
+                inc_tenant_impact = st.checkbox("Tenant Impact?")
+                inc_tenant_name = st.text_input("Tenant Name") if inc_tenant_impact else ""
+            with c3:
+                inc_biz_impact = st.checkbox("Business Continuity Impact?")
+            
+            inc_immediate = st.text_area("Immediate Actions Taken", height=60)
+            
+            if st.form_submit_button("🚨 REPORT INCIDENT", use_container_width=True, type="primary"):
+                if inc_title and inc_desc:
+                    inc_count = total_inc + 1
+                    inc_number = f"INC-{fc}-{today.strftime('%Y%m%d')}-{str(inc_count).zfill(4)}"
+                    
+                    result = supabase.table("incidents").insert({
+                        "facility_code":fc,"incident_number":inc_number,"title":inc_title,
+                        "description":inc_desc,"incident_type":inc_type,"category":inc_category,
+                        "severity":inc_severity,"status":"created",
+                        "location_building":inc_location_bldg,"location_floor":inc_location_floor,
+                        "reported_by":user_name,"incident_date":str(today),"incident_time":str(wat_now.time()),
+                        "tenant_impact":inc_tenant_impact,"tenant_name":inc_tenant_name if inc_tenant_impact else None,
+                        "life_safety_flag":inc_life_safety,"injury_reported":inc_injury,
+                        "business_continuity_impact":inc_biz_impact,
+                        "immediate_actions":inc_immediate,"created_at":wat_now.isoformat()
+                    }).execute()
+                    
+                    if result.data:
+                        inc_id = result.data[0]["id"]
+                        supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"created","description":"Incident reported","performed_by":user_name}).execute()
+                        
+                        try:
+                            send_email_notification(user_email,f"🚨 New Incident — {inc_number}",f"<h3>Incident Reported</h3><p><b>{inc_title}</b></p><p>Severity: {inc_severity.upper()}</p><p>Location: {inc_location_bldg}</p>")
+                        except: pass
+                        
+                        st.session_state.incident_reported = True
+                        st.session_state.incident_number = inc_number
+                        st.rerun()
+                else:
+                    st.error("⚠️ Title and Description are required")
+    
+    # Success message
+    if st.session_state.get("incident_reported", False):
+        st.success(f"✅ Incident {st.session_state.get('incident_number','')} reported!")
+        st.balloons()
+        st.session_state.incident_reported = False
+    
+    # ============================================
+    # TAB 2: ALL INCIDENTS
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 📊 All Incidents")
+        
+        if total_inc == 0:
+            st.info("No incidents recorded.")
+        else:
+            for _, inc in inc_df.head(30).iterrows():
+                sev_color = {"critical":"#EF4444","major":"#F59E0B","minor":"#3B82F6","monitoring":"#6B7280"}.get(inc.get("severity","minor"),"#6B7280")
+                st.markdown(f"""
+                <div style="background:white;border-left:3px solid {sev_color};border-radius:8px;padding:0.6rem;margin:0.2rem 0;font-size:0.75rem;">
+                    <b>{inc.get('incident_number','')}</b> — {inc.get('title','')[:80]}
+                    <br><span style="font-size:0.65rem;color:#666;">{inc.get('status','').upper()} | 📅 {str(inc.get('incident_date',''))}</span>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ============================================
+    # TAB 3: ANALYTICS
+    # ============================================
+    with tabs[3]:
+        st.markdown("### 📈 Incident Analytics")
+        
+        if total_inc > 0:
+            c1, c2 = st.columns(2)
+            with c1:
+                sev_counts = inc_df["severity"].value_counts()
+                fig1 = px.pie(values=sev_counts.values, names=sev_counts.index, title="By Severity", color_discrete_sequence=["#EF4444","#F59E0B","#3B82F6","#6B7280"])
+                fig1.update_layout(height=350)
+                st.plotly_chart(fig1, use_container_width=True)
+            with c2:
+                type_counts = inc_df["incident_type"].value_counts().head(8)
+                fig2 = px.bar(x=type_counts.values, y=type_counts.index, orientation='h', title="By Type", color=type_counts.values)
+                fig2.update_layout(height=350)
+                st.plotly_chart(fig2, use_container_width=True)
+        else:
+            st.info("No data for analytics.")
+    
+    # ============================================
+    # TAB 4: REPORTS
+    # ============================================
+    with tabs[4]:
+        st.markdown("### 📄 Incident Reports")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("📄 HTML Report", key="inc_html_btn", use_container_width=True, type="primary"):
+                logo_b64 = get_logo_base64()
+                logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="30">' if logo_b64 else ''
+                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Incident Report</title><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}</style></head><body><h1>Incident Intelligence Report</h1><p>{info.get('full_name',fc)} | {today}</p><table><tr><th>ID</th><th>Title</th><th>Type</th><th>Severity</th><th>Status</th></tr>"""
+                for _,inc in inc_df.head(30).iterrows():
+                    html += f"<tr><td>{inc.get('incident_number','')}</td><td>{inc.get('title','')[:60]}</td><td>{inc.get('incident_type','')}</td><td>{inc.get('severity','').upper()}</td><td>{inc.get('status','').upper()}</td></tr>"
+                html += "</table></body></html>"
+                st.download_button("📥 Download HTML", html, f"incident_report_{today}.html", "text/html", use_container_width=True)
+        with c2:
+            if st.button("📕 PDF Report", key="inc_pdf_btn", use_container_width=True):
+                try:
+                    from fpdf import FPDF
+                    pdf = FPDF('L','mm','A4'); pdf.add_page()
+                    pdf.set_font('Helvetica','B',16); pdf.set_text_color(204,0,0)
+                    pdf.cell(0,10,safe_text('Incident Intelligence Report'),0,1)
+                    pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
+                    pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {today}'),0,1); pdf.ln(4)
+                    pdf.set_font('Helvetica','B',7); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
+                    for h,w in zip(['ID','Title','Type','Severity','Status'],[35,85,40,30,30]): pdf.cell(w,5,h,1,0,'C',True)
+                    pdf.ln(); pdf.set_font('Helvetica','',7); pdf.set_text_color(0,0,0)
+                    for _,inc in inc_df.head(40).iterrows():
+                        pdf.cell(35,4,safe_text(inc.get('incident_number','')),1,0)
+                        pdf.cell(85,4,safe_text(str(inc.get('title',''))[:38]),1,0)
+                        pdf.cell(40,4,safe_text(inc.get('incident_type','')),1,0)
+                        pdf.cell(30,4,safe_text(inc.get('severity','').upper()),1,0)
+                        pdf.cell(30,4,safe_text(inc.get('status','').upper()),1,0)
+                        pdf.ln()
+                    pdf_file = f"/tmp/incident_report_{today}.pdf"; pdf.output(pdf_file)
+                    with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"incident_report_{today}.pdf", "application/pdf", use_container_width=True)
+                except Exception as e: st.error(f"PDF: {str(e)[:80]}")
 
 
 # ============================================
