@@ -2999,27 +2999,26 @@ def page_wp():
                             new_email = parts[1].replace(")","").strip()
                             dept_filter = new_depts if new_depts else ["All Departments"]
                             
-                            # Test: try the EXACT same format as the SQL that worked
-                            test_result = supabase.table("workflow_config").insert({
-                                "facility_code": "WTC",
-                                "workflow_type": "work_permit", 
-                                "level_number": int(new_level),
-                                "level_name": str({1: "Authorizer", 2: "Confirmer", 3: "Approver"}[new_level]),
-                                "person_name": str(new_name),
-                                "person_email": str(new_email),
-                                "department_filter": '["All Departments"]',
-                                "is_active": True
-                            }).execute()
-                            
-                            st.write(f"Result for {new_name}:", test_result.data)
-                            if test_result.data:
-                                added_count += 1
+                            try:
+                                result = supabase.table("workflow_config").insert({
+                                    "facility_code": fc,
+                                    "workflow_type": "work_permit",
+                                    "level_number": new_level,
+                                    "level_name": {1: "Authorizer", 2: "Confirmer", 3: "Approver"}[new_level],
+                                    "person_name": new_name,
+                                    "person_email": new_email,
+                                    "department_filter": json.dumps(dept_filter),
+                                    "is_active": True
+                                }).execute()
+                                if result.data:
+                                    added_count += 1
+                            except Exception as e:
+                                st.error(f"Error adding {new_name}: {str(e)[:100]}")
                     
                     if added_count > 0:
-                        st.success(f"✅ {added_count} person(s) added!")
-                        st.rerun()
+                        st.success(f"✅ {added_count} person(s) added!"); st.balloons(); st.rerun()
                     else:
-                        st.error("Failed to add anyone.")
+                        st.error("Failed to add. Check database permissions.")
                 else:
                     st.error("⚠️ Please select at least one person")
 
