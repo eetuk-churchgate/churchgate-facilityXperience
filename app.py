@@ -8386,37 +8386,7 @@ def page_ic():
                 user_options = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users if u.get('name') and u.get('email')]
                 user_options.insert(0, "Select User...")
                 
-                for level in range(1, 7):
-                    existing_config = [e for e in (existing.data or []) if e["escalation_level"] == level]
-                    current_user_str = ""
-                    if existing_config:
-                        current_user_str = f"{existing_config[0].get('escalate_to_name','')} ({existing_config[0].get('escalate_to_email','')})"
-                    current_sla = existing_config[0].get("sla_minutes",15*level) if existing_config else 15*level
-                    
-                    default_idx = user_options.index(current_user_str) if current_user_str in user_options else 0
-                    
-                    c1, c2 = st.columns([3,1])
-                    with c1: 
-                        selected_user = st.selectbox(f"L{level} Escalate To", user_options, index=default_idx, key=f"esc_{sev}_{level}_user")
-                    with c2: 
-                        new_sla = st.number_input(f"SLA (min)", value=current_sla, min_value=5, key=f"esc_{sev}_{level}_sla")
-                    
-                    # Store selected user info in session state for save
-                    if selected_user != "Select User..." and "(" in selected_user:
-                        parts = selected_user.split("(")
-                        st.session_state[f"esc_{sev}_{level}_name"] = parts[0].strip()
-                        st.session_state[f"esc_{sev}_{level}_email"] = parts[1].replace(")","").strip()
-                    else:
-                        st.session_state[f"esc_{sev}_{level}_name"] = ""
-                        st.session_state[f"esc_{sev}_{level}_email"] = ""
-                
-                if st.button(f"💾 Save {sev.upper()} Escalation", key=f"save_{sev}", use_container_width=True):
-                    for level in range(1, 7):
-                        name = st.session_state.get(f"esc_{sev}_{level}_name","")
-                        email = st.session_state.get(f"esc_{sev}_{level}_email","")
-                        sla = st.session_state.get(f"esc_{sev}_{level}_sla",15)
-                        
-                        if name and email:
+                if name and email:
                             supabase.table("incident_escalation").delete().eq("facility_code",fc).eq("severity",sev).eq("escalation_level",level).execute()
                             supabase.table("incident_escalation").insert({
                                 "facility_code":fc,"severity":sev,"escalation_level":level,
