@@ -2891,7 +2891,6 @@ def page_wp():
         with st.form("wf_add_person"):
             st.markdown("### ➕ Add Person to Workflow")
             
-            # Get all users for dropdown
             all_users_wp = DB.get_users()
             user_options_wp = [f"{u.get('name','')} ({u.get('email','')})" for u in all_users_wp if u.get('name') and u.get('email')]
             user_options_wp = sorted(user_options_wp)
@@ -2904,7 +2903,6 @@ def page_wp():
                 selected_user_wp = st.selectbox("Select Person*", user_options_wp, key="wf_select_user")
             
             with c2:
-                # Auto-fill from selection
                 if selected_user_wp != "Select User..." and "(" in selected_user_wp:
                     parts = selected_user_wp.split("(")
                     auto_name = parts[0].strip()
@@ -2923,9 +2921,6 @@ def page_wp():
                 "Facility Management — FM Operations & Helpdesk", "Facility Management — Fitout Works",
                 "Facility Management — HSSE Safety & Compliance",
                 "Technology Group — Network & Connectivity", "Technology Group — Building Technology",
-                "Technology Group — Access Control", "Technology Group — Automation",
-                "Technology Group — BMS", "Technology Group — CCTV",
-                "Technology Group — Fire Alarm & Voice Evac", "Technology Group — MDTH (DSTV)",
                 "Security — Man Guarding Operations",
                 "Contractor — Clyde Engineering", "Contractor — Gates and Shield"
             ]
@@ -2948,8 +2943,6 @@ def page_wp():
                     st.success(f"✅ {new_name} added to Level {new_level}!")
                     st.balloons()
                     st.rerun()
-                else:
-                    st.error("⚠️ Name and Email are required")
                 else:
                     st.error("⚠️ Name and Email are required")
 
