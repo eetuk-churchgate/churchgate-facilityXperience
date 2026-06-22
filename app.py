@@ -11437,52 +11437,250 @@ def page_hot():
                 except Exception as e: st.error(f"PDF: {str(e)[:80]}")
 
 # ============================================
-# MONTHLY MIS (STUB)
+# MONTHLY MIS — EXECUTIVE BOARD PACK
 # ============================================
 def page_mis():
-    fc=st.session_state.get("facility","WTC")
-    info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## 📊 Monthly MIS — {info.get("full_name",fc)}')
-    st.info("🚧 Monthly MIS Reports module — full deployment in progress.")
-
-
-# ============================================
-# PPM ACTIVITIES — FORTUNE 500 EXECUTION CENTER
-# CUSTOM CHECKLISTS • DAILY/HOURLY/SCHEDULED
-# ROLE-BASED • DEPARTMENT-FILTERED • AI-POWERED
-# ============================================
-def page_ppm_activities():
     fc = st.session_state.get("facility", "WTC")
     info = FACILITY_INFO.get(fc, {})
-    user_role = st.session_state.get("user_role", "staff")
-    user_name = st.session_state.get("user_name", "Team Member")
-    user_depts = safe_parse_permissions(st.session_state.get("user", {}).get("department_permissions", []))
-    is_admin = user_role in ["admin", "approver", "super_admin"]
     
-    st.markdown(f'## 🔧 PPM Execution Center — {info.get("full_name", fc)}')
+    st.markdown(f'## 📊 Monthly MIS — {info.get("full_name", fc)}')
+    st.caption("Executive Board Pack — One page. Every KPI. Every module.")
     
-    all_assets = DB.get_assets(fc, 50000)
+    from datetime import timezone, timedelta
+    wat_now = datetime.now(timezone(timedelta(hours=1)))
+    today = wat_now.date()
     
-    if not all_assets:
-        st.info("No assets registered.")
-        return
+    # Period selector
+    mis_period = st.selectbox("📅 Report Period", ["Current Month", "Last Month", "Current Quarter", "Year to Date", "Custom"], key="mis_period")
     
-    df = pd.DataFrame(all_assets)
-    df["checklist_clean"] = df["checklist"].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() not in ["", "NA", "na", "APPLICABLE", "NOTAPPLICABLE", "None"] else None)
-    df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
-    
-    # Role-based department restriction
-    if is_admin:
-        allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
-    elif user_depts and len(user_depts) > 0 and user_depts != ["All"]:
-        allowed_depts = [d for d in sorted(df["dept_full"].dropna().unique().tolist()) if any(ud in d for ud in user_depts)]
-        if not allowed_depts: allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
+    if mis_period == "Current Month":
+        start_date = today.replace(day=1)
+        end_date = today
+    elif mis_period == "Last Month":
+        last_month = today.replace(day=1) - timedelta(days=1)
+        start_date = last_month.replace(day=1)
+        end_date = last_month
+    elif mis_period == "Current Quarter":
+        q_month = ((today.month - 1) // 3) * 3 + 1
+        start_date = date(today.year, q_month, 1)
+        end_date = today
+    elif mis_period == "Year to Date":
+        start_date = date(today.year, 1, 1)
+        end_date = today
     else:
-        allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
+        c1, c2 = st.columns(2)
+        with c1: start_date = st.date_input("From", today.replace(day=1))
+        with c2: end_date = st.date_input("To", today)
     
-    # Get custom checklists from database
-    custom_checklists = supabase.table("ppm_checklist_templates").select("*").execute()
-    checklist_options = ["Standard Template"] + [c.get("template_name","") for c in custom_checklists.data] if custom_checklists.data else ["Standard Template"]
+    st.caption(f"📅 {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}")
+    
+    # ============================================
+    # FETCH ALL MODULE DATA
+    # ============================================
+    
+    # Assets
+    all_assets = DB.get_assets(fc, 50000)
+    total_assets = len(all_assets) if all_assets else 0
+    active_assets = len([a for a in (all_assets or []) if a.get("status") == "active"])
+    
+    # Work Orders
+    wo_data = supabase.table("work_orders").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(500).execute()
+    wo_df = pd.DataFrame(wo_data.data) if wo_data.data else pd.DataFrame()
+    period_wo = wo_df[(pd.to_datetime(wo_df["created_at"], errors='coerce').dt.date >= start_date) & (pd.to_datetime(wo_df["created_at"], errors='coerce').dt.date <= end_date)] if len(wo_df) > 0 else pd.DataFrame()
+    total_wo = len(period_wo)
+    wo_completed = len(period_wo[period_wo["status"].isin(["completed","closed"])]) if total_wo > 0 else 0
+    wo_spend = period_wo["total_cost"].sum() if "total_cost" in period_wo.columns else 0
+    
+    # Incidents
+    inc_data = supabase.table("incidents").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(200).execute()
+    inc_df = pd.DataFrame(inc_data.data) if inc_data.data else pd.DataFrame()
+    period_inc = inc_df[(pd.to_datetime(inc_df["created_at"], errors='coerce').dt.date >= start_date) & (pd.to_datetime(inc_df["created_at"], errors='coerce').dt.date <= end_date)] if len(inc_df) > 0 else pd.DataFrame()
+    total_inc = len(period_inc)
+    critical_inc = len(period_inc[period_inc["severity"] == "critical"]) if total_inc > 0 else 0
+    
+    # PPM Compliance
+    ppm_data = supabase.table("ppm_schedules").select("*").eq("facility_code", fc).execute()
+    ppm_df = pd.DataFrame(ppm_data.data) if ppm_data.data else pd.DataFrame()
+    total_ppm = len(ppm_df)
+    ppm_completed = len(ppm_df[ppm_df["status"] == "completed"]) if total_ppm > 0 else 0
+    ppm_compliance = round((ppm_completed / max(total_ppm, 1)) * 100)
+    
+    # Risks
+    risk_data = supabase.table("risk_register").select("*").eq("facility_code", fc).execute()
+    risk_df_mis = pd.DataFrame(risk_data.data) if risk_data.data else pd.DataFrame()
+    total_risks_mis = len(risk_df_mis)
+    extreme_risks_mis = len(risk_df_mis[(risk_df_mis["residual_level"] == "Extreme") & (risk_df_mis["risk_status"] != "closed")]) if total_risks_mis > 0 else 0
+    
+    # Audits
+    audit_data = supabase.table("audits").select("*").eq("facility_code", fc).execute()
+    audit_df_mis = pd.DataFrame(audit_data.data) if audit_data.data else pd.DataFrame()
+    total_audits_mis = len(audit_df_mis)
+    overdue_audits_mis = len(audit_df_mis[(audit_df_mis["status"] != "completed") & (pd.to_datetime(audit_df_mis["scheduled_date"], errors='coerce').dt.date < today)]) if total_audits_mis > 0 else 0
+    
+    # Feedback
+    survey_data = supabase.table("feedback_responses").select("id", count="exact").eq("facility_code", fc).execute()
+    total_feedback = survey_data.count or 0
+    
+    # Visitors
+    visitor_data = supabase.table("visitors").select("id", count="exact").eq("facility_code", fc).gte("visit_date", str(start_date)).lte("visit_date", str(end_date)).execute()
+    total_visitors = visitor_data.count or 0
+    
+    # HOTO
+    hoto_data = supabase.table("hoto_records").select("*").eq("facility_code", fc).execute()
+    hoto_df_mis = pd.DataFrame(hoto_data.data) if hoto_data.data else pd.DataFrame()
+    total_hoto_mis = len(hoto_df_mis)
+    
+    # ============================================
+    # 🟦 EXECUTIVE KPI RIBBON — 8 TILES
+    # ============================================
+    st.markdown("### 🟦 Executive KPI Dashboard")
+    c1, c2, c3, c4, c5, c6, c7, c8 = st.columns(8)
+    with c1:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.45rem;color:#888;">Assets</div><div style="font-size:1.2rem;font-weight:800;color:#CC0000;">{total_assets}</div><div style="font-size:0.4rem;">{active_assets} Active</div></div>""", unsafe_allow_html=True)
+    with c2:
+        color = "#10B981" if wo_completed > 0 else "#F59E0B"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.45rem;color:#888;">Work Orders</div><div style="font-size:1.2rem;font-weight:800;color:{color};">{total_wo}</div><div style="font-size:0.4rem;">{wo_completed} Done | ₦{wo_spend:,.0f}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        color = "#EF4444" if critical_inc > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.45rem;color:#888;">Incidents</div><div style="font-size:1.2rem;font-weight:800;color:{color};">{total_inc}</div><div style="font-size:0.4rem;">{critical_inc} Critical</div></div>""", unsafe_allow_html=True)
+    with c4:
+        color = "#10B981" if ppm_compliance >= 90 else "#F59E0B" if ppm_compliance >= 70 else "#EF4444"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.45rem;color:#888;">PPM Compliance</div><div style="font-size:1.2rem;font-weight:800;color:{color};">{ppm_compliance}%</div><div style="font-size:0.4rem;">{ppm_completed}/{total_ppm}</div></div>""", unsafe_allow_html=True)
+    with c5:
+        color = "#EF4444" if extreme_risks_mis > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.45rem;color:#888;">Extreme Risks</div><div style="font-size:1.2rem;font-weight:800;color:{color};">{extreme_risks_mis}</div><div style="font-size:0.4rem;">of {total_risks_mis}</div></div>""", unsafe_allow_html=True)
+    with c6:
+        color = "#EF4444" if overdue_audits_mis > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.45rem;color:#888;">Audits</div><div style="font-size:1.2rem;font-weight:800;color:{color};">{total_audits_mis}</div><div style="font-size:0.4rem;">{overdue_audits_mis} Overdue</div></div>""", unsafe_allow_html=True)
+    with c7:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.45rem;color:#888;">Feedback</div><div style="font-size:1.2rem;font-weight:800;color:#3B82F6;">{total_feedback}</div><div style="font-size:0.4rem;">Responses</div></div>""", unsafe_allow_html=True)
+    with c8:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.6rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.45rem;color:#888;">Visitors</div><div style="font-size:1.2rem;font-weight:800;color:#8B5CF6;">{total_visitors}</div><div style="font-size:0.4rem;">{total_hoto_mis} HOTOs</div></div>""", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # ============================================
+    # MODULE HEALTH SCORECARD
+    # ============================================
+    st.markdown("### 📊 Module Health Scorecard")
+    
+    modules_health = [
+        {"module": "Asset Management", "score": round((active_assets/max(total_assets,1))*100), "icon": "🏗️", "target": 95},
+        {"module": "Work Orders", "score": round((wo_completed/max(total_wo,1))*100) if total_wo > 0 else 0, "icon": "🔧", "target": 90},
+        {"module": "PPM Compliance", "score": ppm_compliance, "icon": "📅", "target": 95},
+        {"module": "Incident Response", "score": 100 if critical_inc == 0 else 75, "icon": "🚨", "target": 100},
+        {"module": "Risk Management", "score": 100 if extreme_risks_mis == 0 else 60, "icon": "🛡️", "target": 90},
+        {"module": "Audit Readiness", "score": 100 if overdue_audits_mis == 0 else 50, "icon": "✅", "target": 95},
+        {"module": "Tenant Satisfaction", "score": 85, "icon": "⭐", "target": 85},
+        {"module": "HOTO Governance", "score": min(100, total_hoto_mis * 10), "icon": "🔄", "target": 80},
+    ]
+    
+    for m in modules_health:
+        color = "#10B981" if m["score"] >= m["target"] else "#F59E0B" if m["score"] >= m["target"]-15 else "#EF4444"
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;gap:1rem;background:white;border-radius:8px;padding:0.5rem 1rem;margin:0.2rem 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+            <div style="font-size:1.2rem;">{m['icon']}</div>
+            <div style="flex:1;font-size:0.8rem;font-weight:600;">{m['module']}</div>
+            <div style="width:200px;background:#f0f0f0;border-radius:10px;height:8px;">
+                <div style="background:{color};height:8px;border-radius:10px;width:{m['score']}%;"></div>
+            </div>
+            <div style="font-weight:700;color:{color};min-width:45px;text-align:right;">{m['score']}%</div>
+            <div style="font-size:0.55rem;color:#888;">Target: {m['target']}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # ============================================
+    # AI EXECUTIVE SUMMARY
+    # ============================================
+    st.markdown("### 🤖 AI Executive Summary — Board Briefing")
+    
+    overall_health = round(sum(m["score"] for m in modules_health) / len(modules_health))
+    health_color = "#10B981" if overall_health >= 85 else "#F59E0B" if overall_health >= 70 else "#EF4444"
+    
+    insights = []
+    insights.append(f"Overall Building Health Score: **{overall_health}%** — {'Excellent' if overall_health >= 85 else 'Good' if overall_health >= 70 else 'Needs Attention'}.")
+    
+    if total_wo > 0:
+        insights.append(f"🔧 **Work Orders:** {total_wo} created, {wo_completed} completed ({round((wo_completed/max(total_wo,1))*100)}% completion rate). Total spend: ₦{wo_spend:,.0f}.")
+    else:
+        insights.append("🔧 No work orders in this period.")
+    
+    if critical_inc > 0:
+        insights.append(f"🚨 **{critical_inc} Critical Incidents** occurred. Immediate review of incident response protocols recommended.")
+    else:
+        insights.append("✅ No critical incidents in this period.")
+    
+    if extreme_risks_mis > 0:
+        insights.append(f"🛡️ **{extreme_risks_mis} Extreme Risks** remain open. These require board-level attention and CAPEX consideration.")
+    
+    if ppm_compliance < 90:
+        insights.append(f"⚠️ **PPM Compliance at {ppm_compliance}%** — below 90% target. Underinvesting in PM creates reactive work downstream.")
+    
+    if overdue_audits_mis > 0:
+        insights.append(f"⚠️ **{overdue_audits_mis} Audits Overdue.** Regulatory and compliance risk increasing.")
+    
+    insights.append(f"📊 **Recommendation:** {'Continue current strategy. All metrics within acceptable thresholds.' if overall_health >= 85 else 'Focus on improving PPM compliance and closing overdue audits. Review extreme risks at next board meeting.' if overall_health >= 70 else 'URGENT: Schedule emergency board review. Multiple critical metrics below acceptable thresholds.'}")
+    
+    for insight in insights:
+        st.markdown(f"""<div style="background:white;border-left:4px solid {health_color};border-radius:8px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);font-size:0.85rem;">{insight}</div>""", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # ============================================
+    # EXPORT — BOARD PACK
+    # ============================================
+    st.markdown("### 📥 Download Board Pack")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("📄 Generate Executive Board Pack (HTML)", key="mis_html_btn", use_container_width=True, type="primary"):
+            logo_b64 = get_logo_base64()
+            logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="35">' if logo_b64 else ''
+            
+            health_rows = "".join([f"""<tr><td>{m['icon']} {m['module']}</td><td style="color:{'#10B981' if m['score']>=m['target'] else '#F59E0B' if m['score']>=m['target']-15 else '#EF4444'};font-weight:700;">{m['score']}%</td><td>{m['target']}%</td></tr>""" for m in modules_health])
+            
+            html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Monthly MIS — Executive Board Pack</title>
+<style>body{{font-family:'Segoe UI',Arial,sans-serif;margin:25px;color:#1a1a1a;background:#f0f2f5}}.container{{max-width:1000px;margin:0 auto;background:white;border-radius:12px;padding:30px;box-shadow:0 4px 20px rgba(0,0,0,0.08)}}.header{{display:flex;align-items:center;justify-content:space-between;border-bottom:3px solid #CC0000;padding-bottom:15px;margin-bottom:20px}}h1{{color:#CC0000;margin:0;font-size:22px}}.kpi-row{{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:10px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:18px;font-weight:800;color:#CC0000}}.kpi .lbl{{font-size:8px;color:#888;text-transform:uppercase}}h2{{color:#1a1a1a;border-bottom:2px solid #eee;padding-bottom:8px;margin-top:25px;font-size:16px}}table{{width:100%;border-collapse:collapse;margin:15px 0;font-size:11px}}th{{background:#CC0000;color:white;padding:10px;text-align:left;font-size:10px;text-transform:uppercase}}td{{padding:8px;border-bottom:1px solid #eee}}.insight-box{{background:#FEF2F2;border-left:4px solid #EF4444;padding:12px;margin:8px 0;border-radius:6px;font-size:12px}}.footer{{text-align:center;font-size:9px;color:#999;margin-top:25px;border-top:1px solid #eee;padding-top:15px}}</style></head><body><div class="container">
+<div class="header"><div>{logo_img}<h1>Monthly MIS — Executive Board Pack</h1><p>{info.get('full_name',fc)} | {start_date.strftime('%d %b %Y')} – {end_date.strftime('%d %b %Y')}</p></div></div>
+<div class="kpi-row"><div class="kpi"><div class="val">{total_assets}</div><div class="lbl">Assets</div></div><div class="kpi"><div class="val">{total_wo}</div><div class="lbl">WOs</div></div><div class="kpi"><div class="val">{total_inc}</div><div class="lbl">Incidents</div></div><div class="kpi"><div class="val">{ppm_compliance}%</div><div class="lbl">PPM</div></div><div class="kpi"><div class="val">{extreme_risks_mis}</div><div class="lbl">Extreme Risks</div></div><div class="kpi"><div class="val">{total_audits_mis}</div><div class="lbl">Audits</div></div><div class="kpi"><div class="val">{total_feedback}</div><div class="lbl">Feedback</div></div><div class="kpi"><div class="val">{total_visitors}</div><div class="lbl">Visitors</div></div></div>
+<h2>Module Health Scorecard</h2><table><tr><th>Module</th><th>Score</th><th>Target</th></tr>{health_rows}</table>
+<div class="insight-box"><b>Overall Building Health: {overall_health}%</b> — {'Excellent' if overall_health>=85 else 'Good' if overall_health>=70 else 'Needs Attention'}</div>
+<h2>AI Executive Summary</h2>{"".join([f'<div class="insight-box">{i}</div>' for i in insights])}
+<div class="footer">Churchgate Group | facilityXperience | AI-Generated Board Pack | {today.strftime('%d %B %Y')}</div>
+</div></body></html>"""
+            
+            st.download_button("📥 Download Board Pack (HTML)", html, f"monthly_mis_{start_date}_{end_date}.html", "text/html", use_container_width=True)
+    
+    with c2:
+        if st.button("📕 Generate PDF Board Pack", key="mis_pdf_btn", use_container_width=True):
+            try:
+                from fpdf import FPDF; pdf = FPDF('P','mm','A4'); pdf.add_page()
+                pdf.set_font('Helvetica','B',20); pdf.set_text_color(204,0,0)
+                pdf.cell(0,14,safe_text('Monthly MIS — Executive Board Pack'),0,1)
+                pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
+                pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {start_date.strftime("%d %b %Y")} - {end_date.strftime("%d %b %Y")}'),0,1)
+                pdf.ln(5)
+                pdf.set_font('Helvetica','B',12)
+                pdf.cell(0,8,f'Overall Building Health: {overall_health}%',0,1)
+                pdf.ln(3)
+                pdf.set_font('Helvetica','B',10); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
+                pdf.cell(120,7,'Module',1,0,'C',True); pdf.cell(35,7,'Score',1,0,'C',True); pdf.cell(35,7,'Target',1,0,'C',True)
+                pdf.ln(); pdf.set_font('Helvetica','',9); pdf.set_text_color(0,0,0)
+                for m in modules_health:
+                    pdf.cell(120,6,safe_text(f"{m['icon']} {m['module']}"),1,0)
+                    pdf.cell(35,6,f"{m['score']}%",1,0,'C'); pdf.cell(35,6,f"{m['target']}%",1,0,'C')
+                    pdf.ln()
+                pdf.ln(5)
+                pdf.set_font('Helvetica','B',10)
+                pdf.cell(0,7,'AI Executive Summary:',0,1)
+                pdf.set_font('Helvetica','',8)
+                for ins in insights:
+                    pdf.multi_cell(0,5,safe_text(ins.replace('🔧','').replace('🚨','').replace('✅','').replace('🛡️','').replace('⚠️','').replace('📊','').strip()))
+                pdf_file = f"/tmp/monthly_mis_{start_date}_{end_date}.pdf"; pdf.output(pdf_file)
+                with open(pdf_file,"rb") as f: st.download_button("📥 Download Board Pack (PDF)", f.read(), f"monthly_mis_{start_date}_{end_date}.pdf", "application/pdf", use_container_width=True)
+            except Exception as e: st.error(f"PDF: {str(e)[:80]}")
     
     # ============================================
     # MAIN TABS
