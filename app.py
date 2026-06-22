@@ -8175,7 +8175,8 @@ def page_ic():
     with tabs[1]:
         st.markdown("### 🚨 Report New Incident")
         
-        c1, c2, c3 = st.columns(3)
+        with st.form("report_incident_form"):
+            c1, c2, c3 = st.columns(3)
             with c1:
                 inc_title = st.text_input("Title*", placeholder="e.g., Water Leak - Server Room Floor 14")
                 inc_category = st.selectbox("Category*", [
@@ -8190,7 +8191,6 @@ def page_ic():
                 ])
             with c2:
                 inc_severity = st.selectbox("Severity*", ["critical","major","minor","monitoring"])
-                # Incident type based on category
                 type_map = {
                     "Life Safety Incident": ["Elevator Entrapment", "Person Trapped", "Structural Collapse Risk", "Asphyxiation Risk", "Fall Hazard", "Other Life Safety"],
                     "Security Incident": ["Unauthorized Access", "Theft", "Vandalism", "Workplace Violence", "Suspicious Package", "Bomb Threat", "Civil Disturbance", "Other Security"],
