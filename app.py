@@ -11681,6 +11681,45 @@ def page_mis():
                 pdf_file = f"/tmp/monthly_mis_{start_date}_{end_date}.pdf"; pdf.output(pdf_file)
                 with open(pdf_file,"rb") as f: st.download_button("📥 Download Board Pack (PDF)", f.read(), f"monthly_mis_{start_date}_{end_date}.pdf", "application/pdf", use_container_width=True)
             except Exception as e: st.error(f"PDF: {str(e)[:80]}")
+
+
+# ============================================
+# PPM ACTIVITIES — FORTUNE 500 EXECUTION CENTER
+# CUSTOM CHECKLISTS • DAILY/HOURLY/SCHEDULED
+# ROLE-BASED • DEPARTMENT-FILTERED • AI-POWERED
+# ============================================
+def page_ppm_activities():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    user_name = st.session_state.get("user_name", "Team Member")
+    user_depts = safe_parse_permissions(st.session_state.get("user", {}).get("department_permissions", []))
+    is_admin = user_role in ["admin", "approver", "super_admin"]
+    
+    st.markdown(f'## 🔧 PPM Execution Center — {info.get("full_name", fc)}')
+    
+    all_assets = DB.get_assets(fc, 50000)
+    
+    if not all_assets:
+        st.info("No assets registered.")
+        return
+    
+    df = pd.DataFrame(all_assets)
+    df["checklist_clean"] = df["checklist"].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() not in ["", "NA", "na", "APPLICABLE", "NOTAPPLICABLE", "None"] else None)
+    df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
+    
+    # Role-based department restriction
+    if is_admin:
+        allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
+    elif user_depts and len(user_depts) > 0 and user_depts != ["All"]:
+        allowed_depts = [d for d in sorted(df["dept_full"].dropna().unique().tolist()) if any(ud in d for ud in user_depts)]
+        if not allowed_depts: allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
+    else:
+        allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
+    
+    # Get custom checklists from database
+    custom_checklists = supabase.table("ppm_checklist_templates").select("*").execute()
+    checklist_options = ["Standard Template"] + [c.get("template_name","") for c in custom_checklists.data] if custom_checklists.data else ["Standard Template"]
     
     # ============================================
     # MAIN TABS
