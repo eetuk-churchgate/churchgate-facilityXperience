@@ -8590,73 +8590,46 @@ def page_ic():
                 
                 if not st.session_state[edit_key]:
                     # LOCKED VIEW - Display saved values as cards
-                    for level in range(1, 7):
-                        existing_config = [e for e in (existing.data or []) if e["escalation_level"] == level]
-                        if existing_config:
-                            ec = existing_config[0]
-                            name = ec.get("escalate_to_name","")
-                            email = ec.get("escalate_to_email","")
-                            sla = ec.get("sla_minutes",15)
-                            if sla >= 1440: sla_display = f"{sla//1440} Days"
-                            elif sla >= 60: sla_display = f"{sla//60} Hours"
-                            else: sla_display = f"{sla} Mins"
-                            
-                            st.markdown(f"""
-                            <div style="background:white;border:1px solid #e5e7eb;border-radius:8px;padding:0.5rem 1rem;margin:0.2rem 0;display:flex;align-items:center;gap:1rem;">
-                                <div style="font-weight:700;color:#888;min-width:30px;">L{level}</div>
-                                <div style="flex:1;"><b>{name}</b><br><span style="font-size:0.7rem;color:#666;">{email}</span></div>
-                                <div style="background:#f0f0f0;padding:3px 10px;border-radius:12px;font-size:0.65rem;font-weight:600;">⏱️ {sla_display}</div>
-                            </div>
-                            """, unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"""
-                            <div style="background:#fafafa;border:1px dashed #ddd;border-radius:8px;padding:0.5rem 1rem;margin:0.2rem 0;display:flex;align-items:center;gap:1rem;">
-                                <div style="font-weight:700;color:#ccc;min-width:30px;">L{level}</div>
-                                <div style="color:#ccc;">Not configured</div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                    # Display escalation levels - EDITABLE VIEW
+                for level in range(1, 7):
+                    existing_config = [e for e in (existing.data or []) if e["escalation_level"] == level]
+                    existing_people = [f"{e.get('escalate_to_name','')} ({e.get('escalate_to_email','')})" for e in (existing.data or []) if e["escalation_level"] == level]
+                    default_people = [p for p in existing_people if p in user_options]
                     
-                    if st.button("✏️ Edit Escalation", key=f"btn_edit_{sev}", use_container_width=True):
-                        st.session_state[edit_key] = True
-                        st.rerun()
+                    stored_sla = existing_config[0].get("sla_minutes", 15*level) if existing_config else 15*level
+                    if stored_sla >= 1440:
+                        display_time = stored_sla // 1440
+                        display_unit = "Days"
+                    elif stored_sla >= 60:
+                        display_time = stored_sla // 60
+                        display_unit = "Hours"
+                    else:
+                        display_time = stored_sla
+                        display_unit = "Mins"
+                    
+                    c1, c2, c3 = st.columns([2.5, 1, 1])
+                    with c1: 
+                        st.multiselect(f"L{level} Escalate To", user_options, default=default_people, key=f"esc_{sev}_{level}_users")
+                    with c2: 
+                        st.number_input(f"Time", value=display_time, min_value=1, key=f"esc_{sev}_{level}_time")
+                    with c3:
+                        st.selectbox(f"Unit", ["Mins","Hours","Days"], 
+                            index=0 if display_unit == "Mins" else 1 if display_unit == "Hours" else 2,
+                            key=f"esc_{sev}_{level}_unit")
                 
-                else:
-                    # EDITABLE VIEW - Show dropdowns
-                    for level in range(1, 7):
-                        existing_config = [e for e in (existing.data or []) if e["escalation_level"] == level]
-                        
-                        current_user_str = st.session_state.get(f"esc_{sev}_{level}_user", "Select User...")
-                        default_idx = user_options.index(current_user_str) if current_user_str in user_options else 0
-                        
-                        stored_sla = existing_config[0].get("sla_minutes", 15*level) if existing_config else 15*level
-                        if stored_sla >= 1440:
-                            display_time = stored_sla // 1440
-                            display_unit = "Days"
-                        elif stored_sla >= 60:
-                            display_time = stored_sla // 60
-                            display_unit = "Hours"
-                        else:
-                            display_time = stored_sla
-                            display_unit = "Mins"
-                        
-                        c1, c2, c3 = st.columns([2.5, 1, 1])
-                        with c1: 
-                            st.selectbox(f"L{level} Escalate To", user_options, index=default_idx, key=f"esc_{sev}_{level}_user")
-                        with c2: 
-                            st.number_input(f"Time", value=display_time, min_value=1, key=f"esc_{sev}_{level}_time")
-                        with c3:
-                            st.selectbox(f"Unit", ["Mins","Hours","Days"], 
-                                index=0 if display_unit == "Mins" else 1 if display_unit == "Hours" else 2,
-                                key=f"esc_{sev}_{level}_unit")
-                    
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        if st.button(f"💾 Save {sev.upper()}", key=f"save_{sev}", use_container_width=True, type="primary"):
-                            saved = 0
-                            for level in range(1, 7):
-                                selected = st.session_state.get(f"esc_{sev}_{level}_user", "")
-                                if selected and selected != "Select User..." and "(" in selected:
-                                    parts = selected.split("(")
+                c1, c2 = st.columns(2)
+                with c1:
+                    if st.button(f"💾 Save {sev.upper()}", key=f"save_{sev}", use_container_width=True, type="primary"):
+                        saved = 0
+                        for level in range(1, 7):
+                            selected_users = st.session_state.get(f"esc_{sev}_{level}_users", [])
+                            
+                            # Delete existing entries for this level
+                            supabase.table("incident_escalation").delete().eq("facility_code",fc).eq("severity",sev).eq("escalation_level",level).execute()
+                            
+                            for user_str in selected_users:
+                                if "(" in user_str:
+                                    parts = user_str.split("(")
                                     name = parts[0].strip()
                                     email = parts[1].replace(")","").strip()
                                     time_val = st.session_state.get(f"esc_{sev}_{level}_time", 15)
@@ -8665,67 +8638,26 @@ def page_ic():
                                     elif unit == "Days": sla = int(time_val) * 1440
                                     else: sla = int(time_val)
                                     
-                                    supabase.table("incident_escalation").delete().eq("facility_code",fc).eq("severity",sev).eq("escalation_level",level).execute()
                                     supabase.table("incident_escalation").insert({
                                         "facility_code": fc, "severity": sev, "escalation_level": level,
                                         "level_name": f"Level {level}", "escalate_to_name": name,
                                         "escalate_to_email": email, "sla_minutes": sla, "is_active": True
                                     }).execute()
                                     saved += 1
-                            
-                            if saved > 0:
-                                for level in range(1, 7):
-                                    for key in [f"esc_{sev}_{level}_user", f"esc_{sev}_{level}_time", f"esc_{sev}_{level}_unit"]:
-                                        if key in st.session_state: del st.session_state[key]
-                                st.session_state[edit_key] = False
-                                st.success(f"✅ {sev.upper()} saved ({saved} levels)!")
-                                st.rerun()
-                            else:
-                                st.error("⚠️ Select at least one person")
-                    with c2:
-                        if st.button("❌ Cancel", key=f"cancel_{sev}", use_container_width=True):
-                            st.session_state[edit_key] = False
-                            st.rerun()
-                
-                # Save button
-                if st.button(f"💾 Save {sev.upper()} Escalation", key=f"save_{sev}", use_container_width=True):
-                    saved = 0
-                    for level in range(1, 7):
-                        selected = st.session_state.get(f"esc_{sev}_{level}_user", "")
                         
-                        if selected and selected != "Select User..." and "(" in selected:
-                            parts = selected.split("(")
-                            name = parts[0].strip()
-                            email = parts[1].replace(")","").strip()
-                            
-                            time_val = st.session_state.get(f"esc_{sev}_{level}_time", 15)
-                            unit = st.session_state.get(f"esc_{sev}_{level}_unit", "Mins")
-                            
-                            if unit == "Hours":
-                                sla = int(time_val) * 60
-                            elif unit == "Days":
-                                sla = int(time_val) * 1440
-                            else:
-                                sla = int(time_val)
-                            
-                            supabase.table("incident_escalation").delete().eq("facility_code",fc).eq("severity",sev).eq("escalation_level",level).execute()
-                            supabase.table("incident_escalation").insert({
-                                "facility_code": fc, "severity": sev, "escalation_level": level,
-                                "level_name": f"Level {level}", "escalate_to_name": name,
-                                "escalate_to_email": email, "sla_minutes": sla, "is_active": True
-                            }).execute()
-                            saved += 1
-                    
-                    if saved > 0:
-                        # Clear session state to force reload from DB
-                        for level in range(1, 7):
-                            for key in [f"esc_{sev}_{level}_user", f"esc_{sev}_{level}_time", f"esc_{sev}_{level}_unit"]:
-                                if key in st.session_state:
-                                    del st.session_state[key]
-                        st.success(f"✅ {sev.upper()} escalation saved ({saved} levels)!")
+                        if saved > 0:
+                            for level in range(1, 7):
+                                for key in [f"esc_{sev}_{level}_users", f"esc_{sev}_{level}_time", f"esc_{sev}_{level}_unit"]:
+                                    if key in st.session_state: del st.session_state[key]
+                            st.session_state[edit_key] = False
+                            st.success(f"✅ {sev.upper()} saved ({saved} people)!")
+                            st.rerun()
+                        else:
+                            st.error("⚠️ Select at least one person")
+                with c2:
+                    if st.button("❌ Cancel", key=f"cancel_{sev}", use_container_width=True):
+                        st.session_state[edit_key] = False
                         st.rerun()
-                    else:
-                        st.error("⚠️ Please select at least one person for escalation")
                 
                 st.markdown("---")
     
