@@ -5537,31 +5537,283 @@ def page_oa():
     else:st.success("✅ No open alerts")
 
 # ============================================
-# AUDIT CHECKLIST (FULL)
+# AUDIT & GOVERNANCE — COMMAND CENTER
 # ============================================
 def page_ac():
-    fc=st.session_state.get("facility","WTC");info=FACILITY_INFO.get(fc,{})
-    st.markdown(f'## ✅ Audit Framework — {info.get("full_name",fc)}')
-    tab1,tab2=st.tabs(["📋 View Audits","➕ Start Audit"])
-    with tab1:
-        audits=DB.get_all("audits",fc,20)
-        if audits:st.dataframe(pd.DataFrame(audits),use_container_width=True,hide_index=True)
-        else:st.info("No audits")
-    with tab2:
-        with st.form("audit_f"):
-            title=st.text_input("Audit Title*");atype=st.selectbox("Type",["Internal","External","Safety","Quality","ISO"])
-            items=["Fire extinguishers accessible","Emergency exits clear","Electrical panels labeled","PPE available","Housekeeping standards met","First aid kits stocked","Safety signage visible","Waste management compliant"]
-            results={}
-            st.markdown("**Checklist Items:**")
-            for item in items:results[item]=st.selectbox(item,["Pass","Fail","N/A"],key=f"aud_{item[:15]}")
-            if st.form_submit_button("✅ Submit Audit",use_container_width=True):
-                if title:
-                    passed=sum(1 for v in results.values() if v=="Pass")
-                    total=sum(1 for v in results.values() if v!="N/A")
-                    score=round((passed/total)*100,1) if total>0 else 100
-                    cnt=len(DB.get_all("audits",fc,1000))
-                    DB.insert("audits",{"facility_code":fc,"audit_number":f"AUD-{fc}-{datetime.now().year}-{str(cnt+1).zfill(4)}","title":title,"type":atype,"overall_score":score,"status":"completed","findings":results,"audit_date":str(date.today()),"created_at":datetime.now().isoformat()})
-                    st.success(f"Score: {score}%");st.rerun()
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    user_name = st.session_state.get("user_name", "User")
+    is_admin = user_role in ["admin", "approver", "super_admin"]
+    
+    st.markdown(f'## ✅ Audit & Governance — {info.get("full_name", fc)}')
+    st.caption("Governance & Assurance Command Center — Prove everything is working as claimed.")
+    
+    from datetime import timezone, timedelta
+    wat_now = datetime.now(timezone(timedelta(hours=1)))
+    today = wat_now.date()
+    
+    audit_data = supabase.table("audits").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(200).execute()
+    audit_df = pd.DataFrame(audit_data.data) if audit_data.data else pd.DataFrame()
+    
+    findings_data = supabase.table("audit_findings").select("*").order("created_at", desc=True).limit(500).execute()
+    findings_df = pd.DataFrame(findings_data.data) if findings_data.data else pd.DataFrame()
+    
+    total_audits = len(audit_df)
+    completed_audits = len(audit_df[audit_df["status"] == "completed"]) if total_audits > 0 else 0
+    overdue_audits = len(audit_df[(audit_df["status"] != "completed") & (pd.to_datetime(audit_df["scheduled_date"], errors='coerce').dt.date < today)]) if total_audits > 0 else 0
+    open_findings = len(findings_df[findings_df["status"] == "open"]) if len(findings_df) > 0 else 0
+    critical_findings = len(findings_df[(findings_df["severity"] == "critical") & (findings_df["status"] == "open")]) if len(findings_df) > 0 else 0
+    compliance_score = round((completed_audits / max(total_audits, 1)) * 100) if total_audits > 0 else 0
+    
+    # ============================================
+    # 🟦 TOP RIBBON
+    # ============================================
+    st.markdown("### 🟦 Compliance Health Ribbon")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        color = "#10B981" if compliance_score >= 90 else "#F59E0B" if compliance_score >= 75 else "#EF4444"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Compliance Score</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{compliance_score}%</div></div>""", unsafe_allow_html=True)
+    with c2:
+        color = "#EF4444" if overdue_audits > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Overdue Audits</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{overdue_audits}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        color = "#EF4444" if open_findings > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Open NCRs</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{open_findings}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        color = "#EF4444" if critical_findings > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Critical Findings</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{critical_findings}</div></div>""", unsafe_allow_html=True)
+    with c5: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Total Audits</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6;">{total_audits}</div></div>""", unsafe_allow_html=True)
+    with c6:
+        ready = "✅ Ready" if compliance_score >= 90 and critical_findings == 0 else "❌ Not Ready"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Inspection Readiness</div><div style="font-size:1rem;font-weight:800;color:#8B5CF6;">{ready}</div></div>""", unsafe_allow_html=True)
+    
+    if critical_findings > 0:
+        st.error(f"🚨 {critical_findings} CRITICAL findings open — immediate attention required!")
+    if overdue_audits > 0:
+        st.warning(f"⚠️ {overdue_audits} audits are overdue.")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TABS
+    # ============================================
+    tabs = st.tabs(["📋 Audits", "➕ New Audit", "🔍 Findings/NCRs", "✅ Spot Check", "📄 Reports"])
+    
+    # ============================================
+    # TAB 0: ALL AUDITS
+    # ============================================
+    with tabs[0]:
+        st.markdown("### 📋 Audit Register")
+        
+        if total_audits == 0:
+            st.info("No audits recorded yet.")
+        else:
+            for _, aud in audit_df.head(20).iterrows():
+                status = aud.get("status","planned")
+                sc = {"planned":"#3B82F6","in_progress":"#F59E0B","completed":"#10B981","closed":"#6B7280"}.get(status,"#3B82F6")
+                domain = aud.get("audit_domain","").replace("_"," ").title()
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <b>{aud.get('audit_number','N/A')}</b> — {aud.get('title','')[:80]}
+                    <br><span style="font-size:0.65rem;color:#666;">🏷️ {domain} | 👤 {aud.get('auditor_name','')} | 📅 {str(aud.get('scheduled_date',''))}</span>
+                    <span style="float:right;background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;">{status.upper()}</span>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ============================================
+    # TAB 1: NEW AUDIT
+    # ============================================
+    with tabs[1]:
+        st.markdown("### ➕ Schedule New Audit")
+        
+        audit_domains = [
+            "statutory_compliance", "operational_process", "financial",
+            "contractor_vendor", "tenant_billing", "hoto_integrity", "data_quality"
+        ]
+        
+        with st.form("new_audit_form"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                aud_title = st.text_input("Title*", placeholder="e.g., Fire System Annual Audit")
+                aud_domain = st.selectbox("Domain*", audit_domains, format_func=lambda x: x.replace("_"," ").title())
+            with c2:
+                aud_auditor = st.text_input("Auditor Name*")
+                aud_auditee = st.text_input("Auditee Name")
+            with c3:
+                aud_scheduled = st.date_input("Scheduled Date*", today)
+                aud_next = st.date_input("Next Audit Due", today + timedelta(days=365))
+            
+            aud_desc = st.text_area("Scope/Description", height=80)
+            
+            if st.form_submit_button("➕ SCHEDULE AUDIT", use_container_width=True, type="primary"):
+                if aud_title and aud_auditor:
+                    aud_count = total_audits + 1
+                    aud_number = f"AUD-{fc}-{today.strftime('%Y%m%d')}-{str(aud_count).zfill(4)}"
+                    
+                    supabase.table("audits").insert({
+                        "facility_code":fc,"audit_number":aud_number,"title":aud_title,
+                        "audit_domain":aud_domain,"audit_type":"scheduled",
+                        "description":aud_desc,"auditor_name":aud_auditor,
+                        "auditee_name":aud_auditee,"scheduled_date":str(aud_scheduled),
+                        "next_audit_date":str(aud_next),"status":"planned",
+                        "created_by":user_name,"created_at":wat_now.isoformat()
+                    }).execute()
+                    
+                    st.success(f"✅ Audit {aud_number} scheduled!"); st.balloons(); st.rerun()
+                else:
+                    st.error("⚠️ Title and Auditor are required")
+    
+    # ============================================
+    # TAB 2: FINDINGS / NCRs
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 🔍 Non-Conformance Reports (NCRs)")
+        
+        if len(findings_df) == 0:
+            st.success("✅ No findings recorded.")
+        else:
+            # Add finding
+            with st.expander("➕ Raise New Finding"):
+                with st.form("new_finding_form"):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        fnd_description = st.text_input("Finding Description*")
+                        fnd_severity = st.selectbox("Severity*", ["critical","major","minor","observation"])
+                    with c2:
+                        fnd_domain = st.selectbox("Domain", audit_domains, format_func=lambda x: x.replace("_"," ").title())
+                        fnd_responsible = st.text_input("Responsible Person")
+                    
+                    c1, c2 = st.columns(2)
+                    with c1: fnd_due = st.date_input("Due Date*", today + timedelta(days=14))
+                    with c2: fnd_location = st.text_input("Location")
+                    
+                    fnd_corrective = st.text_area("Corrective Action Required")
+                    
+                    if st.form_submit_button("➕ RAISE NCR", use_container_width=True):
+                        if fnd_description:
+                            fnd_count = len(findings_df) + 1
+                            fnd_number = f"NCR-{fc}-{today.strftime('%Y%m%d')}-{str(fnd_count).zfill(4)}"
+                            supabase.table("audit_findings").insert({
+                                "finding_number":fnd_number,"description":fnd_description,
+                                "severity":fnd_severity,"domain":fnd_domain,
+                                "responsible_person":fnd_responsible,"due_date":str(fnd_due),
+                                "location":fnd_location,"corrective_action":fnd_corrective,
+                                "status":"open","created_at":wat_now.isoformat()
+                            }).execute()
+                            st.success(f"✅ NCR {fnd_number} raised!"); st.rerun()
+            
+            st.markdown("---")
+            
+            for _, fnd in findings_df.head(30).iterrows():
+                severity = fnd.get("severity","minor")
+                sev_color = "#EF4444" if severity == "critical" else "#F59E0B" if severity == "major" else "#3B82F6" if severity == "minor" else "#6B7280"
+                status = fnd.get("status","open")
+                st_color = "#EF4444" if status == "open" else "#F59E0B" if status == "in_progress" else "#10B981"
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sev_color};border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <b>{fnd.get('finding_number','N/A')}</b> — {fnd.get('description','')[:80]}
+                    <br><span style="font-size:0.6rem;">👤 {fnd.get('responsible_person','')} | 📅 Due: {fnd.get('due_date','')} | 🏷️ {fnd.get('domain','')}</span>
+                    <span style="float:right;"><span style="background:{sev_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;">{severity.upper()}</span> <span style="background:{st_color};color:white;padding:2px 8px;border-radius:10px;font-size:0.55rem;">{status.upper()}</span></span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if status == "open":
+                    if st.button("✅ Close Finding", key=f"close_fnd_{fnd['id']}", use_container_width=True):
+                        supabase.table("audit_findings").update({"status":"closed","closed_by":user_name,"closed_date":str(today)}).eq("id",fnd["id"]).execute()
+                        st.success("✅ Closed!"); st.rerun()
+    
+    # ============================================
+    # TAB 3: SPOT CHECK
+    # ============================================
+    with tabs[3]:
+        st.markdown("### ✅ Spot Check (Continuous Assurance)")
+        
+        spot_data = supabase.table("spot_checks").select("*").eq("facility_code",fc).order("created_at", desc=True).limit(50).execute()
+        spot_df = pd.DataFrame(spot_data.data) if spot_data.data else pd.DataFrame()
+        
+        with st.form("spot_check_form"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                spot_type = st.selectbox("Check Type", ["Shift Handover","PM Quality","Security Patrol","Housekeeping","HOTO Completeness","WO Accuracy","Meter Reading"])
+                spot_location = st.text_input("Location")
+            with c2:
+                spot_result = st.selectbox("Result", ["pass","fail","observation"])
+                spot_date = st.date_input("Date", today)
+            with c3:
+                spot_auditor = st.text_input("Auditor Name", value=user_name)
+            
+            spot_finding = st.text_area("Findings/Notes")
+            
+            if st.form_submit_button("✅ SUBMIT SPOT CHECK", use_container_width=True, type="primary"):
+                supabase.table("spot_checks").insert({
+                    "facility_code":fc,"check_type":spot_type,"location":spot_location,
+                    "result":spot_result,"auditor_name":spot_auditor,
+                    "check_date":str(spot_date),"finding":spot_finding
+                }).execute()
+                st.success("✅ Spot check recorded!"); st.rerun()
+        
+        st.markdown("---")
+        st.markdown("### 📊 Recent Spot Checks")
+        
+        if len(spot_df) > 0:
+            pass_rate = round(len(spot_df[spot_df["result"]=="pass"]) / len(spot_df) * 100) if len(spot_df) > 0 else 0
+            st.metric("Spot Check Pass Rate", f"{pass_rate}%")
+            
+            for _, spot in spot_df.head(15).iterrows():
+                result = spot.get("result","pass")
+                rc = "#10B981" if result == "pass" else "#EF4444" if result == "fail" else "#F59E0B"
+                st.markdown(f"""
+                <div style="background:white;border-left:3px solid {rc};border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.75rem;">
+                    <b>{spot.get('check_type','')}</b> — {spot.get('location','')} | {str(spot.get('check_date',''))}
+                    <span style="float:right;color:{rc};font-weight:700;">{result.upper()}</span>
+                    <br><span style="font-size:0.65rem;color:#666;">{spot.get('finding','')[:100]}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No spot checks recorded yet.")
+    
+    # ============================================
+    # TAB 4: REPORTS
+    # ============================================
+    with tabs[4]:
+        st.markdown("### 📄 Audit Reports")
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("Total Audits", total_audits)
+        with c2: st.metric("Open NCRs", open_findings)
+        with c3: st.metric("Compliance Score", f"{compliance_score}%")
+        
+        st.markdown("---")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("📄 Generate Governance Report (HTML)", key="aud_html_btn", use_container_width=True, type="primary"):
+                logo_b64 = get_logo_base64()
+                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Governance Report</title><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}.kpi-row{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:20px;font-weight:800;color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:10px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}</style></head><body><h1>Audit & Governance Report</h1><p>{info.get('full_name',fc)} | {today}</p><div class="kpi-row"><div class="kpi"><div class="val">{compliance_score}%</div>Compliance</div><div class="kpi"><div class="val">{overdue_audits}</div>Overdue</div><div class="kpi"><div class="val">{open_findings}</div>Open NCRs</div><div class="kpi"><div class="val">{critical_findings}</div>Critical</div><div class="kpi"><div class="val">{total_audits}</div>Total</div><div class="kpi"><div class="val">{len(spot_df)}</div>Spot Checks</div></div><h2>Findings</h2><table><tr><th>ID</th><th>Description</th><th>Severity</th><th>Status</th><th>Due</th></tr>"""
+                for _,fnd in findings_df.head(30).iterrows(): html += f"<tr><td>{fnd.get('finding_number','')}</td><td>{fnd.get('description','')[:60]}</td><td>{fnd.get('severity','').upper()}</td><td>{fnd.get('status','').upper()}</td><td>{fnd.get('due_date','')}</td></tr>"
+                html += "</table></body></html>"
+                st.download_button("📥 Download HTML", html, f"governance_report_{today}.html", "text/html", use_container_width=True)
+        with c2:
+            if st.button("📕 Generate PDF Report", key="aud_pdf_btn", use_container_width=True):
+                try:
+                    from fpdf import FPDF; pdf = FPDF('L','mm','A4'); pdf.add_page()
+                    pdf.set_font('Helvetica','B',16); pdf.set_text_color(204,0,0)
+                    pdf.cell(0,10,safe_text('Audit & Governance Report'),0,1)
+                    pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
+                    pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {today}'),0,1); pdf.ln(4)
+                    pdf.set_font('Helvetica','B',7); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
+                    for h,w in zip(['ID','Description','Severity','Status','Due'],[35,85,30,30,30]): pdf.cell(w,5,h,1,0,'C',True)
+                    pdf.ln(); pdf.set_font('Helvetica','',7); pdf.set_text_color(0,0,0)
+                    for _,fnd in findings_df.head(40).iterrows():
+                        pdf.cell(35,4,safe_text(fnd.get('finding_number','')),1,0); pdf.cell(85,4,safe_text(str(fnd.get('description',''))[:38]),1,0)
+                        pdf.cell(30,4,safe_text(fnd.get('severity','').upper()),1,0); pdf.cell(30,4,safe_text(fnd.get('status','').upper()),1,0)
+                        pdf.cell(30,4,str(fnd.get('due_date','')),1,0); pdf.ln()
+                    pdf_file = f"/tmp/audit_report_{today}.pdf"; pdf.output(pdf_file)
+                    with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"audit_report_{today}.pdf", "application/pdf", use_container_width=True)
+                except Exception as e: st.error(f"PDF: {str(e)[:80]}")
 
 # ============================================
 # VOICE OF CUSTOMER — FEEDBACK SYSTEM
