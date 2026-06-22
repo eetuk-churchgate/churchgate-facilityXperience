@@ -8123,29 +8123,16 @@ def page_ic():
                         elapsed = f"{hours:02d}:{mins:02d}:{int(elapsed_time.total_seconds()%60):02d}"
                     except: pass
                 
-                # Build life safety line separately
                 life_safety_line = ""
                 if inc.get('life_safety_flag'):
                     tenant = inc.get("tenant_name","")
-                    life_safety_line = f'<br><span style="font-size:0.6rem;color:#EF4444;">⚠️ Life Safety | 🏢 {tenant}</span>'
+                    life_safety_line = f'<br><span style="font-size:0.6rem;color:#EF4444;">Life Safety | {tenant}</span>'
                 
-                st.markdown(f"""
-                <div style="background:white;border-left:4px solid {sev_color};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div>
-                            <b>{inc.get('incident_number','N/A')}</b> — {inc.get('title','')[:80]}
-                            <br><span style="font-size:0.65rem;color:#666;">📍 {inc.get('location_building','')} / {inc.get('location_floor','')} | ⏱️ {elapsed} elapsed</span>
-                            {life_safety_line}
-                        </div>
-                        <div style="text-align:right;">
-                            <span style="background:{sev_color};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{severity.upper()}</span>
-                            <br><span style="background:{sc};color:white;padding:2px 8px;border-radius:12px;font-size:0.55rem;">{status.upper()}</span>
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                card_html = f"""<div style="background:white;border-left:4px solid {sev_color};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);"><div style="display:flex;justify-content:space-between;align-items:center;"><div><b>{inc.get('incident_number','N/A')}</b> — {inc.get('title','')[:80]}<br><span style="font-size:0.65rem;color:#666;">📍 {inc.get('location_building','')} / {inc.get('location_floor','')} | ⏱️ {elapsed} elapsed</span>{life_safety_line}</div><div style="text-align:right;"><span style="background:{sev_color};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{severity.upper()}</span><br><span style="background:{sc};color:white;padding:2px 8px;border-radius:12px;font-size:0.55rem;">{status.upper()}</span></div></div></div>"""
                 
-                # Action buttons based on status
+                st.markdown(card_html, unsafe_allow_html=True)
+                
+                # Action buttons
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
                     if status == "created" and (is_admin or is_manager):
@@ -8170,9 +8157,6 @@ def page_ic():
                         if st.button("✅ Close", key=f"close_{inc_id}", use_container_width=True):
                             supabase.table("incidents").update({"status":"closed","closed_at":wat_now.isoformat(),"closed_by":user_name}).eq("id",inc_id).execute()
                             supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"closed","description":"Incident closed","performed_by":user_name}).execute()
-                            try:
-                                send_email_notification(user_email,f"✅ Incident Closed — {inc.get('incident_number','')}",f"<h3>Incident Closed</h3><p>{inc.get('title','')}</p>")
-                            except: pass
                             st.success("✅ Closed!"); st.balloons(); st.rerun()
     
    # ============================================
