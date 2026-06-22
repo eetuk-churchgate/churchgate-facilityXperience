@@ -9330,41 +9330,40 @@ def page_hot():
                 st.caption("Level 1: All Team Leads | Level 2: Incident Commander | Level 3: FM Director")
             
             if st.form_submit_button("➕ INITIATE HOTO", use_container_width=True, type="primary"):
-                if hoto_title and transferor and transferee:
-                    hoto_count = total_hoto + 1
-                    hoto_number = f"HOTO-{fc}-{today.strftime('%Y%m%d')}-{str(hoto_count).zfill(4)}"
-                    
-                    result = supabase.table("hoto_records").insert({
-                        "facility_code": fc, "hoto_number": hoto_number, "title": hoto_title,
-                        "hoto_type": hoto_type, "tier": tier, "description": hoto_desc,
-                        "transferor_name": transferor, "transferee_name": transferee,
-                        "witness_name": witness, "location_building": hoto_location_bldg,
-                        "location_floor": hoto_location_floor, "status": "initiated",
-                        "defect_liability_start": str(dlp_start), "defect_liability_end": str(dlp_end),
-                        "retention_amount": retention, "created_by": user_name,
-                        "created_at": wat_now.isoformat()
-                    }).execute()
-                    
-                    if result.data:
-                        hoto_id = result.data[0]["id"]
-                        # Create approval records
-                        for level in range(1, 4):
-                            supabase.table("hoto_approvals").insert({
-                                "hoto_id": hoto_id, "approval_level": level,
-                                "approver_role": ["shift_lead","dept_manager","fm_director"][level-1] if tier == "operational_shift" else ["fm_supervisor","fm_manager","fm_director"][level-1],
-                                "status": "pending", "created_at": wat_now.isoformat()
+                        if hoto_title and transferor and transferee:
+                            hoto_count = total_hoto + 1
+                            hoto_number = f"HOTO-{fc}-{today.strftime('%Y%m%d')}-{str(hoto_count).zfill(4)}"
+                            
+                            result = supabase.table("hoto_records").insert({
+                                "facility_code": fc, "hoto_number": hoto_number, "title": hoto_title,
+                                "hoto_type": hoto_type, "tier": tier, "description": hoto_desc,
+                                "transferor_name": transferor, "transferee_name": transferee,
+                                "witness_name": witness, "location_building": hoto_location_bldg,
+                                "location_floor": hoto_location_floor, "status": "initiated",
+                                "defect_liability_start": str(dlp_start), "defect_liability_end": str(dlp_end),
+                                "retention_amount": retention, "created_by": user_name,
+                                "created_at": wat_now.isoformat()
                             }).execute()
-                        
-                        # Send email notification
-                        try:
-                            send_email_notification(user_email, f"🔄 New HOTO Initiated — {hoto_number}", f"<h3>HOTO Initiated</h3><p><b>HOTO:</b> {hoto_number}</p><p><b>Type:</b> {hoto_type.replace('_',' ').title()}</p><p><b>Transferor:</b> {transferor}</p><p><b>Transferee:</b> {transferee}</p><p>Approvals pending.</p>")
-                        except: pass
-                        
-                         st.session_state.hoto_created = True
-                        st.session_state.hoto_number_created = hoto_number
-                        st.rerun()
-                else:
-                    st.error("⚠️ Title, Transferor, and Transferee are required")
+                            
+                            if result.data:
+                                hoto_id = result.data[0]["id"]
+                                for level in range(1, 4):
+                                    supabase.table("hoto_approvals").insert({
+                                        "hoto_id": hoto_id, "approval_level": level,
+                                        "approver_role": ["shift_lead","dept_manager","fm_director"][level-1] if tier == "operational_shift" else ["fm_supervisor","fm_manager","fm_director"][level-1],
+                                        "status": "pending", "created_at": wat_now.isoformat()
+                                    }).execute()
+                                
+                                try:
+                                    send_email_notification(user_email, f"🔄 New HOTO Initiated — {hoto_number}", f"<h3>HOTO Initiated</h3><p><b>HOTO:</b> {hoto_number}</p><p><b>Type:</b> {hoto_type.replace('_',' ').title()}</p><p><b>Transferor:</b> {transferor}</p><p><b>Transferee:</b> {transferee}</p><p>Approvals pending.</p>")
+                                except: pass
+                                
+                                st.session_state.hoto_created = True
+                                st.session_state.hoto_number_created = hoto_number
+                                st.rerun()
+                        else:
+                            st.error("⚠️ Title, Transferor, and Transferee are required")
+
     
     # ============================================
     # TAB 2: SHIFT HANDOVER
