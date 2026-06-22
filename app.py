@@ -8611,19 +8611,43 @@ def page_ic():
                     st.session_state[f"esc_{sev}_{level}_sla"] = final_sla
                 
                 if st.button(f"💾 Save {sev.upper()} Escalation", key=f"save_{sev}", use_container_width=True):
+                    saved = 0
                     for level in range(1, 7):
-                        name = st.session_state.get(f"esc_{sev}_{level}_name","")
-                        email = st.session_state.get(f"esc_{sev}_{level}_email","")
-                        sla = st.session_state.get(f"esc_{sev}_{level}_sla",15)
+                        selected = st.session_state.get(f"esc_{sev}_{level}_user", "")
                         
-                        if name and email:
+                        if selected and selected != "Select User..." and "(" in selected:
+                            parts = selected.split("(")
+                            name = parts[0].strip()
+                            email = parts[1].replace(")","").strip()
+                            
+                            time_val = st.session_state.get(f"esc_{sev}_{level}_time", 15)
+                            unit = st.session_state.get(f"esc_{sev}_{level}_unit", "Mins")
+                            
+                            if unit == "Hours":
+                                sla = int(time_val) * 60
+                            elif unit == "Days":
+                                sla = int(time_val) * 1440
+                            else:
+                                sla = int(time_val)
+                            
                             supabase.table("incident_escalation").delete().eq("facility_code",fc).eq("severity",sev).eq("escalation_level",level).execute()
                             supabase.table("incident_escalation").insert({
-                                "facility_code":fc,"severity":sev,"escalation_level":level,
-                                "level_name":f"Level {level}","escalate_to_name":name,
-                                "escalate_to_email":email,"sla_minutes":int(sla)
+                                "facility_code": fc,
+                                "severity": sev,
+                                "escalation_level": level,
+                                "level_name": f"Level {level}",
+                                "escalate_to_name": name,
+                                "escalate_to_email": email,
+                                "sla_minutes": sla,
+                                "is_active": True
                             }).execute()
-                    st.success(f"✅ {sev.upper()} escalation saved!"); st.rerun()
+                            saved += 1
+                    
+                    if saved > 0:
+                        st.success(f"✅ {sev.upper()} escalation saved ({saved} levels)!")
+                        st.rerun()
+                    else:
+                        st.error("⚠️ Please select at least one person for escalation")
                 
                 st.markdown("---")
     
