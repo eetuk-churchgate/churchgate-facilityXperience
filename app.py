@@ -5643,54 +5643,244 @@ def page_fo():
                 """, unsafe_allow_html=True)
     
     # ============================================
-    # TAB 1: REGISTER RISK
+# RISK MANAGEMENT — FORESIGHT & RESILIENCE COMMAND CENTER
+# ISO 31000 • COSO ERM • TCFD • GRESB ALIGNED
+# ============================================
+def page_fo():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    user_name = st.session_state.get("user_name", "User")
+    is_admin = user_role in ["admin", "approver", "super_admin"]
+    is_fm_director = user_role in ["admin", "super_admin", "sr_management"]
+    
+    st.markdown(f'## 🛡️ Risk Assessment & Management — {info.get("full_name", fc)}')
+    st.caption("ISO 31000 • COSO ERM • TCFD • GRESB Aligned | Foresight & Resilience Command Center")
+    
+    from datetime import timezone, timedelta
+    wat_now = datetime.now(timezone(timedelta(hours=1)))
+    today = wat_now.date()
+    
+    risk_data = supabase.table("risk_register").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(200).execute()
+    risk_df = pd.DataFrame(risk_data.data) if risk_data.data else pd.DataFrame()
+    
+    total_risks = len(risk_df)
+    active_risks = len(risk_df[risk_df["risk_status"] != "closed"]) if total_risks > 0 else 0
+    extreme_risks = len(risk_df[(risk_df["residual_level"] == "Extreme") & (risk_df["risk_status"] != "closed")]) if total_risks > 0 else 0
+    high_risks = len(risk_df[(risk_df["residual_level"] == "High") & (risk_df["risk_status"] != "closed")]) if total_risks > 0 else 0
+    
+    overdue_treatments = 0
+    if total_risks > 0:
+        for _, r in risk_df.iterrows():
+            treatments = supabase.table("risk_treatments").select("*").eq("risk_id", r["id"]).eq("status", "pending").execute()
+            if treatments.data:
+                for t in treatments.data:
+                    try:
+                        if pd.to_datetime(t["due_date"]).date() < today:
+                            overdue_treatments += 1
+                    except: pass
+    
+    total_exposure = risk_df[(risk_df["residual_level"].isin(["High","Extreme"])) & (risk_df["risk_status"] != "closed")]["inherent_cons_financial"].sum() if total_risks > 0 else 0
+    
+    ori = round((extreme_risks * 25 + high_risks * 15 + active_risks * 5) / max(total_risks, 1)) if total_risks > 0 else 0
+    ori = min(ori, 100)
+    
     # ============================================
-    with tabs[1]:
-        st.markdown("### ➕ Register New Risk")
+    # 🟦 TOP RIBBON
+    # ============================================
+    st.markdown("### 🟦 Risk Posture Ribbon — ISO 31000 Aligned")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        color = "#10B981" if ori < 25 else "#F59E0B" if ori < 50 else "#EF4444"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Overall Risk Index</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{ori}/100</div></div>""", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #EF4444;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Residual Exposure</div><div style="font-size:1.3rem;font-weight:800;color:#EF4444;">₦{total_exposure:,.0f}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        color = "#EF4444" if overdue_treatments > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Overdue Actions</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{overdue_treatments}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Extreme Risks</div><div style="font-size:1.3rem;font-weight:800;color:#8B5CF6;">{extreme_risks}</div></div>""", unsafe_allow_html=True)
+    with c5: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">High Risks</div><div style="font-size:1.3rem;font-weight:800;color:#F59E0B;">{high_risks}</div></div>""", unsafe_allow_html=True)
+    with c6: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Total Risks</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6;">{total_risks}</div></div>""", unsafe_allow_html=True)
+    
+    if extreme_risks > 0: st.error(f"🚨 {extreme_risks} EXTREME risks require immediate attention!")
+    if overdue_treatments > 0: st.warning(f"⚠️ {overdue_treatments} risk treatment actions are overdue.")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TABS
+    # ============================================
+    tabs = st.tabs(["📊 Risk Matrix", "➕ Register Risk", "🔧 Treatments & Controls", "📋 Reviews", "📄 Reports"])
+    
+    # ============================================
+    # TAB 0: RISK MATRIX
+    # ============================================
+    with tabs[0]:
+        st.markdown("### 📊 Risk Matrix (5x5 Heatmap) — ISO 31000 Standard")
         
-        risk_categories = [
-            "life_safety", "business_continuity", "tenant_revenue", "regulatory_legal",
-            "financial", "environmental", "reputational", "strategic"
-        ]
-        
-        with st.form("register_risk_form"):
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                risk_title = st.text_input("Risk Title*", placeholder="e.g., Chiller #2 Catastrophic Failure")
-                risk_category = st.selectbox("Category*", risk_categories, format_func=lambda x: x.replace("_"," ").title())
-            with c2:
-                risk_owner = st.text_input("Risk Owner*")
-                risk_exposure = st.number_input("Financial Exposure (₦)", min_value=0.0, value=0.0, step=100000.0)
-            with c3:
-                risk_treatment = st.selectbox("Treatment Strategy", ["reduce","transfer","avoid","accept"])
-                next_review = st.date_input("Next Review", today + timedelta(days=90))
+        if total_risks == 0:
+            st.info("No risks registered yet.")
+        else:
+            matrix_data = []
+            for _, risk in risk_df.iterrows():
+                if risk.get("risk_status") == "closed": continue
+                rl = risk.get("residual_likelihood", 3)
+                rc = risk.get("residual_consequence", 3)
+                rating = rl * rc
+                
+                if rating >= 16: zone = "Extreme"; color = "#EF4444"
+                elif rating >= 10: zone = "High"; color = "#F59E0B"
+                elif rating >= 5: zone = "Medium"; color = "#3B82F6"
+                else: zone = "Low"; color = "#10B981"
+                
+                matrix_data.append({
+                    "Risk": risk.get("risk_number",""), "Title": risk.get("title","")[:50],
+                    "Likelihood": rl, "Consequence": rc, "Rating": rating,
+                    "Zone": zone, "Color": color, "Exposure": risk.get("inherent_cons_financial",0)
+                })
             
-            risk_desc = st.text_area("Risk Description*", height=80, placeholder="Describe the risk, its causes, and potential impact...")
+            if matrix_data:
+                md = pd.DataFrame(matrix_data)
+                fig = px.scatter(md, x="Consequence", y="Likelihood", size="Exposure", color="Zone",
+                    color_discrete_map={"Extreme":"#EF4444","High":"#F59E0B","Medium":"#3B82F6","Low":"#10B981"},
+                    hover_name="Risk", hover_data=["Title"],
+                    title="Residual Risk Matrix — After Controls", range_x=[0.5,5.5], range_y=[0.5,5.5])
+                fig.add_hline(y=2.5, line_dash="dash", line_color="#F59E0B")
+                fig.add_vline(x=2.5, line_dash="dash", line_color="#F59E0B")
+                fig.add_hline(y=3.5, line_dash="dash", line_color="#EF4444")
+                fig.add_vline(x=3.5, line_dash="dash", line_color="#EF4444")
+                fig.update_layout(height=500)
+                st.plotly_chart(fig, use_container_width=True)
+                st.caption("🟢 Low (1-4) | 🔵 Medium (5-8) | 🟡 High (9-12) | 🔴 Extreme (15-25)")
             
             st.markdown("---")
-            st.markdown("**📊 Inherent Risk (Before Controls)**")
+            st.markdown("### 📋 Risk Register — Sorted by Severity")
+            
+            sorted_risks = risk_df[risk_df["risk_status"] != "closed"].copy()
+            if "residual_rating" in sorted_risks.columns:
+                sorted_risks = sorted_risks.sort_values("residual_rating", ascending=False)
+            
+            for _, risk in sorted_risks.head(20).iterrows():
+                rating = risk.get("residual_rating", 5)
+                if rating >= 16: zone = "Extreme"; color = "#EF4444"
+                elif rating >= 10: zone = "High"; color = "#F59E0B"
+                elif rating >= 5: zone = "Medium"; color = "#3B82F6"
+                else: zone = "Low"; color = "#10B981"
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {color};border-radius:10px;padding:0.8rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>{risk.get('risk_number','N/A')}</b> — {risk.get('title','')[:80]}
+                            <br><span style="font-size:0.65rem;color:#666;">🏷️ {risk.get('risk_category','').replace('_',' ').title()} | 👤 {risk.get('risk_owner','')} | 💰 ₦{risk.get('inherent_cons_financial',0):,.0f}</span>
+                        </div>
+                        <span style="background:{color};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{zone.upper()} ({rating}/25)</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # ============================================
+    # TAB 1: REGISTER RISK — FORTUNE 500 STANDARD
+    # ============================================
+    with tabs[1]:
+        st.markdown("### ➕ Register New Risk — ISO 31000 / COSO ERM Standard")
+        
+        risk_categories = {
+            "health_safety_wellbeing": "1. Health, Safety & Wellbeing",
+            "business_continuity": "2. Business Continuity & Operational Resilience",
+            "tenant_revenue": "3. Tenant & Revenue",
+            "regulatory_legal": "4. Regulatory, Legal & Compliance",
+            "financial_fraud": "5. Financial & Fraud",
+            "environmental_sustainability": "6. Environmental & Sustainability",
+            "reputational_brand": "7. Reputational & Brand",
+            "strategic_market": "8. Strategic & Market",
+            "technology_cybersecurity": "9. Technology & Cybersecurity",
+            "third_party_supply_chain": "10. Third-Party & Supply Chain"
+        }
+        
+        sub_categories = {
+            "health_safety_wellbeing": ["Fire & Explosion","Structural Integrity","Entrapment (Elevators)","Hazardous Materials","Legionella/Water Quality","Air Quality (IAQ)","Occupational Health","Pandemic/Infectious Disease","Personal Security","Mental Wellbeing"],
+            "business_continuity": ["Critical Equipment Failure","Utility Outage","Supply Chain Failure","Cyber Attack/BMS Compromise","Telecommunications Failure","Extreme Weather Event","Civil Unrest/Terrorism","Pandemics","Key Person Dependency"],
+            "tenant_revenue": ["Anchor Tenant Loss","Occupancy Rate Decline","Rental Rate Compression","Tenant Default/Bankruptcy","Lease Disputes","Service Credit Claims","Tenant Experience Failure","Competitor Building Advantage"],
+            "regulatory_legal": ["Fire Code Violation","Elevator Non-Compliance","Pressure Vessel Certification","Electrical Safety Non-Compliance","Environmental Permit Breach","Building Code Violation","Data Privacy","Employment Law","Contract Breach","Personal Injury Litigation"],
+            "financial_fraud": ["Theft of Physical Assets","Procurement Fraud","Contractor Overbilling","Inventory Shrinkage","Budget Overrun","Currency/FX Exposure","Interest Rate Risk","Insurance Underinsurance","Accounts Receivable"],
+            "environmental_sustainability": ["Diesel Spill/Leak","Refrigerant Leak (F-Gas)","Improper Waste Disposal","Energy Performance Non-Compliance","Carbon Tax/Emissions Penalty","Water Scarcity","Flood Risk (Physical Climate)","Heat Stress (Physical Climate)","Biodiversity Impact"],
+            "reputational_brand": ["Negative Media Coverage","Social Media Crisis","Tenant Protest/Dispute","Poor Online Ratings","Greenwashing Accusation","Community Relations Failure"],
+            "strategic_market": ["Remote/Hybrid Work Shift","Market Oversupply","Technological Obsolescence","Demographic Shift","Policy Change","Investor Exit/Refinancing Risk","Stranded Asset Risk"],
+            "technology_cybersecurity": ["BMS/SCADA Cyber Attack","Tenant WiFi Compromise","Access Control Hack","CCTV Breach","Ransomware on FM Systems","IoT Sensor Network Failure","Data Loss","Legacy System Obsolescence","AI/Algorithm Bias"],
+            "third_party_supply_chain": ["Critical Contractor Failure","Single-Source Supplier Dependency","Contractor Safety Performance","Contractor Compliance Failure","SLA Breach","Modern Slavery in Supply Chain","Geopolitical Supply Disruption"]
+        }
+        
+        with st.form("register_risk_form"):
+            st.markdown("#### Section A: Risk Identification & Ownership")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                risk_title = st.text_input("Risk Title*", placeholder="e.g., Chiller #2 Catastrophic Compressor Failure")
+                risk_category = st.selectbox("Category*", list(risk_categories.keys()), format_func=lambda x: risk_categories[x])
+            with c2:
+                if risk_category in sub_categories:
+                    risk_sub_category = st.selectbox("Sub-Category*", sub_categories[risk_category])
+                else:
+                    risk_sub_category = st.text_input("Sub-Category*")
+                risk_owner = st.text_input("Risk Owner*")
+            with c3:
+                risk_source = st.selectbox("Source of Identification", ["Incident","Audit","Asset Condition Alert","Tenant Feedback","Regulatory Change","External Event","Strategic Review","Horizon Scanning"])
+                risk_stakeholders = st.text_input("Stakeholders", placeholder="e.g., Tenant Rep, Insurer")
+            
+            risk_desc = st.text_area("Risk Description*", height=80, placeholder="What could happen? What would cause it? What is the chain of events? What is the impact?")
+            risk_triggers = st.text_input("Risk Triggers / Leading Indicators", placeholder="e.g., Increasing vibration, Rising reactive WO count")
+            risk_interdependencies = st.text_input("Interdependencies (Risk IDs)", placeholder="e.g., RISK-0089")
+            
+            st.markdown("---")
+            st.markdown("#### Section B: Inherent Risk Assessment (Before Controls)")
             c1, c2 = st.columns(2)
             with c1:
-                inh_likelihood = st.selectbox("Likelihood", [1,2,3,4,5], format_func=lambda x: {1:"Rare",2:"Unlikely",3:"Possible",4:"Likely",5:"Almost Certain"}[x])
+                inh_likelihood = st.selectbox("Inherent Likelihood*", [1,2,3,4,5], format_func=lambda x: {1:"Rare",2:"Unlikely",3:"Possible",4:"Likely",5:"Almost Certain"}[x])
             with c2:
-                inh_consequence = st.selectbox("Consequence", [1,2,3,4,5], format_func=lambda x: {1:"Insignificant",2:"Minor",3:"Moderate",4:"Major",5:"Catastrophic"}[x])
+                inh_cons_overall = st.selectbox("Inherent Consequence (Overall)*", [1,2,3,4,5], format_func=lambda x: {1:"Insignificant",2:"Minor",3:"Moderate",4:"Major",5:"Catastrophic"}[x])
             
-            inh_rating = inh_likelihood * inh_consequence
+            st.markdown("**Multi-Dimensional Consequence Assessment:**")
+            c1, c2, c3, c4, c5 = st.columns(5)
+            with c1:
+                inh_safety = st.selectbox("Safety", [1,2,3,4,5], format_func=lambda x: {1:"Insig.",2:"Minor",3:"Mod.",4:"Major",5:"Catastr."}[x], key="inh_safety")
+            with c2:
+                inh_financial = st.number_input("Financial (₦)*", min_value=0.0, value=0.0, step=1000000.0, key="inh_financial")
+            with c3:
+                inh_operational = st.selectbox("Operational", [1,2,3,4,5], format_func=lambda x: {1:"<2hrs",2:"<1day",3:"1-3d",4:"1-2w",5:">2w"}[x], key="inh_oper")
+            with c4:
+                inh_reputational = st.selectbox("Reputational", [1,2,3,4,5], format_func=lambda x: {1:"Internal",2:"Tenants",3:"Online",4:"Local Media",5:"National"}[x], key="inh_rep")
+            with c5:
+                inh_regulatory = st.selectbox("Regulatory", [1,2,3,4,5], format_func=lambda x: {1:"Minor Breach",2:"Notice",3:"Fine",4:"Prosecution",5:"License Revoked"}[x], key="inh_reg")
+            
+            inh_rating = inh_likelihood * inh_cons_overall
             zone = "Extreme" if inh_rating >= 16 else "High" if inh_rating >= 10 else "Medium" if inh_rating >= 5 else "Low"
             st.caption(f"Inherent Rating: {inh_rating}/25 — {zone.upper()}")
             
-            existing_controls = st.text_area("Existing Controls", height=60, placeholder="What controls are currently in place?")
+            st.markdown("---")
+            st.markdown("#### Section C: Existing Controls")
+            existing_controls = st.text_area("Existing Controls", height=80, placeholder="List all controls currently in place. Be specific: Not 'PM program' but 'Quarterly vibration analysis on Chiller #2 compressor by certified technician.'")
             
-            st.markdown("**📊 Residual Risk (After Controls)**")
+            st.markdown("---")
+            st.markdown("#### Section D: Residual Risk Assessment (After Controls)")
             c1, c2 = st.columns(2)
             with c1:
-                res_likelihood = st.selectbox("Residual Likelihood", [1,2,3,4,5], format_func=lambda x: {1:"Rare",2:"Unlikely",3:"Possible",4:"Likely",5:"Almost Certain"}[x], index=min(inh_likelihood-1, 4))
+                res_likelihood = st.selectbox("Residual Likelihood*", [1,2,3,4,5], format_func=lambda x: {1:"Rare",2:"Unlikely",3:"Possible",4:"Likely",5:"Almost Certain"}[x], index=min(inh_likelihood-1, 4))
             with c2:
-                res_consequence = st.selectbox("Residual Consequence", [1,2,3,4,5], format_func=lambda x: {1:"Insignificant",2:"Minor",3:"Moderate",4:"Major",5:"Catastrophic"}[x], index=min(inh_consequence-1, 4))
+                res_consequence = st.selectbox("Residual Consequence*", [1,2,3,4,5], format_func=lambda x: {1:"Insignificant",2:"Minor",3:"Moderate",4:"Major",5:"Catastrophic"}[x], index=min(inh_cons_overall-1, 4))
             
             res_rating = res_likelihood * res_consequence
             res_zone = "Extreme" if res_rating >= 16 else "High" if res_rating >= 10 else "Medium" if res_rating >= 5 else "Low"
+            target_level = st.selectbox("Target Risk Level (Risk Appetite)", ["Low","Medium"], format_func=lambda x: f"Acceptable: {x}")
             st.caption(f"Residual Rating: {res_rating}/25 — {res_zone.upper()}")
+            
+            st.markdown("---")
+            st.markdown("#### Section E: Risk Treatment Plan")
+            c1, c2 = st.columns(2)
+            with c1:
+                treatment_strategy = st.selectbox("Treatment Strategy*", ["reduce","transfer","avoid","accept"])
+            with c2:
+                treatment_justification = st.text_area("Treatment Justification", height=60, placeholder="Rationale for chosen strategy. If 'Accept', include cost-benefit analysis.")
             
             if st.form_submit_button("➕ REGISTER RISK", use_container_width=True, type="primary"):
                 if risk_title and risk_owner and risk_desc:
@@ -5699,15 +5889,22 @@ def page_fo():
                     
                     supabase.table("risk_register").insert({
                         "facility_code":fc,"risk_number":risk_number,"title":risk_title,
-                        "risk_category":risk_category,"description":risk_desc,
-                        "inherent_likelihood":inh_likelihood,"inherent_consequence":inh_consequence,
+                        "risk_category":risk_category,"risk_sub_category":risk_sub_category,
+                        "description":risk_desc,"risk_triggers":risk_triggers,
+                        "risk_interdependencies":risk_interdependencies,
+                        "risk_owner":risk_owner,"risk_stakeholders":risk_stakeholders,
+                        "date_raised":str(today),"source_of_identification":risk_source,
+                        "inherent_likelihood":inh_likelihood,
+                        "inherent_cons_safety":inh_safety,"inherent_cons_financial":inh_financial,
+                        "inherent_cons_operational":inh_operational,"inherent_cons_reputational":inh_reputational,
+                        "inherent_cons_regulatory":inh_regulatory,"inherent_cons_overall":inh_cons_overall,
                         "inherent_rating":inh_rating,"existing_controls":existing_controls,
                         "residual_likelihood":res_likelihood,"residual_consequence":res_consequence,
-                        "residual_rating":res_rating,"treatment_strategy":risk_treatment,
-                        "risk_owner":risk_owner,"financial_exposure":risk_exposure,
-                        "risk_status":"identified","next_review_date":str(next_review),
-                        "last_review_date":str(today),"created_by":user_name,
-                        "created_at":wat_now.isoformat()
+                        "residual_rating":res_rating,"residual_level":res_zone,
+                        "target_risk_level":target_level,"treatment_strategy":treatment_strategy,
+                        "treatment_justification":treatment_justification,
+                        "risk_status":"identified","next_review_date":str(today + timedelta(days=90)),
+                        "last_review_date":str(today),"created_by":user_name,"created_at":wat_now.isoformat()
                     }).execute()
                     
                     st.success(f"✅ Risk {risk_number} registered!"); st.balloons(); st.rerun()
@@ -5715,67 +5912,78 @@ def page_fo():
                     st.error("⚠️ Title, Owner, and Description are required")
     
     # ============================================
-    # TAB 2: TREATMENTS
+    # TAB 2: TREATMENTS & CONTROLS
     # ============================================
     with tabs[2]:
-        st.markdown("### 🔧 Risk Treatments")
+        st.markdown("### 🔧 Risk Treatments & Controls")
         
         if total_risks == 0:
             st.info("No risks registered yet.")
         else:
-            # Add treatment
-            with st.expander("➕ Add Treatment Action"):
-                with st.form("add_treatment_form"):
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        treat_risk = st.selectbox("Risk", [f"{r.get('risk_number','')} — {r.get('title','')[:50]}" for _, r in risk_df.iterrows()])
-                        treat_desc = st.text_input("Action Description*")
-                    with c2:
-                        treat_person = st.text_input("Responsible Person")
-                        treat_due = st.date_input("Due Date", today + timedelta(days=30))
-                    
-                    treat_budget = st.number_input("Budget Required (₦)", min_value=0.0, value=0.0, step=10000.0)
-                    
-                    if st.form_submit_button("➕ Add Treatment", use_container_width=True):
-                        if treat_desc:
-                            risk_idx = [i for i, r in enumerate(risk_df.iterrows()) if f"{r[1].get('risk_number','')} — {r[1].get('title','')[:50]}" == treat_risk][0]
-                            risk_id = risk_df.iloc[risk_idx]["id"]
-                            supabase.table("risk_treatments").insert({
-                                "risk_id":risk_id,"action_description":treat_desc,
-                                "responsible_person":treat_person,"due_date":str(treat_due),
-                                "budget_required":treat_budget,"status":"pending"
-                            }).execute()
-                            st.success("✅ Treatment added!"); st.rerun()
+            treat_tabs = st.tabs(["📋 Treatment Actions", "🛡️ Controls"])
             
-            st.markdown("---")
+            with treat_tabs[0]:
+                with st.expander("➕ Add Treatment Action"):
+                    with st.form("add_treatment_form"):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            treat_risk = st.selectbox("Risk", [f"{r.get('risk_number','')} — {r.get('title','')[:50]}" for _, r in risk_df.iterrows()])
+                            treat_desc = st.text_input("Action Description*")
+                        with c2:
+                            treat_person = st.text_input("Action Owner")
+                            treat_due = st.date_input("Due Date", today + timedelta(days=30))
+                        treat_budget = st.number_input("Budget Required (₦)", min_value=0.0, value=0.0, step=10000.0)
+                        if st.form_submit_button("➕ Add Treatment", use_container_width=True):
+                            if treat_desc:
+                                risk_idx = [i for i, r in enumerate(risk_df.iterrows()) if f"{r[1].get('risk_number','')} — {r[1].get('title','')[:50]}" == treat_risk][0]
+                                risk_id = risk_df.iloc[risk_idx]["id"]
+                                supabase.table("risk_treatments").insert({
+                                    "risk_id":risk_id,"action_description":treat_desc,
+                                    "action_owner":treat_person,"due_date":str(treat_due),
+                                    "budget_required":treat_budget,"status":"pending"
+                                }).execute()
+                                st.success("✅ Treatment added!"); st.rerun()
+                
+                st.markdown("---")
+                for _, risk in risk_df.iterrows():
+                    treatments = supabase.table("risk_treatments").select("*").eq("risk_id", risk["id"]).order("created_at").execute()
+                    if treatments.data:
+                        st.markdown(f"**{risk.get('risk_number','')} — {risk.get('title','')[:60]}**")
+                        for t in treatments.data:
+                            status = t.get("status","pending")
+                            sc = "#10B981" if status == "completed" else "#F59E0B" if status == "in_progress" else "#EF4444"
+                            overdue = " ⚠️ OVERDUE" if pd.to_datetime(t["due_date"]).date() < today and status != "completed" else ""
+                            st.markdown(f"""<div style="background:white;border-left:3px solid {sc};border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;">{t.get('action_description','')[:100]}{overdue}<br><span style="font-size:0.6rem;">👤 {t.get('action_owner','')} | 📅 {t.get('due_date','')} | 💰 ₦{t.get('budget_required',0):,.0f}</span><span style="float:right;color:{sc};font-weight:600;">{status.upper()}</span></div>""", unsafe_allow_html=True)
+                            if status != "completed":
+                                if st.button("✅ Complete", key=f"treat_{t['id']}", use_container_width=True):
+                                    supabase.table("risk_treatments").update({"status":"completed","completed_date":str(today),"completed_by":user_name}).eq("id",t["id"]).execute()
+                                    st.success("✅ Completed!"); st.rerun()
+                        st.markdown("---")
             
-            # Show treatments
-            for _, risk in risk_df.iterrows():
-                treatments = supabase.table("risk_treatments").select("*").eq("risk_id", risk["id"]).order("created_at").execute()
-                if treatments.data:
-                    st.markdown(f"**{risk.get('risk_number','')} — {risk.get('title','')[:60]}**")
-                    for t in treatments.data:
-                        status = t.get("status","pending")
-                        sc = "#10B981" if status == "completed" else "#F59E0B" if status == "in_progress" else "#EF4444"
-                        overdue = ""
-                        try:
-                            if pd.to_datetime(t["due_date"]).date() < today and status != "completed":
-                                overdue = " ⚠️ OVERDUE"
-                        except: pass
-                        
-                        st.markdown(f"""
-                        <div style="background:white;border-left:3px solid {sc};border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;">
-                            {t.get('action_description','')[:100]}{overdue}
-                            <br><span style="font-size:0.6rem;">👤 {t.get('responsible_person','')} | 📅 Due: {t.get('due_date','')} | 💰 ₦{t.get('budget_required',0):,.0f}</span>
-                            <span style="float:right;color:{sc};font-weight:600;">{status.upper()}</span>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        if status != "completed":
-                            if st.button("✅ Complete", key=f"treat_{t['id']}", use_container_width=True):
-                                supabase.table("risk_treatments").update({"status":"completed","completed_date":str(today),"completed_by":user_name}).eq("id",t["id"]).execute()
-                                st.success("✅ Completed!"); st.rerun()
-                    st.markdown("---")
+            with treat_tabs[1]:
+                with st.expander("➕ Add Control"):
+                    with st.form("add_control_form"):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            ctrl_risk = st.selectbox("Risk", [f"{r.get('risk_number','')} — {r.get('title','')[:50]}" for _, r in risk_df.iterrows()], key="ctrl_risk")
+                            ctrl_desc = st.text_input("Control Description*")
+                        with c2:
+                            ctrl_type = st.selectbox("Control Type", ["Preventive","Detective","Mitigative","Directive"])
+                            ctrl_owner = st.text_input("Control Owner")
+                        c1, c2 = st.columns(2)
+                        with c1: ctrl_frequency = st.selectbox("Frequency", ["Continuous","Daily","Weekly","Monthly","Quarterly","Annual"])
+                        with c2: ctrl_effectiveness = st.selectbox("Effectiveness", ["Effective","Mostly Effective","Partially Effective","Ineffective","Not Tested"])
+                        if st.form_submit_button("➕ Add Control", use_container_width=True):
+                            if ctrl_desc:
+                                risk_idx2 = [i for i, r in enumerate(risk_df.iterrows()) if f"{r[1].get('risk_number','')} — {r[1].get('title','')[:50]}" == ctrl_risk][0]
+                                risk_id2 = risk_df.iloc[risk_idx2]["id"]
+                                supabase.table("risk_controls").insert({
+                                    "risk_id":risk_id2,"control_description":ctrl_desc,
+                                    "control_type":ctrl_type,"control_owner":ctrl_owner,
+                                    "control_frequency":ctrl_frequency,"effectiveness_rating":ctrl_effectiveness,
+                                    "last_tested_date":str(today)
+                                }).execute()
+                                st.success("✅ Control added!"); st.rerun()
     
     # ============================================
     # TAB 3: REVIEWS
@@ -5786,19 +5994,10 @@ def page_fo():
         if total_risks == 0:
             st.info("No risks registered yet.")
         else:
-            # Show risks due for review
             overdue_reviews = risk_df[(pd.to_datetime(risk_df["next_review_date"], errors='coerce').dt.date <= today) & (risk_df["risk_status"] != "closed")] if total_risks > 0 else pd.DataFrame()
-            
             if len(overdue_reviews) > 0:
                 st.warning(f"⚠️ {len(overdue_reviews)} risks are due for review")
-                for _, risk in overdue_reviews.iterrows():
-                    st.markdown(f"""
-                    <div style="background:#FFFBEB;border-left:3px solid #F59E0B;border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;">
-                        <b>{risk.get('risk_number','')}</b> — Review due: {risk.get('next_review_date','')}
-                    </div>
-                    """, unsafe_allow_html=True)
             
-            # Add review
             with st.expander("➕ Record Review"):
                 with st.form("add_review_form"):
                     c1, c2 = st.columns(2)
@@ -5808,12 +6007,10 @@ def page_fo():
                     with c2:
                         review_new_rating = st.selectbox("New Residual Rating", [1,2,3,4,5,6,8,9,10,12,15,16,20,25])
                         review_comments = st.text_area("Comments")
-                    
                     if st.form_submit_button("➕ Record Review", use_container_width=True):
                         risk_idx = [i for i, r in enumerate(risk_df.iterrows()) if f"{r[1].get('risk_number','')} — {r[1].get('title','')[:50]}" == review_risk][0]
                         risk_id = risk_df.iloc[risk_idx]["id"]
                         old_rating = risk_df.iloc[risk_idx].get("residual_rating", 0)
-                        
                         supabase.table("risk_reviews").insert({
                             "risk_id":risk_id,"review_date":str(review_date_r),
                             "reviewer_name":user_name,"previous_rating":old_rating,
@@ -5824,35 +6021,25 @@ def page_fo():
                             "next_review_date":str(review_date_r + timedelta(days=90))
                         }).eq("id",risk_id).execute()
                         st.success("✅ Review recorded!"); st.rerun()
-            
-            # Show recent reviews
-            st.markdown("---")
-            st.markdown("### Recent Reviews")
-            all_reviews = supabase.table("risk_reviews").select("*").order("created_at", desc=True).limit(20).execute()
-            if all_reviews.data:
-                for rev in all_reviews.data:
-                    st.caption(f"📅 {rev.get('review_date','')} | Rating: {rev.get('previous_rating','')} → {rev.get('new_rating','')} | {rev.get('reviewer_name','')}: {str(rev.get('comments',''))[:80]}")
     
     # ============================================
     # TAB 4: REPORTS
     # ============================================
     with tabs[4]:
         st.markdown("### 📄 Risk Reports")
-        
         c1, c2, c3 = st.columns(3)
         with c1: st.metric("Total Risks", total_risks)
         with c2: st.metric("Extreme Risks", extreme_risks)
         with c3: st.metric("Residual Exposure", f"₦{total_exposure:,.0f}")
         
         st.markdown("---")
-        
         c1, c2 = st.columns(2)
         with c1:
             if st.button("📄 Generate Risk Report (HTML)", key="risk_html_btn", use_container_width=True, type="primary"):
                 logo_b64 = get_logo_base64()
-                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Risk Report</title><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}.kpi-row{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:20px;font-weight:800;color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:10px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}</style></head><body><h1>Risk Management Report</h1><p>{info.get('full_name',fc)} | {today}</p><div class="kpi-row"><div class="kpi"><div class="val">{ori}/100</div>ORI</div><div class="kpi"><div class="val">₦{total_exposure:,.0f}</div>Exposure</div><div class="kpi"><div class="val">{extreme_risks}</div>Extreme</div><div class="kpi"><div class="val">{high_risks}</div>High</div><div class="kpi"><div class="val">{overdue_treatments}</div>Overdue</div><div class="kpi"><div class="val">{total_risks}</div>Total</div></div><h2>Risk Register</h2><table><tr><th>ID</th><th>Title</th><th>Category</th><th>Rating</th><th>Owner</th><th>Exposure</th></tr>"""
+                html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Risk Report</title><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}.kpi-row{{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:20px 0}}.kpi{{background:#f9fafb;border-radius:10px;padding:12px;text-align:center;border-top:3px solid #CC0000}}.kpi .val{{font-size:20px;font-weight:800;color:#CC0000}}table{{width:100%;border-collapse:collapse;font-size:10px}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}</style></head><body><h1>Risk Management Report — ISO 31000</h1><p>{info.get('full_name',fc)} | {today}</p><div class="kpi-row"><div class="kpi"><div class="val">{ori}/100</div>ORI</div><div class="kpi"><div class="val">₦{total_exposure:,.0f}</div>Exposure</div><div class="kpi"><div class="val">{extreme_risks}</div>Extreme</div><div class="kpi"><div class="val">{high_risks}</div>High</div><div class="kpi"><div class="val">{overdue_treatments}</div>Overdue</div><div class="kpi"><div class="val">{total_risks}</div>Total</div></div><h2>Risk Register</h2><table><tr><th>ID</th><th>Title</th><th>Category</th><th>Rating</th><th>Owner</th><th>Exposure</th></tr>"""
                 for _,r in risk_df.head(30).iterrows():
-                    html += f"<tr><td>{r.get('risk_number','')}</td><td>{r.get('title','')[:50]}</td><td>{r.get('risk_category','')}</td><td>{r.get('residual_rating','')}/25</td><td>{r.get('risk_owner','')}</td><td>₦{r.get('financial_exposure',0):,.0f}</td></tr>"
+                    html += f"<tr><td>{r.get('risk_number','')}</td><td>{r.get('title','')[:50]}</td><td>{risk_categories.get(r.get('risk_category',''),r.get('risk_category',''))}</td><td>{r.get('residual_rating','')}/25</td><td>{r.get('risk_owner','')}</td><td>₦{r.get('inherent_cons_financial',0):,.0f}</td></tr>"
                 html += "</table></body></html>"
                 st.download_button("📥 Download HTML", html, f"risk_report_{today}.html", "text/html", use_container_width=True)
         with c2:
@@ -5864,12 +6051,12 @@ def page_fo():
                     pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
                     pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {today}'),0,1); pdf.ln(4)
                     pdf.set_font('Helvetica','B',7); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
-                    for h,w in zip(['ID','Title','Category','Rating','Owner','Exposure'],[35,65,30,20,40,40]): pdf.cell(w,5,h,1,0,'C',True)
+                    for h,w in zip(['ID','Title','Category','Rating','Owner','Exposure'],[35,65,35,20,40,40]): pdf.cell(w,5,h,1,0,'C',True)
                     pdf.ln(); pdf.set_font('Helvetica','',7); pdf.set_text_color(0,0,0)
                     for _,r in risk_df.head(40).iterrows():
                         pdf.cell(35,4,safe_text(r.get('risk_number','')),1,0); pdf.cell(65,4,safe_text(str(r.get('title',''))[:28]),1,0)
-                        pdf.cell(30,4,safe_text(r.get('risk_category','')),1,0); pdf.cell(20,4,str(r.get('residual_rating','')),1,0)
-                        pdf.cell(40,4,safe_text(str(r.get('risk_owner',''))[:18]),1,0); pdf.cell(40,4,f'N{safe_text(str(r.get("financial_exposure",0)))}',1,0)
+                        pdf.cell(35,4,safe_text(r.get('risk_category','')[:15]),1,0); pdf.cell(20,4,str(r.get('residual_rating','')),1,0)
+                        pdf.cell(40,4,safe_text(str(r.get('risk_owner',''))[:18]),1,0); pdf.cell(40,4,f'N{safe_text(str(r.get("inherent_cons_financial",0)))}',1,0)
                         pdf.ln()
                     pdf_file = f"/tmp/risk_report_{today}.pdf"; pdf.output(pdf_file)
                     with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"risk_report_{today}.pdf", "application/pdf", use_container_width=True)
