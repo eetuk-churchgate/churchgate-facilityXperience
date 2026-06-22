@@ -9161,7 +9161,7 @@ def page_hot():
     # ============================================
     # TAB 0: ALL HOTO RECORDS WITH STATUS
     # ============================================
-   with tabs[0]:
+    with tabs[0]:
         st.markdown("### 📋 HOTO Records")
         
         if st.session_state.get("hoto_created", False):
