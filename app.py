@@ -8035,7 +8035,25 @@ def page_cs():
 
 
 # ============================================
+# INCIDENT ESCALATION HELPER (top-level function)
+# ============================================
+def _send_incident_escalation(fc, inc_id, severity, level, title):
+    try:
+        esc = supabase.table("incident_escalation").select("*").eq("facility_code", fc).eq("severity", severity).eq("escalation_level", level).execute()
+        if esc.data:
+            for e in esc.data:
+                send_email_notification(
+                    e["escalate_to_email"],
+                    f"🚨 Incident Escalation L{level} — {title}",
+                    f"<h3>Incident Requires Attention</h3><p><b>Level:</b> {level}</p><p><b>Incident:</b> {title}</p><p>Please respond within {e.get('sla_minutes','15')} minutes.</p>"
+                )
+    except:
+        pass
+
+
+# ============================================
 # INCIDENT INTELLIGENCE — COMMAND & CONTROL TOWER
+# COMPLETE WITH DETAIL VIEW, UPLOADS, ESCALATION
 # ============================================
 def page_ic():
     fc = st.session_state.get("facility", "WTC")
@@ -8076,28 +8094,24 @@ def page_ic():
     with c3:
         color = "#EF4444" if critical_inc > 0 else "#10B981"
         st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Critical</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{critical_inc}</div></div>""", unsafe_allow_html=True)
-    with c4:
-        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Tenants Impacted</div><div style="font-size:1.3rem;font-weight:800;color:#8B5CF6;">{tenant_impacted}</div></div>""", unsafe_allow_html=True)
-    with c5:
-        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Total</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6;">{total_inc}</div></div>""", unsafe_allow_html=True)
+    with c4: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Tenants</div><div style="font-size:1.3rem;font-weight:800;color:#8B5CF6;">{tenant_impacted}</div></div>""", unsafe_allow_html=True)
+    with c5: st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Total</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6;">{total_inc}</div></div>""", unsafe_allow_html=True)
     with c6:
         reopened = len(inc_df[inc_df["reopened_count"] > 0]) if total_inc > 0 else 0
         st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Reopened</div><div style="font-size:1.3rem;font-weight:800;color:#F59E0B;">{reopened}</div></div>""", unsafe_allow_html=True)
     
-    if life_safety > 0:
-        st.error(f"🚨 **LIFE SAFETY:** {life_safety} active incidents involve life safety risk. Immediate attention required!")
-    if critical_inc > 0:
-        st.error(f"🔴 **CRITICAL:** {critical_inc} critical incidents active.")
+    if life_safety > 0: st.error(f"🚨 LIFE SAFETY: {life_safety} active incidents involve life safety risk!")
+    if critical_inc > 0: st.error(f"🔴 CRITICAL: {critical_inc} critical incidents active.")
     
     st.markdown("---")
     
     # ============================================
     # TABS
     # ============================================
-    tabs = st.tabs(["📋 Active Incidents", "➕ Report Incident", "📊 All Incidents", "📈 Analytics", "📄 Reports"])
+    tabs = st.tabs(["📋 Active Incidents", "➕ Report Incident", "📊 All Incidents", "📈 Analytics", "⚙️ Escalation Settings", "📄 Reports"])
     
     # ============================================
-    # TAB 0: ACTIVE INCIDENTS
+    # TAB 0: ACTIVE INCIDENTS WITH DETAIL VIEW
     # ============================================
     with tabs[0]:
         st.markdown("### 📋 Active Incident Queue")
@@ -8132,6 +8146,69 @@ def page_ic():
                 
                 st.markdown(card_html, unsafe_allow_html=True)
                 
+                # Toggle detail view
+                detail_key = f"inc_detail_{inc_id}"
+                if detail_key not in st.session_state: st.session_state[detail_key] = False
+                
+                c1, c2 = st.columns([3,1])
+                with c1:
+                    if not st.session_state[detail_key]:
+                        if st.button(f"📋 View Details", key=f"view_{inc_id}", use_container_width=True):
+                            st.session_state[detail_key] = True; st.rerun()
+                    else:
+                        if st.button(f"🔼 Hide Details", key=f"hide_{inc_id}", use_container_width=True):
+                            st.session_state[detail_key] = False; st.rerun()
+                
+                if st.session_state[detail_key]:
+                    st.markdown(f"""
+                    <div style="background:#f9fafb;border-radius:10px;padding:1rem;margin:0.5rem 0;border:1px solid #e5e7eb;">
+                        <h4>{inc.get('title','')}</h4>
+                        <table style="width:100%;font-size:0.75rem;">
+                            <tr><td><b>Category:</b></td><td>{inc.get('category','N/A')}</td><td><b>Type:</b></td><td>{inc.get('incident_type','N/A')}</td></tr>
+                            <tr><td><b>Severity:</b></td><td style="color:{sev_color};font-weight:700;">{severity.upper()}</td><td><b>Status:</b></td><td style="color:{sc};font-weight:700;">{status.upper()}</td></tr>
+                            <tr><td><b>Location:</b></td><td>{inc.get('location_building','')} / {inc.get('location_floor','')}</td><td><b>Reported:</b></td><td>{str(inc.get('incident_date',''))} {str(inc.get('incident_time',''))}</td></tr>
+                            <tr><td><b>Reported By:</b></td><td>{inc.get('reported_by','N/A')}</td><td><b>Life Safety:</b></td><td>{'⚠️ Yes' if inc.get('life_safety_flag') else 'No'}</td></tr>
+                        </table>
+                        <p><b>Description:</b> {inc.get('description','N/A')}</p>
+                        <p><b>Immediate Actions:</b> {inc.get('immediate_actions','None recorded')}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Timeline
+                    timeline = supabase.table("incident_timeline").select("*").eq("incident_id",inc_id).order("timestamp").execute()
+                    if timeline.data:
+                        st.markdown("**📋 Timeline:**")
+                        for t in timeline.data:
+                            st.caption(f"{str(t.get('timestamp',''))[:16]} | {t.get('performed_by','')} | {t.get('action_type','').upper()}: {t.get('description','')}")
+                    
+                    # Attachments
+                    st.markdown("**📎 Attachments:**")
+                    attachments = supabase.table("incident_attachments").select("*").eq("incident_id",inc_id).execute()
+                    if attachments.data:
+                        for att in attachments.data:
+                            try:
+                                import base64 as b64
+                                file_bytes = b64.b64decode(att["file_data"])
+                                st.download_button(f"📎 {att.get('file_name','Download')}", file_bytes, att.get('file_name','file'), key=f"inc_att_{att['id']}", use_container_width=True)
+                            except: st.caption(f"📎 {att.get('file_name','Attachment')}")
+                    else:
+                        st.caption("No attachments")
+                    
+                    # Upload attachment
+                    with st.form(f"upload_inc_{inc_id}"):
+                        inc_file = st.file_uploader("📎 Attach Document/Image", type=["png","jpg","jpeg","pdf"], key=f"inc_file_{inc_id}")
+                        if st.form_submit_button("📤 Upload", use_container_width=True):
+                            if inc_file:
+                                import base64 as b64
+                                file_bytes = inc_file.read()
+                                file_b64 = b64.b64encode(file_bytes).decode()
+                                supabase.table("incident_attachments").insert({
+                                    "incident_id":inc_id,"file_name":inc_file.name,
+                                    "file_type":inc_file.type,"file_size":len(file_bytes),
+                                    "file_data":file_b64,"uploaded_by":user_name
+                                }).execute()
+                                st.success("✅ Uploaded!"); st.rerun()
+                
                 # Action buttons
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
@@ -8139,12 +8216,14 @@ def page_ic():
                         if st.button("✅ Acknowledge", key=f"ack_{inc_id}", use_container_width=True):
                             supabase.table("incidents").update({"status":"acknowledged","acknowledged_at":wat_now.isoformat(),"acknowledged_by":user_name}).eq("id",inc_id).execute()
                             supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"acknowledged","description":"Incident acknowledged","performed_by":user_name}).execute()
+                            _send_incident_escalation(fc, inc_id, severity, 1, inc.get('title',''))
                             st.success("✅ Acknowledged!"); st.rerun()
                 with c2:
                     if status in ["acknowledged","created"] and (is_admin or is_manager):
                         if st.button("🚀 Respond", key=f"resp_{inc_id}", use_container_width=True):
                             supabase.table("incidents").update({"status":"responding","responded_at":wat_now.isoformat(),"responded_by":user_name}).eq("id",inc_id).execute()
                             supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"responding","description":"Team responding","performed_by":user_name}).execute()
+                            _send_incident_escalation(fc, inc_id, severity, 2, inc.get('title',''))
                             st.success("🚀 Responding!"); st.rerun()
                 with c3:
                     if status == "responding":
@@ -8159,13 +8238,12 @@ def page_ic():
                             supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"closed","description":"Incident closed","performed_by":user_name}).execute()
                             st.success("✅ Closed!"); st.balloons(); st.rerun()
     
-   # ============================================
+    # ============================================
     # TAB 1: REPORT INCIDENT
     # ============================================
     with tabs[1]:
         st.markdown("### 🚨 Report New Incident")
         
-        # Define type map globally for this tab
         type_map = {
             "Life Safety Incident": ["Elevator Entrapment", "Person Trapped", "Structural Collapse Risk", "Asphyxiation Risk", "Fall Hazard", "Other Life Safety"],
             "Security Incident": ["Unauthorized Access", "Theft", "Vandalism", "Workplace Violence", "Suspicious Package", "Bomb Threat", "Civil Disturbance", "Other Security"],
@@ -8177,10 +8255,7 @@ def page_ic():
             "Near Miss": ["Near Miss - Fire", "Near Miss - Electrical", "Near Miss - Structural", "Near Miss - Elevator", "Near Miss - Security", "Other Near Miss"]
         }
         
-        # Step 1: Select Category FIRST (outside form)
-        inc_category = st.selectbox("Category*", list(type_map.keys()), key="inc_cat_selector")
-        
-        # Step 2: Show type based on selected category
+        inc_category = st.selectbox("Category*", list(type_map.keys()))
         inc_type = st.selectbox("Type*", type_map.get(inc_category, ["Select Category First"]))
         
         st.markdown("---")
@@ -8223,20 +8298,17 @@ def page_ic():
                     if result.data:
                         inc_id = result.data[0]["id"]
                         supabase.table("incident_timeline").insert({"incident_id":inc_id,"action_type":"created","description":"Incident reported","performed_by":user_name}).execute()
-                        st.session_state.incident_reported = True
-                        st.session_state.incident_number = inc_number
-                        st.rerun()
+                        _send_incident_escalation(fc, inc_id, inc_severity, 1, inc_title)
+                        st.session_state.incident_reported = True; st.session_state.incident_number = inc_number; st.rerun()
                 else:
                     st.error("⚠️ Title and Description are required")
     
-    # Success message
     if st.session_state.get("incident_reported", False):
-        st.success(f"✅ Incident {st.session_state.get('incident_number','')} reported!")
-        st.balloons()
+        st.success(f"✅ Incident {st.session_state.get('incident_number','')} reported!"); st.balloons()
         st.session_state.incident_reported = False
     
     # ============================================
-    # TAB 2: ALL INCIDENTS
+    # TAB 2: ALL INCIDENTS WITH DETAIL
     # ============================================
     with tabs[2]:
         st.markdown("### 📊 All Incidents")
@@ -8246,71 +8318,127 @@ def page_ic():
         else:
             for _, inc in inc_df.head(30).iterrows():
                 sev_color = {"critical":"#EF4444","major":"#F59E0B","minor":"#3B82F6","monitoring":"#6B7280"}.get(inc.get("severity","minor"),"#6B7280")
+                inc_id = inc["id"]
+                
                 st.markdown(f"""
                 <div style="background:white;border-left:3px solid {sev_color};border-radius:8px;padding:0.6rem;margin:0.2rem 0;font-size:0.75rem;">
                     <b>{inc.get('incident_number','')}</b> — {inc.get('title','')[:80]}
-                    <br><span style="font-size:0.65rem;color:#666;">{inc.get('status','').upper()} | 📅 {str(inc.get('incident_date',''))}</span>
+                    <br><span style="font-size:0.65rem;color:#666;">{inc.get('status','').upper()} | 📅 {str(inc.get('incident_date',''))} | {inc.get('category','')}</span>
                 </div>
                 """, unsafe_allow_html=True)
+                
+                detail_key2 = f"all_inc_{inc_id}"
+                if detail_key2 not in st.session_state: st.session_state[detail_key2] = False
+                
+                if not st.session_state[detail_key2]:
+                    if st.button(f"📋 View Details", key=f"all_view_{inc_id}", use_container_width=True):
+                        st.session_state[detail_key2] = True; st.rerun()
+                else:
+                    if st.button(f"🔼 Hide Details", key=f"all_hide_{inc_id}", use_container_width=True):
+                        st.session_state[detail_key2] = False; st.rerun()
+                
+                if st.session_state[detail_key2]:
+                    st.markdown(f"""
+                    <div style="background:#f9fafb;border-radius:8px;padding:0.8rem;margin:0.3rem 0;">
+                        <p><b>Category:</b> {inc.get('category','N/A')} | <b>Type:</b> {inc.get('incident_type','N/A')}</p>
+                        <p><b>Description:</b> {inc.get('description','N/A')}</p>
+                        <p><b>Actions:</b> {inc.get('immediate_actions','None')}</p>
+                        <p><b>Location:</b> {inc.get('location_building','')} / {inc.get('location_floor','')}</p>
+                        <p><b>Reported:</b> {inc.get('reported_by','')} | <b>Status:</b> {inc.get('status','').upper()}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
     
     # ============================================
     # TAB 3: ANALYTICS
     # ============================================
     with tabs[3]:
         st.markdown("### 📈 Incident Analytics")
-        
         if total_inc > 0:
             c1, c2 = st.columns(2)
             with c1:
                 sev_counts = inc_df["severity"].value_counts()
                 fig1 = px.pie(values=sev_counts.values, names=sev_counts.index, title="By Severity", color_discrete_sequence=["#EF4444","#F59E0B","#3B82F6","#6B7280"])
-                fig1.update_layout(height=350)
-                st.plotly_chart(fig1, use_container_width=True)
+                fig1.update_layout(height=350); st.plotly_chart(fig1, use_container_width=True)
             with c2:
                 type_counts = inc_df["incident_type"].value_counts().head(8)
                 fig2 = px.bar(x=type_counts.values, y=type_counts.index, orientation='h', title="By Type", color=type_counts.values)
-                fig2.update_layout(height=350)
-                st.plotly_chart(fig2, use_container_width=True)
-        else:
-            st.info("No data for analytics.")
+                fig2.update_layout(height=350); st.plotly_chart(fig2, use_container_width=True)
+        else: st.info("No data for analytics.")
     
     # ============================================
-    # TAB 4: REPORTS
+    # TAB 4: ESCALATION SETTINGS (ADMIN ONLY)
     # ============================================
     with tabs[4]:
-        st.markdown("### 📄 Incident Reports")
+        st.markdown("### ⚙️ Incident Escalation Settings")
         
+        if not is_admin:
+            st.error("⛔ Admin access only")
+        else:
+            severity_levels = ["critical","major","minor","monitoring"]
+            
+            for sev in severity_levels:
+                st.markdown(f"**{sev.upper()}**")
+                
+                existing = supabase.table("incident_escalation").select("*").eq("facility_code",fc).eq("severity",sev).order("escalation_level").execute()
+                
+                for level in range(1, 7):
+                    existing_config = [e for e in (existing.data or []) if e["escalation_level"] == level]
+                    current_name = existing_config[0].get("escalate_to_name","") if existing_config else ""
+                    current_email = existing_config[0].get("escalate_to_email","") if existing_config else ""
+                    current_sla = existing_config[0].get("sla_minutes",15*level) if existing_config else 15*level
+                    
+                    c1, c2, c3 = st.columns([2,2,1])
+                    with c1: new_name = st.text_input(f"L{level} Name", value=current_name, key=f"esc_{sev}_{level}_name")
+                    with c2: new_email = st.text_input(f"L{level} Email", value=current_email, key=f"esc_{sev}_{level}_email")
+                    with c3: new_sla = st.number_input(f"SLA (min)", value=current_sla, min_value=5, key=f"esc_{sev}_{level}_sla")
+                
+                if st.button(f"💾 Save {sev.upper()} Escalation", key=f"save_{sev}", use_container_width=True):
+                    for level in range(1, 7):
+                        name = st.session_state.get(f"esc_{sev}_{level}_name","")
+                        email = st.session_state.get(f"esc_{sev}_{level}_email","")
+                        sla = st.session_state.get(f"esc_{sev}_{level}_sla",15)
+                        
+                        if name and email:
+                            supabase.table("incident_escalation").delete().eq("facility_code",fc).eq("severity",sev).eq("escalation_level",level).execute()
+                            supabase.table("incident_escalation").insert({
+                                "facility_code":fc,"severity":sev,"escalation_level":level,
+                                "level_name":f"Level {level}","escalate_to_name":name,
+                                "escalate_to_email":email,"sla_minutes":int(sla)
+                            }).execute()
+                    st.success(f"✅ {sev.upper()} escalation saved!"); st.rerun()
+                
+                st.markdown("---")
+    
+    # ============================================
+    # TAB 5: REPORTS
+    # ============================================
+    with tabs[5]:
+        st.markdown("### 📄 Incident Reports")
         c1, c2 = st.columns(2)
         with c1:
             if st.button("📄 HTML Report", key="inc_html_btn", use_container_width=True, type="primary"):
                 logo_b64 = get_logo_base64()
-                logo_img = f'<img src="data:image/png;base64,{logo_b64}" height="30">' if logo_b64 else ''
                 html = f"""<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Incident Report</title><style>body{{font-family:Arial;margin:20px}}h1{{color:#CC0000}}table{{width:100%;border-collapse:collapse}}th{{background:#CC0000;color:white;padding:8px}}td{{padding:6px;border-bottom:1px solid #eee}}</style></head><body><h1>Incident Intelligence Report</h1><p>{info.get('full_name',fc)} | {today}</p><table><tr><th>ID</th><th>Title</th><th>Type</th><th>Severity</th><th>Status</th></tr>"""
-                for _,inc in inc_df.head(30).iterrows():
-                    html += f"<tr><td>{inc.get('incident_number','')}</td><td>{inc.get('title','')[:60]}</td><td>{inc.get('incident_type','')}</td><td>{inc.get('severity','').upper()}</td><td>{inc.get('status','').upper()}</td></tr>"
+                for _,inc in inc_df.head(30).iterrows(): html += f"<tr><td>{inc.get('incident_number','')}</td><td>{inc.get('title','')[:60]}</td><td>{inc.get('incident_type','')}</td><td>{inc.get('severity','').upper()}</td><td>{inc.get('status','').upper()}</td></tr>"
                 html += "</table></body></html>"
-                st.download_button("📥 Download HTML", html, f"incident_report_{today}.html", "text/html", use_container_width=True)
+                st.download_button("📥 HTML", html, f"incident_report_{today}.html", "text/html", use_container_width=True)
         with c2:
             if st.button("📕 PDF Report", key="inc_pdf_btn", use_container_width=True):
                 try:
-                    from fpdf import FPDF
-                    pdf = FPDF('L','mm','A4'); pdf.add_page()
+                    from fpdf import FPDF; pdf = FPDF('L','mm','A4'); pdf.add_page()
                     pdf.set_font('Helvetica','B',16); pdf.set_text_color(204,0,0)
-                    pdf.cell(0,10,safe_text('Incident Intelligence Report'),0,1)
+                    pdf.cell(0,10,safe_text('Incident Report'),0,1)
                     pdf.set_font('Helvetica','',10); pdf.set_text_color(0,0,0)
                     pdf.cell(0,6,safe_text(f'{info.get("full_name",fc)} | {today}'),0,1); pdf.ln(4)
                     pdf.set_font('Helvetica','B',7); pdf.set_fill_color(204,0,0); pdf.set_text_color(255,255,255)
                     for h,w in zip(['ID','Title','Type','Severity','Status'],[35,85,40,30,30]): pdf.cell(w,5,h,1,0,'C',True)
                     pdf.ln(); pdf.set_font('Helvetica','',7); pdf.set_text_color(0,0,0)
                     for _,inc in inc_df.head(40).iterrows():
-                        pdf.cell(35,4,safe_text(inc.get('incident_number','')),1,0)
-                        pdf.cell(85,4,safe_text(str(inc.get('title',''))[:38]),1,0)
-                        pdf.cell(40,4,safe_text(inc.get('incident_type','')),1,0)
-                        pdf.cell(30,4,safe_text(inc.get('severity','').upper()),1,0)
-                        pdf.cell(30,4,safe_text(inc.get('status','').upper()),1,0)
-                        pdf.ln()
+                        pdf.cell(35,4,safe_text(inc.get('incident_number','')),1,0); pdf.cell(85,4,safe_text(str(inc.get('title',''))[:38]),1,0)
+                        pdf.cell(40,4,safe_text(inc.get('incident_type','')),1,0); pdf.cell(30,4,safe_text(inc.get('severity','').upper()),1,0)
+                        pdf.cell(30,4,safe_text(inc.get('status','').upper()),1,0); pdf.ln()
                     pdf_file = f"/tmp/incident_report_{today}.pdf"; pdf.output(pdf_file)
-                    with open(pdf_file,"rb") as f: st.download_button("📥 Download PDF", f.read(), f"incident_report_{today}.pdf", "application/pdf", use_container_width=True)
+                    with open(pdf_file,"rb") as f: st.download_button("📥 PDF", f.read(), f"incident_report_{today}.pdf", "application/pdf", use_container_width=True)
                 except Exception as e: st.error(f"PDF: {str(e)[:80]}")
 
 
