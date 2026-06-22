@@ -8620,7 +8620,7 @@ def page_ic():
                         with c1: 
                             st.multiselect(f"L{level} Escalate To", user_options, default=default_people, key=f"esc_{sev}_{level}_users")
                         with c2: 
-                            st.number_input(f"Time", value=display_time, min_value=1, key=f"esc_{sev}_{level}_time")
+                            st.number_input(f"Time", value=display_time, min_value=0, key=f"esc_{sev}_{level}_time")
                         with c3:
                             st.selectbox(f"Unit", ["Mins","Hours","Days"], 
                                 index=0 if display_unit == "Mins" else 1 if display_unit == "Hours" else 2,
