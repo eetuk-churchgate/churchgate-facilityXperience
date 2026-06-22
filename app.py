@@ -8188,7 +8188,7 @@ def page_ic():
                     "Health-Related Incident",
                     "Utility & Infrastructure Failure",
                     "Near Miss"
-                ])
+                ], key="inc_cat_select")
             with c2:
                 inc_severity = st.selectbox("Severity*", ["critical","major","minor","monitoring"])
                 type_map = {
@@ -8201,10 +8201,7 @@ def page_ic():
                     "Utility & Infrastructure Failure": ["Power Outage - Grid", "Power Outage - Internal", "Water Supply Failure", "Gas Supply Failure", "Internet/Connectivity Failure", "Generator Failure", "Other Utility"],
                     "Near Miss": ["Near Miss - Fire", "Near Miss - Electrical", "Near Miss - Structural", "Near Miss - Elevator", "Near Miss - Security", "Other Near Miss"]
                 }
-                if inc_category in type_map:
-                    inc_type = st.selectbox("Type*", type_map[inc_category])
-                else:
-                    inc_type = st.text_input("Type*")
+                inc_type = st.selectbox("Type*", type_map.get(st.session_state.get("inc_cat_select", "Life Safety Incident"), ["Select Category First"]))
             with c3:
                 inc_location_bldg = st.selectbox("Building", ["CT — Office Tower","SAT — Residential Tower","IP — Intermediate Parking","RC — Recreation Center","External"])
                 inc_location_floor = st.text_input("Floor/Zone")
