@@ -4957,33 +4957,45 @@ def page_users():
     st.markdown(f'## 👥 User Management Command Center — {FACILITY_INFO.get(fc, {}).get("full_name", fc)}')
     
     # ============================================
-    # GET USERS — FILTERED BY FACILITY (THIS IS THE ONLY NEW CODE)
+    # GET ALL USERS FOR THE DIRECTORY
     # ============================================
-    if is_super or is_admin:
-        # Super Admin and Admins see ALL users (no filter)
-        all_users = DB.get_users()
-        st.caption("🔓 Full Access — Viewing All Facilities")
-    else:
-        # Regular users see ONLY their facility
-        all_users = DB.get_users(fc)
-        st.caption(f"📍 Viewing {FACILITY_INFO.get(fc, {}).get('full_name', fc)} users only")
+    all_users = DB.get_users()  # Always get all users for directory
     
     if not all_users:
-        st.info(f"No users found for {FACILITY_INFO.get(fc, {}).get('full_name', fc)}.")
+        st.info("No users found.")
         return
     
-    df = pd.DataFrame(all_users)
+    # ============================================
+    # FILTER BY FACILITY FOR COUNTS
+    # ============================================
+    if is_super or is_admin:
+        # Super Admin: Directory shows ALL users, but COUNTS are per facility
+        facility_users = [u for u in all_users if u.get("home_facility") == fc]
+        st.caption(f"🔓 Full Access — Viewing All Facilities (Counts for {FACILITY_INFO.get(fc, {}).get('full_name', fc)})")
+        # For the directory, show ALL users (Super Admin sees everything)
+        df = pd.DataFrame(all_users)
+        # For counts, use filtered
+        count_df = pd.DataFrame(facility_users) if facility_users else pd.DataFrame()
+    else:
+        # Regular users: Directory AND counts are filtered by facility
+        facility_users = [u for u in all_users if u.get("home_facility") == fc]
+        st.caption(f"📍 Viewing {FACILITY_INFO.get(fc, {}).get('full_name', fc)} users only")
+        df = pd.DataFrame(facility_users) if facility_users else pd.DataFrame()
+        count_df = df
     
     # ============================================
-    # KPIs
+    # KPIs — USING COUNT_DF (FILTERED BY FACILITY)
     # ============================================
-    total_users = len(df)
-    active_users = len(df[df["is_active"] == True]) if "is_active" in df.columns else 0
-    staff_count = len(df[df["user_type"] == "staff"]) if "user_type" in df.columns else 0
-    tenant_count = len(df[df["user_type"] == "tenant"]) if "user_type" in df.columns else 0
-    contractor_count = len(df[df["user_type"].isin(["contractor","vendor"])]) if "user_type" in df.columns else 0
-    locked_count = len(df[df["account_locked"] == True]) if "account_locked" in df.columns else 0
+    total_users = len(count_df)
+    active_users = len(count_df[count_df["is_active"] == True]) if "is_active" in count_df.columns else 0
+    staff_count = len(count_df[count_df["user_type"] == "staff"]) if "user_type" in count_df.columns else 0
+    tenant_count = len(count_df[count_df["user_type"] == "tenant"]) if "user_type" in count_df.columns else 0
+    contractor_count = len(count_df[count_df["user_type"].isin(["contractor","vendor"])]) if "user_type" in count_df.columns else 0
+    locked_count = len(count_df[count_df["account_locked"] == True]) if "account_locked" in count_df.columns else 0
     
+    # ============================================
+    # KPI CARDS
+    # ============================================
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
         st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #CC0000;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.6rem;color:#888;">Total Users</div><div style="font-size:1.5rem;font-weight:800;">{total_users}</div></div>""", unsafe_allow_html=True)
@@ -5044,7 +5056,7 @@ def page_users():
                     mask = mask | display_df[col].astype(str).str.contains(search_user, case=False, na=False)
             display_df = display_df[mask]
         
-        st.caption(f"📋 Showing {len(display_df)} of {total_users} users")
+        st.caption(f"📋 Showing {len(display_df)} of {len(df)} users")
         
         # Pagination
         page_size = 12
@@ -5069,7 +5081,7 @@ def page_users():
         with c5:
             if st.button("▶▶", key="usr_last"): st.session_state.usr_page = total_pages; st.rerun()
         
-        # User Cards
+        # User Cards (REST OF YOUR EXISTING CODE — UNCHANGED)
         for _, user in display_df.iloc[start:end].iterrows():
             name = user.get("name", "N/A")
             email = user.get("email", "N/A")
@@ -5156,7 +5168,7 @@ def page_users():
             st.markdown("---")
     
     # ============================================
-    # TAB 1: ADD USER
+    # TAB 1: ADD USER (UNCHANGED — KEEP YOUR EXISTING CODE)
     # ============================================
     with tabs[1]:
         st.markdown("### ➕ Add New User")
@@ -5309,11 +5321,12 @@ def page_users():
                     st.error("⚠️ Name, Email, and Password are required")
     
     # ============================================
-    # TAB 2: TENANTS — NOW FILTERED
+    # TAB 2: TENANTS — FILTERED BY FACILITY
     # ============================================
     with tabs[2]:
         st.markdown("### 🏢 Tenant Management")
-        tenant_users = df[df["user_type"] == "tenant"] if "user_type" in df.columns else pd.DataFrame()
+        # Use count_df (filtered by facility) for tenants
+        tenant_users = count_df[count_df["user_type"] == "tenant"] if "user_type" in count_df.columns else pd.DataFrame()
         if len(tenant_users) > 0:
             for _, t in tenant_users.iterrows():
                 st.markdown(f"""
@@ -5326,11 +5339,12 @@ def page_users():
             st.info(f"No tenant users registered for {FACILITY_INFO.get(fc, {}).get('full_name', fc)}.")
     
     # ============================================
-    # TAB 3: CONTRACTORS — NOW FILTERED
+    # TAB 3: CONTRACTORS — FILTERED BY FACILITY
     # ============================================
     with tabs[3]:
         st.markdown("### 🔧 Contractor/Vendor Management")
-        contractor_users = df[df["user_type"].isin(["contractor","vendor"])] if "user_type" in df.columns else pd.DataFrame()
+        # Use count_df (filtered by facility) for contractors
+        contractor_users = count_df[count_df["user_type"].isin(["contractor","vendor"])] if "user_type" in count_df.columns else pd.DataFrame()
         if len(contractor_users) > 0:
             for _, c in contractor_users.iterrows():
                 expiry = str(c.get("contract_expiry","N/A"))[:10]
