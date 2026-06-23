@@ -4957,7 +4957,17 @@ def page_users():
         st.info("No users found.")
         return
     
-    df = pd.DataFrame(all_users)
+    # ============================================
+    # FACILITY FILTERING — THIS IS THE ONLY NEW CODE
+    # ============================================
+    if is_super or is_admin:
+        # Super Admin and Admins see ALL users (no filter)
+        filtered_users = all_users
+    else:
+        # Regular users see ONLY their facility
+        filtered_users = [u for u in all_users if u.get("home_facility") == fc]
+    
+    df = pd.DataFrame(filtered_users)
     
     # ============================================
     # KPIs
