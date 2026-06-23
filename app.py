@@ -310,12 +310,17 @@ class DB:
         except: return False
 
     @staticmethod
-    @st.cache_data(ttl=300)
-    def get_users():
-        try:
-            res=supabase.table("app_users").select("*").order("name").limit(200).execute()
-            return res.data if res.data else []
-        except: return []
+@st.cache_data(ttl=300)
+def get_users(facility_code=None):
+    """Get users, optionally filtered by facility"""
+    try:
+        query = supabase.table("app_users").select("*").order("name")
+        if facility_code:
+            query = query.eq("home_facility", facility_code)
+        res = query.limit(500).execute()
+        return res.data if res.data else []
+    except:
+        return []
 
     @staticmethod
     @st.cache_data(ttl=300)
@@ -4949,25 +4954,25 @@ def page_users():
     is_admin = user_role in ["admin", "approver", "super_admin"]
     is_super = user_role == "super_admin"
     
-    st.markdown(f'## 👥 User Management Command Center')
-    
-    all_users = DB.get_users()
-    
-    if not all_users:
-        st.info("No users found.")
-        return
+    st.markdown(f'## 👥 User Management Command Center — {FACILITY_INFO.get(fc, {}).get("full_name", fc)}')
     
     # ============================================
-    # FACILITY FILTERING — THIS IS THE ONLY NEW CODE
+    # GET USERS — FILTERED BY FACILITY (THIS IS THE ONLY NEW CODE)
     # ============================================
     if is_super or is_admin:
         # Super Admin and Admins see ALL users (no filter)
-        filtered_users = all_users
+        all_users = DB.get_users()
+        st.caption("🔓 Full Access — Viewing All Facilities")
     else:
         # Regular users see ONLY their facility
-        filtered_users = [u for u in all_users if u.get("home_facility") == fc]
+        all_users = DB.get_users(fc)
+        st.caption(f"📍 Viewing {FACILITY_INFO.get(fc, {}).get('full_name', fc)} users only")
     
-    df = pd.DataFrame(filtered_users)
+    if not all_users:
+        st.info(f"No users found for {FACILITY_INFO.get(fc, {}).get('full_name', fc)}.")
+        return
+    
+    df = pd.DataFrame(all_users)
     
     # ============================================
     # KPIs
@@ -5304,7 +5309,7 @@ def page_users():
                     st.error("⚠️ Name, Email, and Password are required")
     
     # ============================================
-    # TAB 2-4: TENANTS, CONTRACTORS, ACTIVITY LOG
+    # TAB 2: TENANTS — NOW FILTERED
     # ============================================
     with tabs[2]:
         st.markdown("### 🏢 Tenant Management")
@@ -5318,8 +5323,11 @@ def page_users():
                 </div>
                 """, unsafe_allow_html=True)
         else:
-            st.info("No tenant users registered.")
+            st.info(f"No tenant users registered for {FACILITY_INFO.get(fc, {}).get('full_name', fc)}.")
     
+    # ============================================
+    # TAB 3: CONTRACTORS — NOW FILTERED
+    # ============================================
     with tabs[3]:
         st.markdown("### 🔧 Contractor/Vendor Management")
         contractor_users = df[df["user_type"].isin(["contractor","vendor"])] if "user_type" in df.columns else pd.DataFrame()
@@ -5333,8 +5341,11 @@ def page_users():
                 </div>
                 """, unsafe_allow_html=True)
         else:
-            st.info("No contractor/vendor users registered.")
+            st.info(f"No contractor/vendor users registered for {FACILITY_INFO.get(fc, {}).get('full_name', fc)}.")
     
+    # ============================================
+    # TAB 4: ACTIVITY LOG
+    # ============================================
     with tabs[4]:
         st.markdown("### 📊 User Activity Log")
         recent_logs = supabase.table("activity_logs").select("*").order("created_at", desc=True).limit(50).execute()
@@ -5345,7 +5356,7 @@ def page_users():
             st.info("No activity recorded yet.")
     
     # ============================================
-    # EDIT USER MODAL (triggered by session state)
+    # EDIT USER MODAL
     # ============================================
     if "edit_user_id" in st.session_state and st.session_state.edit_user_id:
         user_id = st.session_state.edit_user_id
