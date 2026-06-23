@@ -310,17 +310,17 @@ class DB:
         except: return False
 
     @staticmethod
-@st.cache_data(ttl=300)
-def get_users(facility_code=None):
-    """Get users, optionally filtered by facility"""
-    try:
-        query = supabase.table("app_users").select("*").order("name")
-        if facility_code:
-            query = query.eq("home_facility", facility_code)
-        res = query.limit(500).execute()
-        return res.data if res.data else []
-    except:
-        return []
+    @st.cache_data(ttl=300)
+    def get_users(facility_code=None):
+        """Get users, optionally filtered by facility"""
+        try:
+            query = supabase.table("app_users").select("*").order("name")
+            if facility_code:
+                query = query.eq("home_facility", facility_code)
+            res = query.limit(500).execute()
+            return res.data if res.data else []
+        except:
+            return []
 
     @staticmethod
     @st.cache_data(ttl=300)
