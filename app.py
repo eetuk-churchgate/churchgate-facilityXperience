@@ -9662,11 +9662,11 @@ def page_cs():
                                             })
                                             
                                             template_dates = None
-                                            tpl_res = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").select("schedule_dates").eq("template_name", bulk_template).single().execute(), error_prefix="Template dates")
-                                            if tpl_res and tpl_res.data and tpl_res.data.get("schedule_dates"):
-                                                template_dates = tpl_res.data["schedule_dates"].split(",")
-                                            
-                                            if template_dates:
+                                        tpl_res = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").select("schedule_dates").eq("template_name", bulk_template).single().execute(), error_prefix="Template dates")
+                                        if tpl_res and tpl_res.data and tpl_res.data.get("schedule_dates"):
+                                            template_dates = tpl_res.data["schedule_dates"].split(",")
+                                        
+                                        if template_dates:
                                             for d in template_dates:
                                                 d = d.strip()
                                                 try:
