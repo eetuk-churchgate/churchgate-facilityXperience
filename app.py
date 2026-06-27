@@ -9667,27 +9667,16 @@ def page_cs():
                                                 template_dates = tpl_res.data["schedule_dates"].split(",")
                                             
                                             if template_dates:
-                                                for d in template_dates:
-                                                    d = d.strip()
+                                            for d in template_dates:
+                                                d = d.strip()
+                                                try:
+                                                    parsed_date = datetime.strptime(d, "%d-%m-%Y").strftime("%Y-%m-%d")
+                                                except:
                                                     try:
-                                                        parsed_date = datetime.strptime(d, "%d-%m-%Y").strftime("%Y-%m-%d")
+                                                        parsed_date = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-%m-%d")
                                                     except:
-                                                        try:
-                                                            parsed_date = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-%m-%d")
-                                                        except:
-                                                            parsed_date = str(date.today())
-                                                    
-                                                    safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
-                                                        "facility_code": fc,
-                                                        "asset_id": asset.get("id"),
-                                                        "title": f"{asset.get('name','PPM')} - {bulk_template}",
-                                                        "frequency": bulk_freq,
-                                                        "status": "scheduled",
-                                                        "assigned_team": asset.get("department", ""),
-                                                        "next_due_date": parsed_date,
-                                                        "created_at": datetime.now().isoformat()
-                                                    }).execute(), error_prefix="PPM schedule")
-                                            else:
+                                                        parsed_date = str(date.today())
+                                                
                                                 safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
                                                     "facility_code": fc,
                                                     "asset_id": asset.get("id"),
@@ -9695,20 +9684,31 @@ def page_cs():
                                                     "frequency": bulk_freq,
                                                     "status": "scheduled",
                                                     "assigned_team": asset.get("department", ""),
-                                                    "next_due_date": str(date.today()),
+                                                    "next_due_date": parsed_date,
                                                     "created_at": datetime.now().isoformat()
                                                 }).execute(), error_prefix="PPM schedule")
-                                            
-                                            count += 1
+                                        else:
+                                            safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
+                                                "facility_code": fc,
+                                                "asset_id": asset.get("id"),
+                                                "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                                                "frequency": bulk_freq,
+                                                "status": "scheduled",
+                                                "assigned_team": asset.get("department", ""),
+                                                "next_due_date": str(date.today()),
+                                                "created_at": datetime.now().isoformat()
+                                            }).execute(), error_prefix="PPM schedule")
                                         
-                                        msg = f"✅ {count} assets enrolled with {bulk_template}!"
-                                        if skipped > 0:
-                                            msg += f" ({skipped} skipped — already enrolled)"
-                                        st.success(msg)
-                                        st.balloons()
-                                        st.rerun()
-                                    else:
-                                        st.error("⚠️ Please select a template")
+                                        count += 1
+                                    
+                                    msg = f"✅ {count} assets enrolled with {bulk_template}!"
+                                    if skipped > 0:
+                                        msg += f" ({skipped} skipped — already enrolled)"
+                                    st.success(msg)
+                                    st.balloons()
+                                    st.rerun()
+                                else:
+                                    st.error("⚠️ Please select a template")
     
     # ============================================
     # TAB 4: CONSOLIDATED REPORT
