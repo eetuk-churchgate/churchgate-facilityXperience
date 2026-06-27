@@ -6913,7 +6913,7 @@ def page_fo():
                         
                         asset_name = selected_asset.split(" (")[0] if "(" in selected_asset else selected_asset
                         
-                        safe_supabase_query(lambda: supabase.table("asset_fmeca").insert({
+                        fmeca_insert_data = {
                             "facility_code":fc,"failure_mode_id":fm_id,
                             "asset_name":asset_name,"asset_criticality":fm_criticality,
                             "failure_mode_description":fm_failure_desc,
@@ -6934,7 +6934,8 @@ def page_fo():
                             "replacement_cost":fm_replacement_cost,"statutory_inspection":fm_statutory,
                             "linked_risk_id":fm_linked_risk if fm_linked_risk else None,
                             "status":"active","created_by":user_name,"created_at":wat_now.isoformat()
-                        }).execute()
+                        }
+                        safe_supabase_query(lambda: supabase.table("asset_fmeca").insert(fmeca_insert_data).execute(), error_prefix="FMECA insert")
                         
                         st.success(f"✅ FMECA {fm_id} created!"); st.balloons(); st.rerun()
                     else:
