@@ -12778,7 +12778,7 @@ def page_ppm_activities():
     # ============================================
     # TAB 5: CHECKLIST BUILDER (ADMIN) — INTERACTIVE
     # ============================================
-    with tabs[5]
+    with tabs[5]:
         st.markdown("### ⚙️ Interactive Checklist Builder")
         
         if not is_admin:
