@@ -9960,28 +9960,28 @@ def page_ic():
                         </table>
                         <p><b>Description:</b> {inc.get('description','N/A')}</p>
                         <p><b>Immediate Actions:</b> {inc.get('immediate_actions','None recorded')}</p>
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                                    
-                                    # Timeline
-                                    timeline = safe_supabase_query(lambda: supabase.table("incident_timeline").select("*").eq("incident_id",inc_id).order("timestamp").execute(), error_prefix="Incident timeline")
-                                    if timeline and timeline.data:
-                                        st.markdown("**📋 Timeline:**")
-                                        for t in timeline.data:
-                                            st.caption(f"{str(t.get('timestamp',''))[:16]} | {t.get('performed_by','')} | {t.get('action_type','').upper()}: {t.get('description','')}")
-                                    
-                                    # Attachments
-                                    st.markdown("**📎 Attachments:**")
-                                    attachments = safe_supabase_query(lambda: supabase.table("incident_attachments").select("*").eq("incident_id",inc_id).execute(), error_prefix="Incident attachments")
-                                    if attachments and attachments.data:
-                                        for att in attachments.data:
-                                            try:
-                                                import base64 as b64
-                                                file_bytes = b64.b64decode(att["file_data"])
-                                                st.download_button(f"📎 {att.get('file_name','Download')}", file_bytes, att.get('file_name','file'), key=f"inc_att_{att['id']}", use_container_width=True)
-                                            except: st.caption(f"📎 {att.get('file_name','Attachment')}")
-                                    else:
-                                        st.caption("No attachments")
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Timeline
+                    timeline = safe_supabase_query(lambda: supabase.table("incident_timeline").select("*").eq("incident_id",inc_id).order("timestamp").execute(), error_prefix="Incident timeline")
+                    if timeline and timeline.data:
+                        st.markdown("**📋 Timeline:**")
+                        for t in timeline.data:
+                            st.caption(f"{str(t.get('timestamp',''))[:16]} | {t.get('performed_by','')} | {t.get('action_type','').upper()}: {t.get('description','')}")
+                    
+                    # Attachments
+                    st.markdown("**📎 Attachments:**")
+                    attachments = safe_supabase_query(lambda: supabase.table("incident_attachments").select("*").eq("incident_id",inc_id).execute(), error_prefix="Incident attachments")
+                    if attachments and attachments.data:
+                        for att in attachments.data:
+                            try:
+                                import base64 as b64
+                                file_bytes = b64.b64decode(att["file_data"])
+                                st.download_button(f"📎 {att.get('file_name','Download')}", file_bytes, att.get('file_name','file'), key=f"inc_att_{att['id']}", use_container_width=True)
+                            except: st.caption(f"📎 {att.get('file_name','Attachment')}")
+                    else:
+                        st.caption("No attachments")
                                     
                                     # Upload attachment
                                     with st.form(f"upload_inc_{inc_id}"):
