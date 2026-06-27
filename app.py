@@ -9644,13 +9644,13 @@ def page_cs():
             with c3:
                 overwrite_existing = st.checkbox("Overwrite existing", value=True, key="cs_bulk_overwrite")
             
-            st.caption(f"📋 {len(filtered)} assets will be enrolled with **{bulk_template}** at **{bulk_freq}** frequency)
+            st.caption(f"📋 {len(filtered)} assets will be enrolled with **{bulk_template}** at **{bulk_freq}** frequency")
             
             if st.form_submit_button("🚀 ENROLL ASSETS", use_container_width=True, type="primary"):
                 if bulk_template:
-                                        count = 0
-                                        skipped = 0
-                                        for _, asset in filtered.iterrows():
+                    count = 0
+                    skipped = 0
+                    for _, asset in filtered.iterrows():
                                             is_enrolled = pd.notna(asset.get("checklist_clean"))
                                             if is_enrolled and not overwrite_existing:
                                                 skipped += 1
