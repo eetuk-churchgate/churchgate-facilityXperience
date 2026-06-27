@@ -10580,47 +10580,43 @@ def page_wo():
                             <b>📋 Timeline ({len(timeline.data)} events)</b>
                         </div>
                         """, unsafe_allow_html=True)
-                                                        for t in timeline.data:
-                                                            icon = {"open":"🔵","in_progress":"🟡","on_hold":"🟣","completed":"🟢","cancelled":"🔴","closed":"⚫"}.get(t.get("status_to",""),"📝")
-                                                            comment_text = str(t.get('comment') or 'No comment')
-                                                            st.markdown(f"""
-                                                            <div style="background:white;border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;border:1px solid #e5e7eb;">
-                                                                {icon} <b>{str(t.get('created_at',''))[:16]}</b> | {t.get('changed_by','')}
-                                                                <br><span style="color:#888;">{t.get('status_from','')} → {t.get('status_to','')}</span>
-                                                                <br><span style="font-size:0.65rem;">💬 {comment_text[:100]}</span>
-                                                            </div>
-                                                            """, unsafe_allow_html=True)
-                                                        if st.button(f"❌ Close Timeline", key=f"timeline_close_{wo_id}", use_container_width=True):
-                                                            st.session_state[toggle_key] = False
-                                                            st.rerun()
-                                                
-                                                # ============================================
-                                                # ACTION BUTTONS (SET SESSION STATE ONLY)
-                                                # ============================================
-                                                
-                                                # Assign (Team Lead)
-                                                if status == "open" and (is_super or is_admin or is_team_lead):
-                                                    c1, c2 = st.columns(2)
-                                                    with c1:
-                                                        all_users = DB.get_users()
-                                                        tech_names = sorted([u.get("name","") for u in all_users if u.get("name")])
-                                                        current_tech = wo.get("technician_name","")
-                                                        default_idx = tech_names.index(current_tech) if current_tech in tech_names else 0
-                                                        assign_to = st.selectbox("Assign to", tech_names, index=default_idx, key=f"assign_{wo_id}", label_visibility="collapsed")
-                                                    with c2:
-                                                        if st.button("👤 Assign", key=f"assign_btn_{wo_id}", use_container_width=True):
-                                                            safe_supabase_query(lambda: supabase.table("work_orders").update({"technician_name": assign_to}).eq("id", wo_id).execute(), error_prefix="Assign WO")
-                                                            safe_supabase_query(lambda: supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"open","status_to":"open","changed_by":user_name,"comment":f"Assigned to {assign_to}","created_at":wat_now.isoformat()}).execute(), error_prefix="Timeline")
-                                                            
-                                                            assigned_user = next((u for u in all_users if u.get("name") == assign_to), None)
-                                                            if assigned_user and assigned_user.get("email"):
-                                                                try:
-                                                                    send_email_notification(
-                                                                        assigned_user["email"],
-                                                                        f"🔧 New Work Order Assigned — {wo.get('wo_number','')}",
-                                                                        f"""
-                                                                        <div style="font-family:Arial;max-width:550px;border:1px solid #ddd;border-radius:12px;overflow:hidden;">
-                                                                            <div style="background:#CC0000;padding:20px;color:white;">
+                        for t in timeline.data:
+                            icon = {"open":"🔵","in_progress":"🟡","on_hold":"🟣","completed":"🟢","cancelled":"🔴","closed":"⚫"}.get(t.get("status_to",""),"📝")
+                            comment_text = str(t.get('comment') or 'No comment')
+                            st.markdown(f"""
+                            <div style="background:white;border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;border:1px solid #e5e7eb;">
+                                {icon} <b>{str(t.get('created_at',''))[:16]}</b> | {t.get('changed_by','')}
+                                <br><span style="color:#888;">{t.get('status_from','')} → {t.get('status_to','')}</span>
+                                <br><span style="font-size:0.65rem;">💬 {comment_text[:100]}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        if st.button(f"❌ Close Timeline", key=f"timeline_close_{wo_id}", use_container_width=True):
+                            st.session_state[toggle_key] = False
+                            st.rerun()
+                
+                # Assign (Team Lead)
+                if status == "open" and (is_super or is_admin or is_team_lead):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        all_users = DB.get_users()
+                        tech_names = sorted([u.get("name","") for u in all_users if u.get("name")])
+                        current_tech = wo.get("technician_name","")
+                        default_idx = tech_names.index(current_tech) if current_tech in tech_names else 0
+                        assign_to = st.selectbox("Assign to", tech_names, index=default_idx, key=f"assign_{wo_id}", label_visibility="collapsed")
+                    with c2:
+                        if st.button("👤 Assign", key=f"assign_btn_{wo_id}", use_container_width=True):
+                            safe_supabase_query(lambda: supabase.table("work_orders").update({"technician_name": assign_to}).eq("id", wo_id).execute(), error_prefix="Assign WO")
+                            safe_supabase_query(lambda: supabase.table("wo_timeline").insert({"wo_id":wo_id,"status_from":"open","status_to":"open","changed_by":user_name,"comment":f"Assigned to {assign_to}","created_at":wat_now.isoformat()}).execute(), error_prefix="Timeline")
+                            
+                            assigned_user = next((u for u in all_users if u.get("name") == assign_to), None)
+                            if assigned_user and assigned_user.get("email"):
+                                try:
+                                    send_email_notification(
+                                        assigned_user["email"],
+                                        f"🔧 New Work Order Assigned — {wo.get('wo_number','')}",
+                                        f"""
+                                        <div style="font-family:Arial;max-width:550px;border:1px solid #ddd;border-radius:12px;overflow:hidden;">
+                                            <div style="background:#CC0000;padding:20px;color:white;">
                                                 <h2 style="margin:0;">🔧 New Work Order Assigned</h2>
                                                 <p style="margin:5px 0 0 0;font-size:12px;">{info.get('full_name',fc)}</p>
                                             </div>
@@ -10635,9 +10631,6 @@ def page_wo():
                                                     <tr><td><b>Location:</b></td><td>{wo.get('location_building','')} / {wo.get('location_floor','')}</td></tr>
                                                     <tr><td><b>SLA:</b></td><td>{str(wo.get('sla_due_date',''))[:10]}</td></tr>
                                                 </table>
-                                                <div style="text-align:center;margin:20px 0;">
-                                                    <a href="https://facilityxperience.streamlit.app" style="background:#CC0000;color:white;padding:10px 25px;text-decoration:none;border-radius:6px;font-weight:bold;">View in facilityXperience</a>
-                                                </div>
                                             </div>
                                         </div>
                                         """
@@ -10661,7 +10654,6 @@ def page_wo():
                             st.rerun()
                     with c2:
                         if st.button("⏸️ On Hold", key=f"hold_{wo_id}", use_container_width=True):
-                            st.write("DEBUG: Setting holding_wo =", wo_id)
                             st.session_state.holding_wo = wo_id
                             st.rerun()
                     with c3:
