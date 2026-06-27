@@ -6772,7 +6772,7 @@ def page_fo():
                         "treatment_justification":treatment_justification,
                         "risk_status":"identified","next_review_date":str(today + timedelta(days=90)),
                         "last_review_date":str(today),"created_by":user_name,"created_at":wat_now.isoformat()
-                    }).execute()
+                    }).execute(), error_prefix="Register risk")
                     
                     st.success(f"✅ Risk {risk_number} registered!"); st.balloons(); st.rerun()
                 else:
