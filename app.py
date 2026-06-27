@@ -9608,27 +9608,27 @@ def page_cs():
         with c3:
             st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #F59E0B;"><div style="font-size:0.6rem;color:#888;">⏳ Pending</div><div style="font-size:1.8rem;font-weight:800;color:#F59E0B;">{not_enrolled}</div></div>""", unsafe_allow_html=True)
         with c4:
-                                rate = round(enrolled_count/total_filtered*100,1) if total_filtered > 0 else 0
-                                st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #3B82F6;"><div style="font-size:0.6rem;color:#888;">Enrollment Rate</div><div style="font-size:1.8rem;font-weight:800;color:#3B82F6;">{rate}%</div></div>""", unsafe_allow_html=True)
-                            
-                            st.markdown("---")
-                            
-                            # Template reference
-                            st.markdown("### 📋 Available International Standard Templates")
-                            if templates and templates.data:
-                                for t in templates.data:
-                                    items_count = 0
-                                    try:
-                                        items_res = safe_supabase_query(lambda: supabase.table("ppm_checklist_items").select("id", count="exact").eq("template_id", t["id"]).execute(), error_prefix="Checklist items")
-                                        items_count = items_res.count if items_res else 0
-                                    except: pass
-                                    
-                                    st.markdown(f"""
-                                    <div style="background:white;border-radius:8px;padding:0.6rem;margin:0.2rem 0;border-left:4px solid #3B82F6;">
-                                        <b>{t.get('template_name','')}</b> — {t.get('international_standard','')}
-                                        <br><span style="font-size:0.65rem;color:#666;">📋 {items_count} items | 🏷️ {t.get('asset_category','')}</span>
-                                    </div>
-                                    """, unsafe_allow_html=True)
+            rate = round(enrolled_count/total_filtered*100,1) if total_filtered > 0 else 0
+            st.markdown(f"""<div style="background:white;border-radius:10px;padding:1rem;text-align:center;border-top:3px solid #3B82F6;"><div style="font-size:0.6rem;color:#888;">Enrollment Rate</div><div style="font-size:1.8rem;font-weight:800;color:#3B82F6;">{rate}%</div></div>""", unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Template reference
+        st.markdown("### 📋 Available International Standard Templates")
+        if templates and templates.data:
+            for t in templates.data:
+                items_count = 0
+                try:
+                    items_res = safe_supabase_query(lambda: supabase.table("ppm_checklist_items").select("id", count="exact").eq("template_id", t["id"]).execute(), error_prefix="Checklist items")
+                    items_count = items_res.count if items_res else 0
+                except: pass
+                
+                st.markdown(f"""
+                <div style="background:white;border-radius:8px;padding:0.6rem;margin:0.2rem 0;border-left:4px solid #3B82F6;">
+                    <b>{t.get('template_name','')}</b> — {t.get('international_standard','')}
+                    <br><span style="font-size:0.65rem;color:#666;">📋 {items_count} items | 🏷️ {t.get('asset_category','')}</span>
+                </div>
+                """, unsafe_allow_html=True)
                             
                             # Bulk enrollment
                             st.markdown("---")
