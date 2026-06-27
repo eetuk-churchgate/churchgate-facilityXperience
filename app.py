@@ -5934,12 +5934,12 @@ def page_users():
                     DB.update("app_users", user["id"], {"is_active": not is_active})
                     st.rerun()
             with c5:
-                                if st.button("🗑️ Delete", key=f"qdel_{user['id']}", use_container_width=True):
-                                    safe_supabase_query(lambda: supabase.table("app_users").delete().eq("id", user["id"]).execute(), error_prefix="Delete user")
-                                    st.warning("🗑️ Deleted!")
-                                    st.rerun()
-                            
-                            st.markdown("---")
+                if st.button("🗑️ Delete", key=f"qdel_{user['id']}", use_container_width=True):
+                    safe_supabase_query(lambda: supabase.table("app_users").delete().eq("id", user["id"]).execute(), error_prefix="Delete user")
+                    st.warning("🗑️ Deleted!")
+                    st.rerun()
+            
+            st.markdown("---")
     
     # ============================================
     # TAB 1: ADD USER (UNCHANGED — KEEP YOUR EXISTING CODE)
@@ -5956,6 +5956,7 @@ def page_users():
                 with c1:
                     new_name = st.text_input("Full Name*", key="add_name")
                     new_email = st.text_input("Email*", key="add_email")
+
                 with c2:
                     new_emp_id = st.text_input("Employee ID*", key="add_emp")
                     new_mobile = st.text_input("Mobile Number", key="add_mob")
