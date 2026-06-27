@@ -11571,58 +11571,58 @@ def page_hot():
                         </div>
                         <div style="text-align:right;">
                             <span style="background:{sc};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status.upper()}</span>
-                                                            {f'<br><span style="font-size:0.5rem;color:#EF4444;">DLP: {str(h.get("defect_liability_end",""))[:10]}</span>' if h.get("defect_liability_end") else ''}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                """, unsafe_allow_html=True)
-                                                
-                                                # Approval actions
-                                                approvals = safe_supabase_query(lambda: supabase.table("hoto_approvals").select("*").eq("hoto_id", hoto_id).order("approval_level").execute(), error_prefix="HOTO approvals")
-                                                if approvals and approvals.data:
-                                                    with st.expander(f"🔐 Approvals ({len(approvals.data)})"):
-                                                        for app in approvals.data:
-                                                            app_status = app.get("status","pending")
-                                                            app_color = "#10B981" if app_status == "approved" else "#EF4444" if app_status == "rejected" else "#F59E0B"
-                                                            st.markdown(f"""
-                                                            <div style="background:#f9fafb;border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;border-left:3px solid {app_color};">
-                                                                <b>Level {app.get('approval_level','')}</b> — {app.get('approver_role','').replace('_',' ').title()}
-                                                                <br>Status: <span style="color:{app_color};font-weight:700;">{app_status.upper()}</span>
-                                                                {f" | {app.get('comments','')[:60]}" if app.get('comments') else ''}
-                                                            </div>
-                                                            """, unsafe_allow_html=True)
-                                                
-                                                # Quick approve/reject for authorized users
-                                                if status not in ["closed","disputed"] and (is_admin or is_fm_director):
-                                                    c1, c2, c3 = st.columns(3)
-                                                    with c1:
-                                                        if st.button("✅ Approve", key=f"app_{hoto_id}", use_container_width=True):
-                                                            safe_supabase_query(lambda: supabase.table("hoto_approvals").insert({
-                                                                "hoto_id": hoto_id, "approval_level": 1, "approver_role": "fm_director",
-                                                                "approver_name": user_name, "approver_email": user_email,
-                                                                "status": "approved", "comments": "Approved by FM Director",
-                                                                "action_date": wat_now.isoformat(), "created_at": wat_now.isoformat()
-                                                            }).execute(), error_prefix="Approve HOTO")
-                                                            st.success("✅ Approved!"); st.rerun()
-                                                    with c2:
-                                                        if st.button("❌ Reject", key=f"rej_{hoto_id}", use_container_width=True):
-                                                            st.session_state.rejecting_hoto = hoto_id; st.rerun()
-                                                    with c3:
-                                                        if status == "initiated":
-                                                            if st.button("▶ Start Inspection", key=f"start_{hoto_id}", use_container_width=True):
-                                                                safe_supabase_query(lambda: supabase.table("hoto_records").update({"status":"pre_inspection"}).eq("id",hoto_id).execute(), error_prefix="Start inspection")
-                                                                st.success("▶ Pre-Inspection started!"); st.rerun()
-                                                        elif status == "pre_inspection":
-                                                            if st.button("🔍 Joint Inspection", key=f"joint_{hoto_id}", use_container_width=True):
-                                                                safe_supabase_query(lambda: supabase.table("hoto_records").update({"status":"joint_inspection"}).eq("id",hoto_id).execute(), error_prefix="Joint inspection")
-                                                                st.success("🔍 Joint Inspection phase!"); st.rerun()
-                                                        elif status in ["joint_inspection","punch_list"]:
-                                                            if st.button("✅ Accept & Close", key=f"close_{hoto_id}", use_container_width=True):
-                                                                safe_supabase_query(lambda: supabase.table("hoto_records").update({"status":"acceptance","acceptance_date":str(today)}).eq("id",hoto_id).execute(), error_prefix="Close HOTO")
-                                                                try:
-                                                                    send_email_notification(user_email, f"✅ HOTO Closed — {h.get('hoto_number','')}", f"<h3>HOTO Accepted & Closed</h3><p><b>HOTO:</b> {h.get('hoto_number','')}</p><p><b>Title:</b> {h.get('title','')}</p><p>Acceptance Date: {today}</p>")
-                                                                except: pass
-                                                                st.success("✅ HOTO Accepted & Closed!"); st.balloons(); st.rerun()
+                            {f'<br><span style="font-size:0.5rem;color:#EF4444;">DLP: {str(h.get("defect_liability_end",""))[:10]}</span>' if h.get("defect_liability_end") else ''}
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Approval actions
+                approvals = safe_supabase_query(lambda: supabase.table("hoto_approvals").select("*").eq("hoto_id", hoto_id).order("approval_level").execute(), error_prefix="HOTO approvals")
+                if approvals and approvals.data:
+                    with st.expander(f"🔐 Approvals ({len(approvals.data)})"):
+                        for app in approvals.data:
+                            app_status = app.get("status","pending")
+                            app_color = "#10B981" if app_status == "approved" else "#EF4444" if app_status == "rejected" else "#F59E0B"
+                            st.markdown(f"""
+                            <div style="background:#f9fafb;border-radius:6px;padding:0.5rem;margin:0.1rem 0;font-size:0.7rem;border-left:3px solid {app_color};">
+                                <b>Level {app.get('approval_level','')}</b> — {app.get('approver_role','').replace('_',' ').title()}
+                                <br>Status: <span style="color:{app_color};font-weight:700;">{app_status.upper()}</span>
+                                {f" | {app.get('comments','')[:60]}" if app.get('comments') else ''}
+                            </div>
+                            """, unsafe_allow_html=True)
+                
+                # Quick approve/reject for authorized users
+                if status not in ["closed","disputed"] and (is_admin or is_fm_director):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        if st.button("✅ Approve", key=f"app_{hoto_id}", use_container_width=True):
+                            safe_supabase_query(lambda: supabase.table("hoto_approvals").insert({
+                                "hoto_id": hoto_id, "approval_level": 1, "approver_role": "fm_director",
+                                "approver_name": user_name, "approver_email": user_email,
+                                "status": "approved", "comments": "Approved by FM Director",
+                                "action_date": wat_now.isoformat(), "created_at": wat_now.isoformat()
+                            }).execute(), error_prefix="Approve HOTO")
+                            st.success("✅ Approved!"); st.rerun()
+                    with c2:
+                        if st.button("❌ Reject", key=f"rej_{hoto_id}", use_container_width=True):
+                            st.session_state.rejecting_hoto = hoto_id; st.rerun()
+                    with c3:
+                        if status == "initiated":
+                            if st.button("▶ Start Inspection", key=f"start_{hoto_id}", use_container_width=True):
+                                safe_supabase_query(lambda: supabase.table("hoto_records").update({"status":"pre_inspection"}).eq("id",hoto_id).execute(), error_prefix="Start inspection")
+                                st.success("▶ Pre-Inspection started!"); st.rerun()
+                        elif status == "pre_inspection":
+                            if st.button("🔍 Joint Inspection", key=f"joint_{hoto_id}", use_container_width=True):
+                                safe_supabase_query(lambda: supabase.table("hoto_records").update({"status":"joint_inspection"}).eq("id",hoto_id).execute(), error_prefix="Joint inspection")
+                                st.success("🔍 Joint Inspection phase!"); st.rerun()
+                        elif status in ["joint_inspection","punch_list"]:
+                            if st.button("✅ Accept & Close", key=f"close_{hoto_id}", use_container_width=True):
+                                safe_supabase_query(lambda: supabase.table("hoto_records").update({"status":"acceptance","acceptance_date":str(today)}).eq("id",hoto_id).execute(), error_prefix="Close HOTO")
+                                try:
+                                    send_email_notification(user_email, f"✅ HOTO Closed — {h.get('hoto_number','')}", f"<h3>HOTO Accepted & Closed</h3><p><b>HOTO:</b> {h.get('hoto_number','')}</p><p><b>Title:</b> {h.get('title','')}</p><p>Acceptance Date: {today}</p>")
+                                except: pass
+                                st.success("✅ HOTO Accepted & Closed!"); st.balloons(); st.rerun()
     
     # Rejection form
     if "rejecting_hoto" in st.session_state and st.session_state.rejecting_hoto:
