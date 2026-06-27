@@ -10557,29 +10557,29 @@ def page_wo():
                         </div>
                         <div style="text-align:right;">
                             <span style="background:{sc};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status.upper()}</span>
-                                                            <br><span style="background:{pc};color:white;padding:2px 8px;border-radius:12px;font-size:0.55rem;">{priority.upper()}</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                """, unsafe_allow_html=True)
-                                                
-                                                # Timeline
-                                                timeline = safe_supabase_query(lambda: supabase.table("wo_timeline").select("*").eq("wo_id", wo_id).order("created_at").execute(), error_prefix="WO timeline")
-                                                if timeline and timeline.data:
-                                                    toggle_key = f"timeline_{wo_id}"
-                                                    if toggle_key not in st.session_state:
-                                                        st.session_state[toggle_key] = False
-                                                    
-                                                    if not st.session_state[toggle_key]:
-                                                        if st.button(f"📋 View Timeline ({len(timeline.data)} events)", key=f"timeline_btn_{wo_id}", use_container_width=True):
-                                                            st.session_state[toggle_key] = True
-                                                            st.rerun()
-                                                    else:
-                                                        st.markdown(f"""
-                                                        <div style="background:#f9fafb;border-left:4px solid #3B82F6;border-radius:8px;padding:0.8rem;margin:0.3rem 0;">
-                                                            <b>📋 Timeline ({len(timeline.data)} events)</b>
-                                                        </div>
-                                                        """, unsafe_allow_html=True)
+                            <br><span style="background:{pc};color:white;padding:2px 8px;border-radius:12px;font-size:0.55rem;">{priority.upper()}</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Timeline
+                timeline = safe_supabase_query(lambda: supabase.table("wo_timeline").select("*").eq("wo_id", wo_id).order("created_at").execute(), error_prefix="WO timeline")
+                if timeline and timeline.data:
+                    toggle_key = f"timeline_{wo_id}"
+                    if toggle_key not in st.session_state:
+                        st.session_state[toggle_key] = False
+                    
+                    if not st.session_state[toggle_key]:
+                        if st.button(f"📋 View Timeline ({len(timeline.data)} events)", key=f"timeline_btn_{wo_id}", use_container_width=True):
+                            st.session_state[toggle_key] = True
+                            st.rerun()
+                    else:
+                        st.markdown(f"""
+                        <div style="background:#f9fafb;border-left:4px solid #3B82F6;border-radius:8px;padding:0.8rem;margin:0.3rem 0;">
+                            <b>📋 Timeline ({len(timeline.data)} events)</b>
+                        </div>
+                        """, unsafe_allow_html=True)
                                                         for t in timeline.data:
                                                             icon = {"open":"🔵","in_progress":"🟡","on_hold":"🟣","completed":"🟢","cancelled":"🔴","closed":"⚫"}.get(t.get("status_to",""),"📝")
                                                             comment_text = str(t.get('comment') or 'No comment')
