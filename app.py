@@ -7043,7 +7043,7 @@ def page_fo():
                                     "control_type":ctrl_type,"control_owner":ctrl_owner,
                                     "control_frequency":ctrl_frequency,"effectiveness_rating":ctrl_effectiveness,
                                     "last_tested_date":str(today)
-                                }).execute()
+                                }).execute(), error_prefix="Add control")
                                 st.success("✅ Control added!"); st.rerun()
     
     # ============================================
