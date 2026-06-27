@@ -7388,7 +7388,7 @@ def page_ac():
                         "auditee_name":aud_auditee,"scheduled_date":str(aud_scheduled),
                         "next_audit_date":str(aud_next),"status":"planned",
                         "created_by":user_name,"created_at":wat_now.isoformat()
-                    }).execute()
+                    }).execute(), error_prefix="Schedule audit")
                     
                     st.success(f"✅ Audit {aud_number} scheduled!"); st.balloons(); st.rerun()
                 else:
