@@ -9982,26 +9982,27 @@ def page_ic():
                             except: st.caption(f"📎 {att.get('file_name','Attachment')}")
                     else:
                         st.caption("No attachments")
-                                    
-                                    # Upload attachment
-                                    with st.form(f"upload_inc_{inc_id}"):
-                                        inc_file = st.file_uploader("📎 Attach Document/Image", type=["png","jpg","jpeg","pdf"], key=f"inc_file_{inc_id}")
-                                        if st.form_submit_button("📤 Upload", use_container_width=True):
-                                            if inc_file:
-                                                import base64 as b64
-                                                file_bytes = inc_file.read()
-                                                file_b64 = b64.b64encode(file_bytes).decode()
-                                                safe_supabase_query(lambda: supabase.table("incident_attachments").insert({
-                                                    "incident_id":inc_id,"file_name":inc_file.name,
-                                                    "file_type":inc_file.type,"file_size":len(file_bytes),
-                                                    "file_data":file_b64,"uploaded_by":user_name
-                                                }).execute(), error_prefix="Upload attachment")
-                                                st.success("✅ Uploaded!"); st.rerun()
+                    
+                    # Upload attachment
+                    with st.form(f"upload_inc_{inc_id}"):
+                        inc_file = st.file_uploader("📎 Attach Document/Image", type=["png","jpg","jpeg","pdf"], key=f"inc_file_{inc_id}")
+                        if st.form_submit_button("📤 Upload", use_container_width=True):
+                            if inc_file:
+                                import base64 as b64
+                                file_bytes = inc_file.read()
+                                file_b64 = b64.b64encode(file_bytes).decode()
+                                safe_supabase_query(lambda: supabase.table("incident_attachments").insert({
+                                    "incident_id":inc_id,"file_name":inc_file.name,
+                                    "file_type":inc_file.type,"file_size":len(file_bytes),
+                                    "file_data":file_b64,"uploaded_by":user_name
+                                }).execute(), error_prefix="Upload attachment")
+                                st.success("✅ Uploaded!"); st.rerun()
                 
                 # ============================================
                 # ACTION BUTTONS — ALL WITH FORMS
                 # ============================================
                 can_acknowledge = user_role in ["safety_officer", "security_officer", "hsse_coordinator", "team_lead", "manager", "admin", "super_admin"]
+
                 can_respond = user_role in ["safety_officer", "security_officer", "hsse_coordinator", "team_lead", "manager", "admin", "super_admin"]
                 can_contain = user_role in ["hsse_coordinator", "team_lead", "manager", "sr_manager", "admin", "super_admin"]
                 can_close = user_role in ["hsse_coordinator", "manager", "sr_manager", "admin", "super_admin"]
