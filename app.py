@@ -10977,7 +10977,7 @@ def page_wo():
     # ============================================
     # TAB 4: ASSIGNMENT CONSOLE & ANALYTICS
     # ============================================
-    with tabs[4]
+    with tabs[4]:
         st.markdown("### 👥 Work Order Assignment Console")
         
         if total_wo == 0:
