@@ -6995,15 +6995,15 @@ def page_fo():
                             treat_due = st.date_input("Due Date", today + timedelta(days=30))
                         treat_budget = st.number_input("Budget Required (₦)", min_value=0.0, value=0.0, step=10000.0)
                         if st.form_submit_button("➕ Add Treatment", use_container_width=True):
-                    if treat_desc:
-                        risk_idx = [i for i, r in enumerate(risk_df.iterrows()) if f"{r[1].get('risk_number','')} — {r[1].get('title','')[:50]}" == treat_risk][0]
-                        risk_id = risk_df.iloc[risk_idx]["id"]
-                        safe_supabase_query(lambda: supabase.table("risk_treatments").insert({
-                            "risk_id":risk_id,"action_description":treat_desc,
-                            "action_owner":treat_person,"due_date":str(treat_due),
-                            "budget_required":treat_budget,"status":"pending"
-                        }).execute(), error_prefix="Add treatment")
-                        st.success("✅ Treatment added!"); st.rerun()
+                            if treat_desc:
+                                risk_idx = [i for i, r in enumerate(risk_df.iterrows()) if f"{r[1].get('risk_number','')} — {r[1].get('title','')[:50]}" == treat_risk][0]
+                                risk_id = risk_df.iloc[risk_idx]["id"]
+                                safe_supabase_query(lambda: supabase.table("risk_treatments").insert({
+                                    "risk_id":risk_id,"action_description":treat_desc,
+                                    "action_owner":treat_person,"due_date":str(treat_due),
+                                    "budget_required":treat_budget,"status":"pending"
+                                }).execute(), error_prefix="Add treatment")
+                                st.success("✅ Treatment added!"); st.rerun()
                 
                 st.markdown("---")
                 for _, risk in risk_df.iterrows():
