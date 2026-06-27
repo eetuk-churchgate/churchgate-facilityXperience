@@ -7427,11 +7427,11 @@ def page_ac():
                                 safe_supabase_query(lambda: supabase.table("audit_findings").insert({
                                     "finding_number":fnd_number,"description":fnd_description,
                                     "severity":fnd_severity,"domain":fnd_domain,
-                                "responsible_person":fnd_responsible,"due_date":str(fnd_due),
-                                "location":fnd_location,"corrective_action":fnd_corrective,
-                                "status":"open","created_at":wat_now.isoformat()
-                            }).execute()
-                            st.success(f"✅ NCR {fnd_number} raised!"); st.rerun()
+                                    "responsible_person":fnd_responsible,"due_date":str(fnd_due),
+                                    "location":fnd_location,"corrective_action":fnd_corrective,
+                                    "status":"open","created_at":wat_now.isoformat()
+                                }).execute(), error_prefix="Raise NCR")
+                                st.success(f"✅ NCR {fnd_number} raised!"); st.rerun()
             
             st.markdown("---")
             
