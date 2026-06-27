@@ -11701,7 +11701,7 @@ def page_hot():
             else:
                 st.caption("Level 1: All Team Leads | Level 2: Incident Commander | Level 3: FM Director")
             
-            f st.form_submit_button("➕ INITIATE HOTO", use_container_width=True, type="primary"):
+            if st.form_submit_button("➕ INITIATE HOTO", use_container_width=True, type="primary"):
                 if hoto_title and transferor and transferee:
                     hoto_count = total_hoto + 1
                     hoto_number = f"HOTO-{fc}-{today.strftime('%Y%m%d')}-{str(hoto_count).zfill(4)}"
