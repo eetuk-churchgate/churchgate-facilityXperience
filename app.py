@@ -5403,7 +5403,7 @@ def page_visitor():
                                 "belongings": "",
                                 "status": "pre_registered",
                                 "created_at": datetime.now().isoformat()
-                            }).execute()
+                            }).execute(), error_prefix="Batch register")
                             
                             success_count += 1
                         except Exception as e:
