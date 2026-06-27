@@ -9629,25 +9629,25 @@ def page_cs():
                     <br><span style="font-size:0.65rem;color:#666;">📋 {items_count} items | 🏷️ {t.get('asset_category','')}</span>
                 </div>
                 """, unsafe_allow_html=True)
-                            
-                            # Bulk enrollment
-                            st.markdown("---")
-                            st.markdown("### 📦 Bulk Enrollment")
-                            st.caption("Enroll all currently filtered assets with a checklist template.")
-                            
-                            with st.form("cs_bulk_enroll"):
-                                c1, c2, c3 = st.columns(3)
-                                with c1:
-                                    bulk_template = st.selectbox("Checklist Template", template_names, key="cs_bulk_tpl")
-                                with c2:
-                                    bulk_freq = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="cs_bulk_freq")
-                                with c3:
-                                    overwrite_existing = st.checkbox("Overwrite existing", value=True, key="cs_bulk_overwrite")
-                                
-                                st.caption(f"📋 {len(filtered)} assets will be enrolled with **{bulk_template}** at **{bulk_freq}** frequency")
-                                
-                                if st.form_submit_button("🚀 ENROLL ASSETS", use_container_width=True, type="primary"):
-                                    if bulk_template:
+        
+        # Bulk enrollment
+        st.markdown("---")
+        st.markdown("### 📦 Bulk Enrollment")
+        st.caption("Enroll all currently filtered assets with a checklist template.")
+        
+        with st.form("cs_bulk_enroll"):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                bulk_template = st.selectbox("Checklist Template", template_names, key="cs_bulk_tpl")
+            with c2:
+                bulk_freq = st.selectbox("PPM Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], key="cs_bulk_freq")
+            with c3:
+                overwrite_existing = st.checkbox("Overwrite existing", value=True, key="cs_bulk_overwrite")
+            
+            st.caption(f"📋 {len(filtered)} assets will be enrolled with **{bulk_template}** at **{bulk_freq}** frequency)
+            
+            if st.form_submit_button("🚀 ENROLL ASSETS", use_container_width=True, type="primary"):
+                if bulk_template:
                                         count = 0
                                         skipped = 0
                                         for _, asset in filtered.iterrows():
