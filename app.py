@@ -6754,25 +6754,28 @@ def page_fo():
                     risk_count = total_risks + 1
                     risk_number = f"RISK-{fc}-{today.strftime('%Y%m%d')}-{str(risk_count).zfill(4)}"
                     
-                    safe_supabase_query(lambda: supabase.table("risk_register").insert({
-                        "facility_code":fc,"risk_number":risk_number,"title":risk_title,
-                        "risk_category":risk_category,"risk_sub_category":risk_sub_category,
-                        "description":risk_desc,"risk_triggers":risk_triggers,
-                        "risk_interdependencies":risk_interdependencies,
-                        "risk_owner":risk_owner,"risk_stakeholders":risk_stakeholders,
-                        "date_raised":str(today),"source_of_identification":risk_source,
-                        "inherent_likelihood":inh_likelihood,
-                        "inherent_cons_safety":inh_safety,"inherent_cons_financial":inh_financial,
-                        "inherent_cons_operational":inh_operational,"inherent_cons_reputational":inh_reputational,
-                        "inherent_cons_regulatory":inh_regulatory,"inherent_cons_overall":inh_cons_overall,
-                        "inherent_rating":inh_rating,"existing_controls":existing_controls,
-                        "residual_likelihood":res_likelihood,"residual_consequence":res_consequence,
-                        "residual_rating":res_rating,"residual_level":res_zone,
-                        "target_risk_level":target_level,"treatment_strategy":treatment_strategy,
-                        "treatment_justification":treatment_justification,
-                        "risk_status":"identified","next_review_date":str(today + timedelta(days=90)),
-                        "last_review_date":str(today),"created_by":user_name,"created_at":wat_now.isoformat()
-                    }).execute(), error_prefix="Register risk")
+                    safe_supabase_query(
+                        lambda: supabase.table("risk_register").insert({
+                            "facility_code":fc,"risk_number":risk_number,"title":risk_title,
+                            "risk_category":risk_category,"risk_sub_category":risk_sub_category,
+                            "description":risk_desc,"risk_triggers":risk_triggers,
+                            "risk_interdependencies":risk_interdependencies,
+                            "risk_owner":risk_owner,"risk_stakeholders":risk_stakeholders,
+                            "date_raised":str(today),"source_of_identification":risk_source,
+                            "inherent_likelihood":inh_likelihood,
+                            "inherent_cons_safety":inh_safety,"inherent_cons_financial":inh_financial,
+                            "inherent_cons_operational":inh_operational,"inherent_cons_reputational":inh_reputational,
+                            "inherent_cons_regulatory":inh_regulatory,"inherent_cons_overall":inh_cons_overall,
+                            "inherent_rating":inh_rating,"existing_controls":existing_controls,
+                            "residual_likelihood":res_likelihood,"residual_consequence":res_consequence,
+                            "residual_rating":res_rating,"residual_level":res_zone,
+                            "target_risk_level":target_level,"treatment_strategy":treatment_strategy,
+                            "treatment_justification":treatment_justification,
+                            "risk_status":"identified","next_review_date":str(today + timedelta(days=90)),
+                            "last_review_date":str(today),"created_by":user_name,"created_at":wat_now.isoformat()
+                        }).execute(),
+                        error_prefix="Register risk"
+                    )
                     
                     st.success(f"✅ Risk {risk_number} registered!"); st.balloons(); st.rerun()
                 else:
