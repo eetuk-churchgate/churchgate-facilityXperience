@@ -9651,64 +9651,64 @@ def page_cs():
                     count = 0
                     skipped = 0
                     for _, asset in filtered.iterrows():
-                                            is_enrolled = pd.notna(asset.get("checklist_clean"))
-                                            if is_enrolled and not overwrite_existing:
-                                                skipped += 1
-                                                continue
-                                            DB.update("assets", asset["id"], {
-                                                "checklist": bulk_template,
-                                                "ppm_frequency": bulk_freq,
-                                                "checklist_template": bulk_template
-                                            })
-                                            
-                                            template_dates = None
-                                        tpl_res = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").select("schedule_dates").eq("template_name", bulk_template).single().execute(), error_prefix="Template dates")
-                                        if tpl_res and tpl_res.data and tpl_res.data.get("schedule_dates"):
-                                            template_dates = tpl_res.data["schedule_dates"].split(",")
-                                        
-                                        if template_dates:
-                                            for d in template_dates:
-                                                d = d.strip()
-                                                try:
-                                                    parsed_date = datetime.strptime(d, "%d-%m-%Y").strftime("%Y-%m-%d")
-                                                except:
-                                                    try:
-                                                        parsed_date = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-%m-%d")
-                                                    except:
-                                                        parsed_date = str(date.today())
-                                                
-                                                safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
-                                                    "facility_code": fc,
-                                                    "asset_id": asset.get("id"),
-                                                    "title": f"{asset.get('name','PPM')} - {bulk_template}",
-                                                    "frequency": bulk_freq,
-                                                    "status": "scheduled",
-                                                    "assigned_team": asset.get("department", ""),
-                                                    "next_due_date": parsed_date,
-                                                    "created_at": datetime.now().isoformat()
-                                                }).execute(), error_prefix="PPM schedule")
-                                        else:
-                                            safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
-                                                "facility_code": fc,
-                                                "asset_id": asset.get("id"),
-                                                "title": f"{asset.get('name','PPM')} - {bulk_template}",
-                                                "frequency": bulk_freq,
-                                                "status": "scheduled",
-                                                "assigned_team": asset.get("department", ""),
-                                                "next_due_date": str(date.today()),
-                                                "created_at": datetime.now().isoformat()
-                                            }).execute(), error_prefix="PPM schedule")
-                                        
-                                        count += 1
-                                    
-                                    msg = f"✅ {count} assets enrolled with {bulk_template}!"
-                                    if skipped > 0:
-                                        msg += f" ({skipped} skipped — already enrolled)"
-                                    st.success(msg)
-                                    st.balloons()
-                                    st.rerun()
-                                else:
-                                    st.error("⚠️ Please select a template")
+                        is_enrolled = pd.notna(asset.get("checklist_clean"))
+                        if is_enrolled and not overwrite_existing:
+                            skipped += 1
+                            continue
+                        DB.update("assets", asset["id"], {
+                            "checklist": bulk_template,
+                            "ppm_frequency": bulk_freq,
+                            "checklist_template": bulk_template
+                        })
+                        
+                        template_dates = None
+                        tpl_res = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").select("schedule_dates").eq("template_name", bulk_template).single().execute(), error_prefix="Template dates")
+                        if tpl_res and tpl_res.data and tpl_res.data.get("schedule_dates"):
+                            template_dates = tpl_res.data["schedule_dates"].split(",")
+                        
+                        if template_dates:
+                            for d in template_dates:
+                                d = d.strip()
+                                try:
+                                    parsed_date = datetime.strptime(d, "%d-%m-%Y").strftime("%Y-%m-%d")
+                                except:
+                                    try:
+                                        parsed_date = datetime.strptime(d, "%Y-%m-%d").strftime("%Y-%m-%d")
+                                    except:
+                                        parsed_date = str(date.today())
+                                
+                                safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
+                                    "facility_code": fc,
+                                    "asset_id": asset.get("id"),
+                                    "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                                    "frequency": bulk_freq,
+                                    "status": "scheduled",
+                                    "assigned_team": asset.get("department", ""),
+                                    "next_due_date": parsed_date,
+                                    "created_at": datetime.now().isoformat()
+                                }).execute(), error_prefix="PPM schedule")
+                        else:
+                            safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
+                                "facility_code": fc,
+                                "asset_id": asset.get("id"),
+                                "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                                "frequency": bulk_freq,
+                                "status": "scheduled",
+                                "assigned_team": asset.get("department", ""),
+                                "next_due_date": str(date.today()),
+                                "created_at": datetime.now().isoformat()
+                            }).execute(), error_prefix="PPM schedule")
+                        
+                        count += 1
+                    
+                    msg = f"✅ {count} assets enrolled with {bulk_template}!"
+                    if skipped > 0:
+                        msg += f" ({skipped} skipped — already enrolled)"
+                    st.success(msg)
+                    st.balloons()
+                    st.rerun()
+                else:
+                    st.error("⚠️ Please select a template")
     
     # ============================================
     # TAB 4: CONSOLIDATED REPORT
