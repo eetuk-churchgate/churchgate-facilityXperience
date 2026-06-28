@@ -741,6 +741,71 @@ def inject_css():
         }
         
         /* ============================================
+           PREMIUM CHECKBOXES & EXPANDERS
+           ============================================ */
+        .streamlit-expanderHeader {
+            background: white !important;
+            border: 1px solid rgba(200, 169, 81, 0.15) !important;
+            border-radius: 10px !important;
+            padding: 0.6rem 1rem !important;
+            font-weight: 600 !important;
+            font-size: 0.78rem !important;
+            color: #2c2c2c !important;
+            transition: all 0.25s ease !important;
+            margin-bottom: 0.2rem !important;
+        }
+        .streamlit-expanderHeader:hover {
+            border-color: #C8A951 !important;
+            background: #faf6ef !important;
+            box-shadow: 0 2px 8px rgba(200, 169, 81, 0.08) !important;
+        }
+        .streamlit-expanderHeader svg {
+            fill: #C8A951 !important;
+        }
+        .streamlit-expanderContent {
+            background: #faf7f2 !important;
+            border: 1px solid rgba(200, 169, 81, 0.1) !important;
+            border-top: none !important;
+            border-radius: 0 0 10px 10px !important;
+            padding: 0.8rem 1rem !important;
+        }
+        
+        .stCheckbox label {
+            font-size: 0.75rem !important;
+            font-weight: 500 !important;
+            color: #3d3522 !important;
+            padding: 0.3rem 0 !important;
+            transition: color 0.2s ease !important;
+        }
+        .stCheckbox label:hover {
+            color: #C8A951 !important;
+        }
+        
+        .stCheckbox input[type="checkbox"] {
+            accent-color: #C8A951 !important;
+            width: 16px !important;
+            height: 16px !important;
+            cursor: pointer !important;
+        }
+        
+        /* ============================================
+           FACILITY SELECTOR - FIX VISIBILITY
+           ============================================ */
+        section[data-testid="stSidebar"] .stSelectbox > div > div {
+            background: rgba(200, 169, 81, 0.12) !important;
+            border: 1px solid rgba(200, 169, 81, 0.25) !important;
+            border-radius: 10px !important;
+        }
+        section[data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] div {
+            color: #f5ede4 !important;
+            font-weight: 600 !important;
+        }
+        section[data-testid="stSidebar"] .stSelectbox svg {
+            fill: #C8A951 !important;
+            opacity: 1 !important;
+        }
+        
+        /* ============================================
            RESPONSIVE
            ============================================ */
         @media (max-width: 768px) {
@@ -964,7 +1029,7 @@ def ask_facility_xpert(query, categories):
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama-3.1-8b-instant",
+                "model": "llama3-8b-8192",
                 "messages": [
                     {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues quickly. Available departments: {cat_list}. For emergencies (fire, elevator stuck, major water leak, electrical hazard), ALWAYS tell them to raise an URGENT ticket or call the facility team. NEVER make up phone numbers or email addresses. If you don't know something, say so. Be concise, helpful, and professional. Give step-by-step solutions."},
                     {"role": "user", "content": query}
@@ -978,6 +1043,8 @@ def ask_facility_xpert(query, categories):
         if response.status_code == 200:
             data = response.json()
             return data["choices"][0]["message"]["content"]
+        else:
+            st.error(f"⚠️ Groq API error: Status {response.status_code} - {response.text[:200]}")
         
         # Fallback to knowledge base
         kb = safe_supabase_query(lambda: supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute(), error_prefix="Knowledge base")
@@ -985,7 +1052,8 @@ def ask_facility_xpert(query, categories):
             solutions = "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
             return f"Here are solutions from our knowledge base:\n\n{solutions}"
         return None
-    except:
+    except Exception as e:
+        st.error(f"⚠️ AI error: {str(e)[:150]}")
         try:
             kb = safe_supabase_query(lambda: supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute(), error_prefix="Knowledge base")
             if kb and kb.data:
@@ -3684,6 +3752,10 @@ def page_raise_ticket():
     
     st.markdown(f'## 🎫 Raise a Ticket — {info.get("full_name", fc)}')
     
+    # Check Groq API key
+    api_key = st.secrets.get("GROQ_API_KEY", "")
+    if not api_key:
+        st.error("⚠️ GROQ_API_KEY not configured. AI assistant unavailable.")    
     # ============================================
     # AI CHAT — TOP OF PAGE
     # ============================================
@@ -3708,25 +3780,17 @@ def page_raise_ticket():
                 st.session_state.ai_conversation = msgs[-20:]
         except: pass
     
-    # Chat container with styling
-    with st.container():
-        st.markdown("""
-        <div style="background:white;border-radius:16px;padding:1rem;margin-bottom:1rem;border:1px solid rgba(200,169,81,0.15);box-shadow:0 2px 12px rgba(0,0,0,0.03);min-height:200px;max-height:400px;overflow-y:auto;">
-        """, unsafe_allow_html=True)
-        
-        for msg in st.session_state.ai_chat_history:
-            if msg["role"] == "user":
-                st.chat_message("user").write(msg["content"])
-            else:
-                st.chat_message("assistant").write(msg["content"])
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+    # Display chat history
+    for msg in st.session_state.ai_chat_history:
+        if msg["role"] == "user":
+            st.chat_message("user").write(msg["content"])
+        else:
+            st.chat_message("assistant").write(msg["content"])
     
     if st.session_state.ai_chat_history:
         if st.button("🗑️ Clear Chat History", key="clear_btn", use_container_width=True):
             st.session_state.ai_chat_history = []
             st.session_state.ai_conversation = []
-            user_email = st.session_state.get("user", {}).get("email", "guest")
             try:
                 safe_supabase_query(lambda: supabase.table("ai_chat_sessions").delete().eq("user_email", user_email).execute(), error_prefix="Clear chat")
             except: pass
@@ -3743,44 +3807,43 @@ def page_raise_ticket():
             cat_names_list = sorted(list(set(c.get("category_name", "") for c in hc)))
             
             try:
-                api_key = st.secrets.get("GROQ_API_KEY", "")
+                api_key = ""
+                try:
+                    api_key = st.secrets["GROQ_API_KEY"]
+                except:
+                    api_key = os.environ.get("GROQ_API_KEY", "")
                 
                 messages = [
-                    {"role": "system", "content": f"""You are facilityXpert, the intelligent AI assistant for Churchgate Group's {info.get('full_name', fc)} in {info.get('city', 'Nigeria')}. 
+                    {"role": "system", "content": f"""You are facilityXpert, the official AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria.
 
-YOUR ROLE: Provide friendly, helpful first-level support for any facility-related issue.
+YOUR ROLE: Help tenants and staff resolve facility-related issues only.
 
-AVAILABLE DEPARTMENTS: {cat_names_list}
+FACILITY CONTEXT:
+- World Trade Center Abuja: 22-floor Office Tower + 24-floor Residential Tower + Recreation Center
+- Managed by Churchgate Group
+- Departments: {cat_names_list}
 
-CONVERSATION STYLE:
-- Be warm, conversational, and empathetic
-- Ask clarifying questions when needed
-- Give practical, step-by-step troubleshooting advice
-- Use simple language - no technical jargon
-- Keep responses concise but thorough (2-4 sentences, then ask if they need more help)
+GUARDRAILS - YOU MUST FOLLOW:
+1. STAY ON TOPIC: Only discuss facility issues.
+2. NO PERSONAL INFO: Never ask for or share personal information.
+3. NO BIAS: Treat all users equally.
+4. NO ADULT CONTENT: Shut down inappropriate content with: "I can only assist with facility-related questions."
+5. NO FAKE INFO: Never invent ticket numbers, phone numbers, or emails.
+6. EMERGENCIES: For fire, flood, elevator stuck, electrical hazards - instruct them to call facility emergency or visit reception immediately.
+7. BE PROFESSIONAL: Clear, polite, professional language.
 
-FIRST-LEVEL SUPPORT:
-- Internet/WiFi: Guide through basic checks, router restart, cable connections
-- AC/Cooling: Check thermostat settings, ensure windows closed, check for blocked vents
-- Lighting: Check breakers, confirm if bulb replacement needed
-- Plumbing: Locate shut-off valves, identify leak sources
-- Elevator: Reassure and advise on safety protocols
-- General maintenance: Help identify the right category for their issue
+CRITICAL RULE - TICKET FORM IS ON THIS PAGE:
+When a user needs to raise a ticket, ALWAYS say: "Please scroll down to the 'Raise New Ticket' form on this page and submit your request. Select the [category name] category."
+NEVER tell them to visit a website or call a number. The ticket form is RIGHT HERE on this page.
 
-CRITICAL RULES:
-1. ALWAYS try to resolve the issue first with practical troubleshooting
-2. If the issue persists after troubleshooting, THEN recommend raising a ticket: "Please scroll down to 'Raise New Ticket' and select the [category name] category."
-3. For TRUE EMERGENCIES (fire, flood, person trapped, major electrical hazard, gas leak): Say "This is an emergency. Please call facility security or visit reception immediately. Also raise an URGENT ticket below."
-4. NEVER make up phone numbers, email addresses, or specific people's names
-5. If you don't know something, say "I'd recommend raising a ticket for this so our team can investigate."
-6. The ticket form is RIGHT BELOW this chat."""}
+RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolved, direct to the Raise New Ticket form below."""}
                 ]
                 messages.extend(st.session_state.ai_conversation[-15:])
                 
                 response = requests.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={"model": "llama-3.3-70b-versatile", "messages": messages, "max_tokens": 300, "temperature": 0.7},
+                    json={"model": "llama3-8b-8192", "messages": messages, "max_tokens": 300, "temperature": 0.5},
                     timeout=15
                 )
                 
@@ -3792,9 +3855,9 @@ CRITICAL RULES:
                 ai_response = None
                 kb = safe_supabase_query(lambda: supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{prompt}%,tags.ilike.%{prompt}%").limit(3).execute(), error_prefix="Knowledge base")
                 if kb and kb.data:
-                    ai_response = "Here are some solutions from our knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+                    ai_response = "Solutions from knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
                 else:
-                    ai_response = "I'm having trouble connecting right now. Please scroll down to raise a ticket and our team will assist you shortly."
+                    ai_response = "I couldn't find a solution. Please raise a ticket using the form below."
             
             st.session_state.ai_chat_history.append({"role": "assistant", "content": ai_response})
             st.session_state.ai_conversation.append({"role": "assistant", "content": ai_response})
@@ -3997,7 +4060,21 @@ CRITICAL RULES:
                 else:
                     st.markdown(f"**Your Rating:** {'⭐' * t.get('satisfaction_rating', 0)}")
     else:
-        st.info("No tickets raised yet"
+        st.info("No tickets raised yet")
+
+
+def page_helpdesk_queue():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    is_admin = user_role in ["admin", "approver", "super_admin"]
+    
+    st.markdown(f'## 💬 Helpdesk — {info.get("full_name", fc)}')
+    
+    categories = DB.get_helpdesk_categories()
+    
+    nav_tabs = ["🏠 Home", "📊 AI Analytics", "📄 Reports", "⏱️ Escalation", "⚙️ Settings"]
+    tabs = st.tabs(nav_tabs)
     
     # ============================================
     # TAB 0: HOME — TICKET QUEUE (FULL)
@@ -5621,19 +5698,25 @@ def page_visitor():
 # USER MANAGEMENT — FORTUNE 500 COMMAND CENTER
 # ============================================
 def page_users():
+    import time as _time
     fc = st.session_state.get("facility", "WTC")
     user_role = st.session_state.get("user_role", "staff")
     is_admin = user_role in ["admin", "approver", "super_admin"]
     is_super = user_role == "super_admin"
     
     st.markdown(f'## 👥 User Management Command Center — {FACILITY_INFO.get(fc, {}).get("full_name", fc)}')
-
-    
     
     # ============================================
     # GET ALL USERS FOR THE DIRECTORY
-    # ============================================
-    all_users = DB.get_users()  # Always get all users for directory
+    # ============================================    import time as _time
+    all_users_raw = None
+    for attempt in range(3):
+        try:
+            all_users_raw = supabase.table("app_users").select("*").order("name").limit(1000).execute()
+            break
+        except:
+            _time.sleep(0.5)
+    all_users = all_users_raw.data if all_users_raw and all_users_raw.data else []
     
     if not all_users:
         st.info("No users found.")
@@ -5643,7 +5726,12 @@ def page_users():
     # FILTER BY FACILITY FOR COUNTS
     # ============================================
     # Everyone sees ONLY their current facility's users — including Super Admin
-    facility_users = [u for u in all_users if u.get("home_facility") == fc]
+    facility_users = []
+    for u in all_users:
+        home_fac = str(u.get("home_facility", ""))
+        facilities = [f.strip() for f in home_fac.split(",")]
+        if fc in facilities:
+            facility_users.append(u)
     df = pd.DataFrame(facility_users) if facility_users else pd.DataFrame()
     count_df = df
     st.caption(f"📍 Viewing {FACILITY_INFO.get(fc, {}).get('full_name', fc)} users only")
@@ -5836,7 +5924,7 @@ def page_users():
             st.markdown("---")
     
     # ============================================
-    # TAB 1: ADD USER (UNCHANGED — KEEP YOUR EXISTING CODE)
+    # TAB 1: ADD USER
     # ============================================
     with tabs[1]:
         st.markdown("### ➕ Add New User")
@@ -5850,7 +5938,6 @@ def page_users():
                 with c1:
                     new_name = st.text_input("Full Name*", key="add_name")
                     new_email = st.text_input("Email*", key="add_email")
-
                 with c2:
                     new_emp_id = st.text_input("Employee ID*", key="add_emp")
                     new_mobile = st.text_input("Mobile Number", key="add_mob")
@@ -5859,13 +5946,9 @@ def page_users():
                 
                 new_role = st.selectbox("System Role*", ["team_member", "team_lead", "manager", "sr_manager", "sr_management", "admin", "super_admin"],
                     format_func=lambda x: {
-                        "team_member":"👤 Team Member",
-                        "team_lead":"🔐 Team Lead",
-                        "manager":"👔 Manager",
-                        "sr_manager":"💼 Sr. Manager",
-                        "sr_management":"🏢 Sr. Management",
-                        "admin":"🔴 Admin",
-                        "super_admin":"👑 Super Admin"
+                        "team_member":"👤 Team Member", "team_lead":"🔐 Team Lead",
+                        "manager":"👔 Manager", "sr_manager":"💼 Sr. Manager",
+                        "sr_management":"🏢 Sr. Management", "admin":"🔴 Admin", "super_admin":"👑 Super Admin"
                     }[x], key="add_role")
                 
                 new_facility = st.multiselect("Home Facility", ["WTC", "AGVL", "FCPL", "RBPL", "VDL", "WAREHOUSES"], default=["WTC"], key="add_fac")
@@ -5873,17 +5956,17 @@ def page_users():
                 st.markdown("---")
                 st.markdown("**📋 Module Permissions**")
                 module_groups = {
-    "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
-    "Asset & PPM": ["Asset Register", "PPM Activities", "Checklist Status"],
-    "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"],
-    "Work Orders": ["Work Orders"],
-    "Risk Management": ["Risk Assessment"],
-    "People": ["Visitor Management", "User Management"],
-    "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
-    "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
-    "Utility": ["Utility Dashboard"],
-    "Reports": ["Monthly MIS"],
-}
+                    "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
+                    "Asset & PPM": ["Asset Register", "PPM Activities", "Checklist Status"],
+                    "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"],
+                    "Work Orders": ["Work Orders"],
+                    "Risk Management": ["Risk Assessment"],
+                    "People": ["Visitor Management", "User Management"],
+                    "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
+                    "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
+                    "Utility": ["Utility Dashboard"],
+                    "Reports": ["Monthly MIS"],
+                }
                 selected_perms = []
                 for group, modules in module_groups.items():
                     with st.expander(f"📁 {group}"):
@@ -5898,7 +5981,6 @@ def page_users():
                 
                 new_password = st.text_input("Password*", type="password", key="add_pw")
                 
-                # Password strength indicator
                 if new_password:
                     strength = 0
                     if len(new_password) >= 12: strength += 1
@@ -5937,7 +6019,6 @@ def page_users():
                 contract_expiry = st.date_input("Contract Expiry Date", date.today() + timedelta(days=365), key="add_cexpiry")
                 new_password = st.text_input("Password*", type="password", key="add_cpw")
             
-            # Profile picture
             profile_pic = st.file_uploader("Profile Picture", type=["png","jpg","jpeg"], key="add_pic")
             
             submitted = st.form_submit_button("➕ CREATE USER", use_container_width=True, type="primary")
@@ -5950,7 +6031,6 @@ def page_users():
                     else:
                         pw_hash = hash_password(new_password)
                         
-                        # Map user type
                         ut = "staff" if "Staff" in user_type_add else ("tenant" if "Tenant" in user_type_add else "contractor")
                         
                         user_data = {
@@ -5981,16 +6061,57 @@ def page_users():
                             user_data["contractor_department"] = contractor_dept
                             user_data["contract_expiry"] = str(contract_expiry)
                         
-                        # Handle profile picture
                         if profile_pic:
                             pic_b64 = base64.b64encode(profile_pic.read()).decode()
                             user_data["profile_picture"] = f"data:image/{profile_pic.type.split('/')[-1]};base64,{pic_b64}"
                         
-                        result = DB.insert("app_users", user_data)
-                        if result:
-                            st.success(f"✅ User {new_name} created!")
-                            st.balloons()
-                            st.rerun()
+                        # Check if user already exists
+                        existing_user = safe_supabase_query(lambda: supabase.table("app_users").select("id").eq("email", new_email).execute(), error_prefix="Check existing")
+                        
+                        if existing_user and existing_user.data and len(existing_user.data) > 0:
+                            # Update existing user
+                            result = safe_supabase_query(lambda: supabase.table("app_users").update(user_data).eq("email", new_email).execute(), error_prefix="Update user")
+                            if result:
+                                st.success(f"✅ User {new_name} updated!")
+                                st.balloons()
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to update user.")
+                        else:
+                            # Insert new user
+                            result = safe_supabase_query(lambda: supabase.table("app_users").insert(user_data).execute(), error_prefix="Create user")
+                            if result and result.data:
+                                try:
+                                    send_email_notification(
+                                        new_email,
+                                        f"🎉 Welcome to facilityXperience — Churchgate Group",
+                                        f"""
+                                        <div style="font-family:Arial;max-width:550px;border:1px solid #ddd;border-radius:12px;overflow:hidden;">
+                                            <div style="background:#C8A951;padding:25px;color:white;text-align:center;">
+                                                <h2 style="margin:0;">🎉 Welcome to facilityXperience</h2>
+                                                <p style="margin:5px 0 0 0;font-size:13px;">Churchgate Group</p>
+                                            </div>
+                                            <div style="padding:25px;">
+                                                <p>Dear <b>{new_name}</b>,</p>
+                                                <p>Your account has been created on the <b>facilityXperience</b> platform.</p>
+                                                <p><b>Email:</b> {new_email}</p>
+                                                <p><b>Role:</b> {new_role.replace('_', ' ').title()}</p>
+                                                <p>Please log in and change your password on first access.</p>
+                                                <div style="text-align:center;margin:20px 0;">
+                                                    <a href="https://churchgate-facilityxperience.hf.space" style="background:#C8A951;color:white;padding:12px 30px;text-decoration:none;border-radius:6px;font-weight:bold;">Login to facilityXperience</a>
+                                                </div>
+                                                <p style="font-size:12px;color:#888;">If you have any questions, please contact the IT team.</p>
+                                            </div>
+                                        </div>
+                                        """
+                                    )
+                                except: pass
+                                
+                                st.success(f"✅ User {new_name} created!")
+                                st.balloons()
+                                st.rerun()
+                            else:
+                                st.error("❌ Failed to create user. Email may already exist.")
                 else:
                     st.error("⚠️ Name, Email, and Password are required")
     
