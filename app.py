@@ -194,7 +194,7 @@ def inject_css():
     st.markdown("""
     <style>
         /* ============================================
-           PREMIUM WARM PAPER THEME
+           PREMIUM VERCEL-INSPIRED DESIGN
            Churchgate Group | facilityXperience
            ============================================ */
         
@@ -215,6 +215,8 @@ def inject_css():
             --sidebar-muted: #b5a892;
             --text-dark: #2c2c2c;
             --text-muted: #6b6b6b;
+            --card-shadow: 0 2px 24px rgba(0,0,0,0.04);
+            --card-shadow-hover: 0 8px 48px rgba(0,0,0,0.08);
         }
         
         * {
@@ -228,7 +230,7 @@ def inject_css():
         }
         .main > div {
             background: transparent !important;
-            padding: 0 1.5rem !important;
+            padding: 0 2rem !important;
         }
         
         /* ---- Hide Streamlit Branding ---- */
@@ -294,10 +296,8 @@ def inject_css():
         }
         
         /* ============================================
-           SIDEBAR - AGGRESSIVE SHARP TEXT FIX
+           SIDEBAR - SHARP TEXT FIX
            ============================================ */
-        
-        /* Force ALL sidebar text to be sharp */
         section[data-testid="stSidebar"],
         section[data-testid="stSidebar"] *,
         section[data-testid="stSidebar"] .stSelectbox select,
@@ -317,50 +317,9 @@ def inject_css():
             line-height: 1.5 !important;
         }
         
-        /* Dropdown text - even sharper */
-        section[data-testid="stSidebar"] .stSelectbox select {
-            font-weight: 600 !important;
-            font-size: 0.85rem !important;
-            letter-spacing: 0.03em !important;
-            -webkit-font-smoothing: antialiased !important;
-            -moz-osx-font-smoothing: grayscale !important;
-            text-rendering: optimizeLegibility !important;
-        }
-        
-        /* Navigation buttons - sharper */
-        section[data-testid="stSidebar"] .stButton > button {
-            font-weight: 500 !important;
-            font-size: 0.7rem !important;
-            letter-spacing: 0.02em !important;
-            -webkit-font-smoothing: antialiased !important;
-            -moz-osx-font-smoothing: grayscale !important;
-            text-rendering: optimizeLegibility !important;
-        }
-        
-        /* Facility name - bold and sharp */
-        section[data-testid="stSidebar"] div[style*="background"] b {
-            font-weight: 700 !important;
-            font-size: 0.9rem !important;
-            letter-spacing: 0.03em !important;
-            -webkit-font-smoothing: antialiased !important;
-            -moz-osx-font-smoothing: grayscale !important;
-            text-rendering: optimizeLegibility !important;
-        }
-        
-        /* Facility details - readable */
-        section[data-testid="stSidebar"] div[style*="background"] span {
-            font-weight: 400 !important;
-            font-size: 0.7rem !important;
-            letter-spacing: 0.02em !important;
-            -webkit-font-smoothing: antialiased !important;
-            -moz-osx-font-smoothing: grayscale !important;
-            text-rendering: optimizeLegibility !important;
-        }
-        
         /* ============================================
            SIDEBAR - DROPDOWN (FIXED - VISIBLE TEXT)
            ============================================ */
-        /* Label - "One View" */
         section[data-testid="stSidebar"] .stSelectbox label {
             font-size: 0.6rem !important;
             font-weight: 700 !important;
@@ -371,7 +330,6 @@ def inject_css():
             opacity: 0.9 !important;
         }
         
-        /* The actual dropdown select box - TEXT MUST BE VISIBLE */
         section[data-testid="stSidebar"] .stSelectbox select {
             background: rgba(200, 169, 81, 0.1) !important;
             border: 1px solid rgba(200, 169, 81, 0.2) !important;
@@ -386,7 +344,6 @@ def inject_css():
             cursor: pointer !important;
         }
         
-        /* Dropdown arrow icon - MAKE IT VISIBLE */
         section[data-testid="stSidebar"] .stSelectbox select option {
             background: #2c2418 !important;
             color: #f5ede4 !important;
@@ -394,14 +351,12 @@ def inject_css():
             font-size: 0.8rem !important;
         }
         
-        /* Dropdown arrow - make it gold and visible */
         section[data-testid="stSidebar"] .stSelectbox svg {
             fill: #C8A951 !important;
             color: #C8A951 !important;
             opacity: 1 !important;
         }
         
-        /* The dropdown container */
         section[data-testid="stSidebar"] .stSelectbox {
             padding: 0 0.5rem !important;
         }
@@ -469,7 +424,6 @@ def inject_css():
             box-shadow: 0 4px 16px rgba(200, 169, 81, 0.25) !important;
         }
         
-        /* Sidebar Section Headers */
         .sidebar-section {
             font-size: 0.5rem !important;
             font-weight: 700 !important;
@@ -480,7 +434,6 @@ def inject_css():
             opacity: 0.8;
         }
         
-        /* Sidebar User Profile */
         .sidebar-profile {
             padding: 0.8rem 1.5rem;
             border-top: 1px solid rgba(200, 169, 81, 0.1);
@@ -510,7 +463,7 @@ def inject_css():
         }
         
         /* ============================================
-           TOP NAV
+           TOP NAV - CLEAN LIGHT
            ============================================ */
         .fx-topnav {
             background: rgba(255, 252, 248, 0.92) !important;
@@ -568,121 +521,126 @@ def inject_css():
         }
         
         /* ============================================
-           GREETING HEADER
+           GREETING HEADER - CLEAN & PREMIUM
            ============================================ */
         .greeting-header {
             background: white !important;
-            padding: 1rem 1.5rem !important;
-            border-radius: 14px !important;
-            margin-bottom: 1rem !important;
-            border: 1px solid rgba(200, 169, 81, 0.1) !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
-        }
-        .greeting-header h1 {
-            color: #2c2c2c !important;
-            font-size: 1.3rem !important;
-            font-weight: 700 !important;
-            margin: 0 !important;
-            font-family: 'Playfair Display', serif !important;
-        }
-        .greeting-header p {
-            color: #6b6b6b !important;
-            font-size: 0.75rem !important;
-            margin: 0.1rem 0 0 0 !important;
-        }
-        .greeting-time {
-            font-size: 0.7rem !important;
-            color: #a8893a !important;
-            font-weight: 500 !important;
-        }
-        
-        /* ============================================
-           HEADER CARDS
-           ============================================ */
-        .churchgate-header {
-            background: white !important;
-            padding: 1.2rem 1.5rem !important;
-            border-radius: 14px !important;
-            margin-bottom: 1rem !important;
-            border: 1px solid rgba(200, 169, 81, 0.1) !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
+            padding: 1.5rem 2rem !important;
+            border-radius: 16px !important;
+            margin-bottom: 1.5rem !important;
+            border: none !important;
+            box-shadow: 0 2px 24px rgba(0,0,0,0.04) !important;
             position: relative !important;
+            overflow: hidden !important;
         }
-        .churchgate-header::before {
+        .greeting-header::before {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
-            width: 3px;
+            width: 4px;
             height: 100%;
             background: linear-gradient(180deg, #C8A951, #a8893a);
-            border-radius: 14px 0 0 14px;
         }
-        .churchgate-header h1 {
-            font-size: 1.3rem !important;
-            font-weight: 700 !important;
+        .greeting-header h1 {
             color: #2c2c2c !important;
-            font-family: 'Playfair Display', serif !important;
+            font-size: 1.5rem !important;
+            font-weight: 700 !important;
             margin: 0 !important;
+            font-family: 'Playfair Display', serif !important;
+            letter-spacing: -0.02em !important;
         }
-        .churchgate-header p {
+        .greeting-header p {
             color: #6b6b6b !important;
-            font-size: 0.75rem !important;
+            font-size: 0.8rem !important;
             margin: 0.2rem 0 0 0 !important;
         }
         
         /* ============================================
-           METRIC CARDS
+           METRIC CARDS - CLEAN WITH SOFT SHADOWS
            ============================================ */
         .fx-card {
             background: white !important;
-            border-radius: 14px !important;
-            padding: 0.8rem 0.8rem !important;
-            border: 1px solid rgba(200, 169, 81, 0.08) !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
+            border-radius: 16px !important;
+            padding: 1.2rem 1rem !important;
+            border: none !important;
+            box-shadow: 0 2px 24px rgba(0,0,0,0.04) !important;
             text-align: center !important;
-            transition: all 0.2s ease !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
         }
         .fx-card:hover {
-            transform: translateY(-2px) !important;
-            box-shadow: 0 6px 24px rgba(200, 169, 81, 0.1) !important;
-            border-color: rgba(200, 169, 81, 0.2) !important;
+            transform: translateY(-4px) !important;
+            box-shadow: 0 8px 48px rgba(0,0,0,0.08) !important;
         }
         .fx-card-label {
-            font-size: 0.5rem !important;
+            font-size: 0.55rem !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.08em !important;
             color: #a8893a !important;
-            margin-bottom: 0.1rem !important;
+            margin-bottom: 0.3rem !important;
         }
         .fx-card-value {
-            font-size: 1.6rem !important;
+            font-size: 1.8rem !important;
             font-weight: 700 !important;
             color: #2c2c2c !important;
             line-height: 1 !important;
             font-family: 'Playfair Display', serif !important;
+            letter-spacing: -0.02em !important;
         }
         
         /* ============================================
-           BUTTONS
+           MAIN CONTENT DROPDOWN - FIX FOR VISIBILITY
+           ============================================ */
+        .stSelectbox select {
+            color: #2c2c2c !important;
+            background-color: white !important;
+            border: 1px solid rgba(200, 169, 81, 0.2) !important;
+            border-radius: 10px !important;
+            font-weight: 600 !important;
+            font-size: 0.85rem !important;
+            padding: 0.6rem 0.8rem !important;
+            min-height: 44px !important;
+            cursor: pointer !important;
+        }
+        
+        .stSelectbox label {
+            font-size: 0.6rem !important;
+            font-weight: 700 !important;
+            color: #a8893a !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.08em !important;
+            margin-bottom: 0.2rem !important;
+        }
+        
+        .stSelectbox svg {
+            fill: #C8A951 !important;
+            color: #C8A951 !important;
+            opacity: 1 !important;
+        }
+        
+        /* ============================================
+           BUTTONS - ELEGANT VERCEL STYLE
            ============================================ */
         .stButton > button {
             background: white !important;
             color: #2c2c2c !important;
-            border: 1px solid rgba(200, 169, 81, 0.12) !important;
-            border-radius: 10px !important;
-            padding: 0.4rem 1rem !important;
+            border: 1px solid rgba(200, 169, 81, 0.2) !important;
+            border-radius: 12px !important;
+            padding: 0.6rem 1.4rem !important;
             font-weight: 600 !important;
-            font-size: 0.75rem !important;
-            transition: all 0.2s ease !important;
+            font-size: 0.8rem !important;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
             box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
         }
         .stButton > button:hover {
             background: #faf6ef !important;
             border-color: #C8A951 !important;
-            box-shadow: 0 4px 16px rgba(200, 169, 81, 0.12) !important;
-            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 16px rgba(200, 169, 81, 0.15) !important;
+            transform: translateY(-2px) !important;
+        }
+        .stButton > button:active {
+            transform: scale(0.98) !important;
         }
         .stButton > button[kind="primary"] {
             background: linear-gradient(135deg, #C8A951, #a8893a) !important;
@@ -691,25 +649,25 @@ def inject_css():
             box-shadow: 0 4px 16px rgba(200, 169, 81, 0.25) !important;
         }
         .stButton > button[kind="primary"]:hover {
-            box-shadow: 0 6px 20px rgba(200, 169, 81, 0.35) !important;
-            transform: translateY(-1px) !important;
+            box-shadow: 0 6px 24px rgba(200, 169, 81, 0.35) !important;
+            transform: translateY(-2px) !important;
         }
         
         /* ============================================
-           TABS
+           TABS - CLEAN PILLS
            ============================================ */
         .stTabs [data-baseweb="tab-list"] {
-            gap: 0.2rem !important;
+            gap: 0.25rem !important;
             background: #ede8df !important;
-            padding: 0.2rem !important;
-            border-radius: 12px !important;
+            padding: 0.25rem !important;
+            border-radius: 14px !important;
         }
         .stTabs [data-baseweb="tab"] {
             background: transparent !important;
             border-radius: 10px !important;
-            padding: 0.4rem 1rem !important;
+            padding: 0.5rem 1.2rem !important;
             font-weight: 600 !important;
-            font-size: 0.75rem !important;
+            font-size: 0.8rem !important;
             color: #6b6b6b !important;
             border: none !important;
             transition: all 0.2s ease !important;
@@ -718,85 +676,10 @@ def inject_css():
             background: white !important;
             color: #2c2c2c !important;
             box-shadow: 0 2px 8px rgba(0,0,0,0.04) !important;
+            border-radius: 10px !important;
         }
         .stTabs [data-baseweb="tab"]:hover {
             color: #2c2c2c !important;
-        }
-        
-        /* ============================================
-           DATA TABLES
-           ============================================ */
-        [data-testid="stDataFrame"] {
-            border-radius: 14px !important;
-            border: 1px solid rgba(200, 169, 81, 0.08) !important;
-            font-size: 0.7rem !important;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
-            overflow: hidden !important;
-        }
-        [data-testid="stDataFrame"] th {
-            background: #f5f0e8 !important;
-            font-weight: 700 !important;
-            font-size: 0.55rem !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.06em !important;
-            color: #a8893a !important;
-            padding: 0.6rem 1rem !important;
-        }
-        [data-testid="stDataFrame"] td {
-            padding: 0.5rem 1rem !important;
-            border-bottom: 1px solid rgba(200, 169, 81, 0.04) !important;
-        }
-        [data-testid="stDataFrame"] tr:hover td {
-            background: #faf6ef !important;
-        }
-        
-        /* ============================================
-           EXPANDERS
-           ============================================ */
-        .streamlit-expanderHeader {
-            background: white !important;
-            border-radius: 10px !important;
-            font-weight: 600 !important;
-            font-size: 0.8rem !important;
-            border: 1px solid rgba(200, 169, 81, 0.08) !important;
-            padding: 0.5rem 1rem !important;
-        }
-        .streamlit-expanderHeader:hover {
-            border-color: #C8A951 !important;
-        }
-        .streamlit-expanderContent {
-            background: white !important;
-            border-radius: 0 0 10px 10px !important;
-            padding: 0.8rem !important;
-            border: 1px solid rgba(200, 169, 81, 0.08) !important;
-            border-top: none !important;
-        }
-        
-        /* ============================================
-           METRICS
-           ============================================ */
-        [data-testid="stMetric"] {
-            background: white !important;
-            padding: 0.8rem !important;
-            border-radius: 14px !important;
-            border: 1px solid rgba(200, 169, 81, 0.06) !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
-        }
-        [data-testid="stMetric"]:hover {
-            box-shadow: 0 4px 16px rgba(200, 169, 81, 0.08) !important;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 0.55rem !important;
-            font-weight: 700 !important;
-            text-transform: uppercase !important;
-            letter-spacing: 0.06em !important;
-            color: #a8893a !important;
-        }
-        [data-testid="stMetricValue"] {
-            font-size: 1.4rem !important;
-            font-weight: 700 !important;
-            color: #2c2c2c !important;
-            font-family: 'Playfair Display', serif !important;
         }
         
         /* ============================================
@@ -818,26 +701,27 @@ def inject_css():
         }
         
         /* ============================================
-           DIVIDERS
+           DIVIDERS - SUBTLE
            ============================================ */
         hr {
             border: none !important;
             height: 1px !important;
             background: linear-gradient(90deg, transparent, rgba(200, 169, 81, 0.12), transparent) !important;
-            margin: 1rem 0 !important;
+            margin: 1.5rem 0 !important;
         }
         
         /* ============================================
-           BADGES
+           BADGES - CLEAN
            ============================================ */
         .fx-badge {
             display: inline-flex !important;
             align-items: center !important;
             gap: 0.2rem !important;
-            padding: 0.15rem 0.6rem !important;
+            padding: 0.2rem 0.7rem !important;
             border-radius: 50px !important;
-            font-size: 0.55rem !important;
+            font-size: 0.6rem !important;
             font-weight: 700 !important;
+            letter-spacing: 0.02em !important;
         }
         .badge-success {
             background: #f0f7ee;
@@ -857,23 +741,6 @@ def inject_css():
         }
         
         /* ============================================
-           INPUT FIELDS
-           ============================================ */
-        .stTextInput input, .stSelectbox select, .stTextArea textarea {
-            border-radius: 10px !important;
-            border: 1px solid rgba(200, 169, 81, 0.12) !important;
-            padding: 0.4rem 0.8rem !important;
-            font-size: 0.75rem !important;
-            transition: all 0.2s ease !important;
-            background: white !important;
-        }
-        .stTextInput input:focus, .stSelectbox select:focus, .stTextArea textarea:focus {
-            border-color: #C8A951 !important;
-            box-shadow: 0 0 0 3px rgba(200, 169, 81, 0.08) !important;
-            outline: none !important;
-        }
-        
-        /* ============================================
            RESPONSIVE
            ============================================ */
         @media (max-width: 768px) {
@@ -883,33 +750,20 @@ def inject_css():
                 gap: 0.3rem !important;
             }
             .churchgate-header {
-                padding: 0.8rem !important;
+                padding: 1rem !important;
             }
             .fx-card-value {
-                font-size: 1.2rem !important;
+                font-size: 1.3rem !important;
             }
             .greeting-header {
-                padding: 0.8rem !important;
+                padding: 1rem !important;
             }
             .greeting-header h1 {
-                font-size: 1rem !important;
+                font-size: 1.1rem !important;
             }
-        }
-        
-        /* ============================================
-           UTILITY - REDUCE SPACE
-           ============================================ */
-        .element-container {
-            margin-bottom: 0.3rem !important;
-        }
-        .stMarkdown {
-            margin-bottom: 0.2rem !important;
-        }
-        
-        section[data-testid="stSidebar"] .stButton > button {
-            padding: 0.3rem 0.8rem !important;
-            font-size: 0.65rem !important;
-            margin: 0.03rem 0.5rem !important;
+            .main > div {
+                padding: 0 0.8rem !important;
+            }
         }
     </style>
     """, unsafe_allow_html=True)
@@ -1366,32 +1220,41 @@ def sidebar():
         """, unsafe_allow_html=True)
         
         # One View — Facility Selector
-        st.markdown('<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.5rem 0 0.2rem 0;">📍 One View</p>', unsafe_allow_html=True)
+        user_role = st.session_state.get("user_role", "staff")
+        is_sr_mgmt = user_role in ["super_admin", "sr_management", "admin", "approver"]
         
-        sel = st.session_state.get("facility", "WTC")
-        
-        facility_options = {
-            "WTC": "🏢 World Trade Center — Abuja",
-            "AGVL": "🏗️ Agroline Ventures Limited — Abuja",
-            "FCPL": "🏭 First Continental Properties — Lagos",
-            "RBPL": "🏬 RB Properties Limited — Lagos",
-            "VDL": "🌊 Ocean Terrace — Lagos",
-            "WAREHOUSES": "📦 Warehouse Network — Lagos",
-        }
-        
-        new_sel = st.selectbox(
-            "Select Facility",
-            list(facility_options.keys()),
-            format_func=lambda x: facility_options[x],
-            index=list(facility_options.keys()).index(sel) if sel in facility_options else 0,
-            key="facility_selector",
-            label_visibility="collapsed"
-        )
-        
-        if new_sel != sel:
-            st.session_state.facility = new_sel
-            st.cache_data.clear()
-            st.rerun()
+        if is_sr_mgmt:
+            st.markdown('<p style="font-size:0.5rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin:0.5rem 0 0.2rem 0;">📍 One View</p>', unsafe_allow_html=True)
+            
+            sel = st.session_state.get("facility", "WTC")
+            
+            facility_options = {
+                "WTC": "🏢 World Trade Center — Abuja",
+                "AGVL": "🏗️ Agroline Ventures Limited — Abuja",
+                "FCPL": "🏭 First Continental Properties — Lagos",
+                "RBPL": "🏬 RB Properties Limited — Lagos",
+                "VDL": "🌊 Ocean Terrace — Lagos",
+                "WAREHOUSES": "📦 Warehouse Network — Lagos",
+            }
+            
+            new_sel = st.selectbox(
+                "Select Facility",
+                list(facility_options.keys()),
+                format_func=lambda x: facility_options[x],
+                index=list(facility_options.keys()).index(sel) if sel in facility_options else 0,
+                key="facility_selector",
+                label_visibility="collapsed"
+            )
+            
+            if new_sel != sel:
+                st.session_state.facility = new_sel
+                st.cache_data.clear()
+                st.rerun()
+        else:
+            # Non-Sr Management: fixed to their home facility
+            user_home = st.session_state.get("user", {}).get("home_facility", "WTC")
+            st.session_state.facility = user_home
+            sel = user_home
         
         # Facility info card
         info = FACILITY_INFO.get(sel, {})
@@ -3182,9 +3045,26 @@ def get_sub_locations_for_building(fc, building_code):
     try:
         loc = safe_supabase_query(lambda: supabase.table("helpdesk_locations").select("id").eq("facility_code", fc).eq("location_code", building_code).single().execute(), error_prefix="Location lookup")
         if loc and loc.data:
-            res = safe_supabase_query(lambda: supabase.table("helpdesk_sub_locations").select("sub_location_name").eq("location_id", loc.data["id"]).order("sub_location_name").execute(), error_prefix="Sub-locations")
+            res = safe_supabase_query(lambda: supabase.table("helpdesk_sub_locations").select("sub_location_name").eq("location_id", loc.data["id"]).execute(), error_prefix="Sub-locations")
             if res and res.data:
-                return [s["sub_location_name"] for s in res.data]
+                sub_locs = [s["sub_location_name"] for s in res.data]
+                # Custom sort: Ground/Basement first, then Floor 1-99, then others
+                def sort_key(name):
+                    if name.startswith("Ground"): return (0, name)
+                    if name.startswith("Basement"): return (1, name)
+                    if name.startswith("Floor "):
+                        try:
+                            num = int(name.replace("Floor ", ""))
+                            return (2, f"{num:03d}")
+                        except:
+                            return (3, name)
+                    if name.startswith("Mezzanine"): return (4, name)
+                    if name.startswith("Electrical"): return (5, name)
+                    if name.startswith("Penthouse"): return (6, name)
+                    if name.startswith("Rooftop"): return (7, name)
+                    return (8, name)
+                sub_locs.sort(key=sort_key)
+                return sub_locs
     except: pass
     return [f"{building_code} / 0", f"{building_code} / 1"]
 
@@ -3342,7 +3222,7 @@ def page_wp():
             building_options[b.get("location_code", "")] = b.get("location_name", "")
         
         if not building_options:
-            building_options = {"CT": "CT — Office Tower", "SAT": "SAT — Residential Tower", "RC": "RC — Recreation Center", "IP": "IP — Intermediate Parking"}
+            building_options = {"MAIN": info.get("full_name", fc)}
         
         st.markdown("**🏢 Select Building & Location**")
         c1, c2 = st.columns(2)
@@ -3804,7 +3684,11 @@ def page_raise_ticket():
     
     st.markdown(f'## 🎫 Raise a Ticket — {info.get("full_name", fc)}')
     
+    # ============================================
+    # AI CHAT — TOP OF PAGE
+    # ============================================
     st.markdown("### 🤖 facilityXpert — AI Assistant")
+    st.caption("Get instant first-level support. Describe your issue and I'll help you troubleshoot.")
     
     user_email = st.session_state.get("user", {}).get("email", "guest")
     
@@ -3824,11 +3708,19 @@ def page_raise_ticket():
                 st.session_state.ai_conversation = msgs[-20:]
         except: pass
     
-    for msg in st.session_state.ai_chat_history:
-        if msg["role"] == "user":
-            st.chat_message("user").write(msg["content"])
-        else:
-            st.chat_message("assistant").write(msg["content"])
+    # Chat container with styling
+    with st.container():
+        st.markdown("""
+        <div style="background:white;border-radius:16px;padding:1rem;margin-bottom:1rem;border:1px solid rgba(200,169,81,0.15);box-shadow:0 2px 12px rgba(0,0,0,0.03);min-height:200px;max-height:400px;overflow-y:auto;">
+        """, unsafe_allow_html=True)
+        
+        for msg in st.session_state.ai_chat_history:
+            if msg["role"] == "user":
+                st.chat_message("user").write(msg["content"])
+            else:
+                st.chat_message("assistant").write(msg["content"])
+        
+        st.markdown("</div>", unsafe_allow_html=True)
     
     if st.session_state.ai_chat_history:
         if st.button("🗑️ Clear Chat History", key="clear_btn", use_container_width=True):
@@ -3840,7 +3732,7 @@ def page_raise_ticket():
             except: pass
             st.rerun()
     
-    prompt = st.chat_input("Ask facilityXpert anything...", key="ai_chat_main")
+    prompt = st.chat_input("💬 Describe your facility issue here...", key="ai_chat_main")
     
     if prompt:
         st.session_state.ai_chat_history.append({"role": "user", "content": prompt})
@@ -3854,36 +3746,41 @@ def page_raise_ticket():
                 api_key = st.secrets.get("GROQ_API_KEY", "")
                 
                 messages = [
-                    {"role": "system", "content": f"""You are facilityXpert, the official AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria.
+                    {"role": "system", "content": f"""You are facilityXpert, the intelligent AI assistant for Churchgate Group's {info.get('full_name', fc)} in {info.get('city', 'Nigeria')}. 
 
-YOUR ROLE: Help tenants and staff resolve facility-related issues only.
+YOUR ROLE: Provide friendly, helpful first-level support for any facility-related issue.
 
-FACILITY CONTEXT:
-- World Trade Center Abuja: 22-floor Office Tower + 24-floor Residential Tower + Recreation Center
-- Managed by Churchgate Group
-- Departments: {cat_names_list}
+AVAILABLE DEPARTMENTS: {cat_names_list}
 
-GUARDRAILS - YOU MUST FOLLOW:
-1. STAY ON TOPIC: Only discuss facility issues.
-2. NO PERSONAL INFO: Never ask for or share personal information.
-3. NO BIAS: Treat all users equally.
-4. NO ADULT CONTENT: Shut down inappropriate content with: "I can only assist with facility-related questions."
-5. NO FAKE INFO: Never invent ticket numbers, phone numbers, or emails.
-6. EMERGENCIES: For fire, flood, elevator stuck, electrical hazards - instruct them to call facility emergency or visit reception immediately.
-7. BE PROFESSIONAL: Clear, polite, professional language.
+CONVERSATION STYLE:
+- Be warm, conversational, and empathetic
+- Ask clarifying questions when needed
+- Give practical, step-by-step troubleshooting advice
+- Use simple language - no technical jargon
+- Keep responses concise but thorough (2-4 sentences, then ask if they need more help)
 
-CRITICAL RULE - TICKET FORM IS ON THIS PAGE:
-When a user needs to raise a ticket, ALWAYS say: "Please scroll down to the 'Raise New Ticket' form on this page and submit your request. Select the [category name] category."
-NEVER tell them to visit a website or call a number. The ticket form is RIGHT HERE on this page.
+FIRST-LEVEL SUPPORT:
+- Internet/WiFi: Guide through basic checks, router restart, cable connections
+- AC/Cooling: Check thermostat settings, ensure windows closed, check for blocked vents
+- Lighting: Check breakers, confirm if bulb replacement needed
+- Plumbing: Locate shut-off valves, identify leak sources
+- Elevator: Reassure and advise on safety protocols
+- General maintenance: Help identify the right category for their issue
 
-RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolved, direct to the Raise New Ticket form below."""}
+CRITICAL RULES:
+1. ALWAYS try to resolve the issue first with practical troubleshooting
+2. If the issue persists after troubleshooting, THEN recommend raising a ticket: "Please scroll down to 'Raise New Ticket' and select the [category name] category."
+3. For TRUE EMERGENCIES (fire, flood, person trapped, major electrical hazard, gas leak): Say "This is an emergency. Please call facility security or visit reception immediately. Also raise an URGENT ticket below."
+4. NEVER make up phone numbers, email addresses, or specific people's names
+5. If you don't know something, say "I'd recommend raising a ticket for this so our team can investigate."
+6. The ticket form is RIGHT BELOW this chat."""}
                 ]
                 messages.extend(st.session_state.ai_conversation[-15:])
                 
                 response = requests.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={"model": "llama-3.1-8b-instant", "messages": messages, "max_tokens": 300, "temperature": 0.5},
+                    json={"model": "llama-3.3-70b-versatile", "messages": messages, "max_tokens": 300, "temperature": 0.7},
                     timeout=15
                 )
                 
@@ -3895,9 +3792,9 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                 ai_response = None
                 kb = safe_supabase_query(lambda: supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{prompt}%,tags.ilike.%{prompt}%").limit(3).execute(), error_prefix="Knowledge base")
                 if kb and kb.data:
-                    ai_response = "Solutions from knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
+                    ai_response = "Here are some solutions from our knowledge base:\n\n" + "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
                 else:
-                    ai_response = "I couldn't find a solution. Please raise a ticket."
+                    ai_response = "I'm having trouble connecting right now. Please scroll down to raise a ticket and our team will assist you shortly."
             
             st.session_state.ai_chat_history.append({"role": "assistant", "content": ai_response})
             st.session_state.ai_conversation.append({"role": "assistant", "content": ai_response})
@@ -3921,7 +3818,16 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
     for b in buildings:
         building_options[b.get("location_code", "")] = b.get("location_name", "")
     if not building_options:
-        building_options = {"CT": "CT — Office Tower", "SAT": "SAT — Residential Tower", "RC": "RC — Recreation Center", "IP": "IP — Intermediate Parking"}
+        if fc == "AGVL":
+            building_options = {"AGVL": "Churchgate Plaza"}
+        elif fc == "FCPL":
+            building_options = {"FCPL": "Churchgate Tower 1"}
+        elif fc == "RBPL":
+            building_options = {"RBPL": "Churchgate Tower 2"}
+        elif fc == "VDL":
+            building_options = {"VDL": "The Ocean Terrace"}
+        else:
+            building_options = {"CT": "CT — Office Tower", "SAT": "SAT — Residential Tower", "RC": "RC — Recreation Center", "IP": "IP — Intermediate Parking"}
     
     c1, c2 = st.columns(2)
     with c1:
@@ -3996,7 +3902,8 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                 
                 st.success(f"✅ Ticket {ticket_number} raised successfully!")
                 st.balloons()
-                time.sleep(1.5)
+                import time as _time
+                _time.sleep(1.5)
                 
                 ticket_cat_id = None
                 for c in categories:
@@ -4013,7 +3920,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                                 f"🎫 New Ticket #{ticket_number} — {category}",
                                 f"""
                                 <div style="font-family:Arial;max-width:600px;margin:0 auto;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
-                                    <div style="background:#CC0000;padding:20px;color:white;">
+                                    <div style="background:#C8A951;padding:20px;color:white;">
                                         <h2 style="margin:0;">facilityXperience</h2>
                                         <p style="margin:5px 0 0 0;font-size:12px;opacity:0.9;">Churchgate Group — {info.get('full_name',fc)}</p>
                                     </div>
@@ -4036,7 +3943,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                                             <p style="margin:5px 0 0 0;color:#92400E;">Please review and take action on this ticket. SLA timer has started.</p>
                                         </div>
                                         <div style="margin-top:15px;text-align:center;">
-                                            <a href="https://churchgate-facilityxperience.hf.space" style="background:#CC0000;color:white;padding:10px 25px;text-decoration:none;border-radius:6px;font-weight:bold;">View in facilityXperience</a>
+                                            <a href="https://churchgate-facilityxperience.hf.space" style="background:#C8A951;color:white;padding:10px 25px;text-decoration:none;border-radius:6px;font-weight:bold;">View in facilityXperience</a>
                                         </div>
                                     </div>
                                     <div style="background:#f9f9f9;padding:12px;text-align:center;font-size:10px;color:#999;">
@@ -4090,20 +3997,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                 else:
                     st.markdown(f"**Your Rating:** {'⭐' * t.get('satisfaction_rating', 0)}")
     else:
-        st.info("No tickets raised yet")
-
-def page_helpdesk_queue():
-    fc = st.session_state.get("facility", "WTC")
-    info = FACILITY_INFO.get(fc, {})
-    user_role = st.session_state.get("user_role", "staff")
-    is_admin = user_role in ["admin", "approver", "super_admin"]
-    
-    st.markdown(f'## 💬 Helpdesk — {info.get("full_name", fc)}')
-    
-    categories = DB.get_helpdesk_categories()
-    
-    nav_tabs = ["🏠 Home", "📊 AI Analytics", "📄 Reports", "⏱️ Escalation", "⚙️ Settings"]
-    tabs = st.tabs(nav_tabs)
+        st.info("No tickets raised yet"
     
     # ============================================
     # TAB 0: HOME — TICKET QUEUE (FULL)
@@ -5974,17 +5868,22 @@ def page_users():
                         "super_admin":"👑 Super Admin"
                     }[x], key="add_role")
                 
-                new_facility = st.selectbox("Home Facility", ["WTC", "AGVL", "FCPL", "RBPL", "VDL", "WAREHOUSES"], key="add_fac")
+                new_facility = st.multiselect("Home Facility", ["WTC", "AGVL", "FCPL", "RBPL", "VDL", "WAREHOUSES"], default=["WTC"], key="add_fac")
                 
                 st.markdown("---")
                 st.markdown("**📋 Module Permissions**")
                 module_groups = {
-                    "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
-                    "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"],
-                    "People": ["Visitor Management", "User Management"],
-                    "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
-                    "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
-                }
+    "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
+    "Asset & PPM": ["Asset Register", "PPM Activities", "Checklist Status"],
+    "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"],
+    "Work Orders": ["Work Orders"],
+    "Risk Management": ["Risk Assessment"],
+    "People": ["Visitor Management", "User Management"],
+    "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
+    "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
+    "Utility": ["Utility Dashboard"],
+    "Reports": ["Monthly MIS"],
+}
                 selected_perms = []
                 for group, modules in module_groups.items():
                     with st.expander(f"📁 {group}"):
@@ -6061,7 +5960,7 @@ def page_users():
                             "role": new_role,
                             "user_type": ut,
                             "is_active": True,
-                            "home_facility": new_facility,
+                            "home_facility": ",".join(new_facility) if isinstance(new_facility, list) else new_facility,
                             "mobile": new_mobile,
                             "created_by": st.session_state.get("user_name",""),
                             "created_at": datetime.now().isoformat()
@@ -8216,11 +8115,19 @@ def page_feedback():
             
             st.markdown("---")
             
+            # Check if there's an existing survey for this facility
+            existing_survey = safe_supabase(lambda: supabase.table("feedback_surveys").select("*").eq("facility_code", fc).order("created_at", desc=True).limit(1).execute())
+            current_status = "Inactive"
+            current_title = f"Tenant Satisfaction Survey {selected_quarter.split('(')[0].strip()} FY {fy_year}"
+            if existing_survey and existing_survey.data and len(existing_survey.data) > 0:
+                current_status = "Active" if existing_survey.data[0].get("is_active") else "Inactive"
+                current_title = existing_survey.data[0].get("title", current_title)
+            
             with st.form("survey_admin_form"):
                 st.markdown("**📝 Survey Details**")
                 c1, c2 = st.columns(2)
-                with c1: survey_title = st.text_input("Survey Title", value=f"Tenant Satisfaction Survey {selected_quarter.split('(')[0].strip()} FY {fy_year}", key="survey_title")
-                with c2: survey_status = st.selectbox("Status", ["Active", "Inactive"], key="survey_status")
+                with c1: survey_title = st.text_input("Survey Title", value=current_title, key="survey_title")
+                with c2: survey_status = st.selectbox("Status", ["Active", "Inactive"], index=0 if current_status == "Active" else 1, key="survey_status")
                 
                 if st.form_submit_button("💾 Save Survey", use_container_width=True, type="primary"):
                     existing = safe_supabase(lambda: supabase.table("feedback_surveys").select("*").eq("facility_code", fc).eq("title", survey_title).execute())
@@ -8252,7 +8159,7 @@ def page_feedback():
                 tenants = safe_supabase(lambda: supabase.table("organizations").select("*").eq("type", "tenant").order("name").execute())
             
             if tenants and tenants.data and len(tenants.data) > 0:
-                st.caption(f"📋 {len(tenants.data)} tenants found")
+                st.caption(f"📋 {len(tenants.data)} tenants found in {info.get('full_name', fc)}")
                 
                 tenant_options = {}
                 for t in tenants.data:
@@ -8300,11 +8207,11 @@ def page_feedback():
                             if email:
                                 send_email_notification(email, f"📝 {survey_title}",
                                     f"""<div style="font-family:Arial;max-width:600px;border:1px solid #ddd;border-radius:8px;overflow:hidden;">
-                                    <div style="background:#CC0000;padding:20px;color:white;"><h2>We Value Your Feedback</h2><p>{info.get('full_name',fc)} — {selected_quarter}</p></div>
+                                    <div style="background:#C8A951;padding:20px;color:white;"><h2>We Value Your Feedback</h2><p>{info.get('full_name',fc)} — {selected_quarter}</p></div>
                                     <div style="padding:20px;"><p>Dear {t.get('name','Valued Tenant')},</p>
                                     <p>Please take our tenant satisfaction survey. Your feedback helps us improve.</p>
                                     <p><b>Time:</b> Less than 5 minutes</p>
-                                    <div style="text-align:center;margin:20px 0;"><a href="https://facilityxperience.streamlit.app" style="background:#CC0000;color:white;padding:12px 30px;text-decoration:none;border-radius:6px;font-weight:bold;">Take Survey Now</a></div></div></div>""")
+                                    <div style="text-align:center;margin:20px 0;"><a href="https://churchgate-facilityxperience.hf.space" style="background:#C8A951;color:white;padding:12px 30px;text-decoration:none;border-radius:6px;font-weight:bold;">Take Survey Now</a></div></div></div>""")
                                 sent_count += 1
                         st.success(f"✅ Survey sent to {sent_count} tenants!")
                         st.balloons()
@@ -10935,7 +10842,13 @@ def page_wo():
                 wo_failure_class = st.selectbox("Failure Class", ["N/A — Not Applicable","Mechanical","Electrical","User Error","Wear & Tear","Design Issue","Technology","Software/Firmware","Network/Connectivity","Unknown"], index=failure_idx)
                 wo_team = st.selectbox("Assigned Team", ["Engineering — Electrical","Engineering — HVAC","Engineering — Plumbing","Facility Management — Hard Services","Technology Group"])
             c1, c2 = st.columns(2)
-            with c1: wo_location_bldg = st.selectbox("Building", ["CT — Office Tower","SAT — Residential Tower","IP — Intermediate Parking","RC — Recreation Center","External"])
+            with c1:
+                bldg_options = DB.get_locations(fc)
+                if bldg_options:
+                    bldg_names = [b.get("location_name","") for b in bldg_options]
+                else:
+                    bldg_names = [info.get("full_name", fc)]
+                wo_location_bldg = st.selectbox("Building", bldg_names)
             with c2: wo_location_floor = st.text_input("Floor/Zone", placeholder="e.g., Floor 13")
             wo_description = st.text_area("Description", height=80)
             wo_attachment = st.file_uploader("📎 Attach Quote/Invoice (Optional)", type=["pdf","png","jpg","jpeg","docx","xlsx"])
@@ -11677,7 +11590,12 @@ def page_hot():
                 transferee = st.text_input("Transferee (To)*")
                 witness = st.text_input("Witness/Verifier", value=user_name)
             with c3:
-                hoto_location_bldg = st.selectbox("Building", ["CT — Office Tower","SAT — Residential Tower","IP — Intermediate Parking","RC — Recreation Center","External"])
+                bldg_options = DB.get_locations(fc)
+                if bldg_options:
+                    bldg_names = [b.get("location_name","") for b in bldg_options]
+                else:
+                    bldg_names = [info.get("full_name", fc)]
+                hoto_location_bldg = st.selectbox("Building", bldg_names)
                 hoto_location_floor = st.text_input("Floor/Zone")
             
             hoto_desc = st.text_area("Scope Description", height=80)
