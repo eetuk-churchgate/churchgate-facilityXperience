@@ -806,6 +806,85 @@ def inject_css():
         }
         
         /* ============================================
+           MOBILE RESPONSIVE
+           ============================================ */
+        @media (max-width: 768px) {
+            .fx-topnav {
+                padding: 0.4rem 0.8rem !important;
+                flex-wrap: wrap !important;
+                gap: 0.3rem !important;
+                min-height: 40px !important;
+            }
+            .fx-topnav .fx-brand {
+                font-size: 0.85rem !important;
+            }
+            .fx-topnav-right {
+                gap: 0.3rem !important;
+            }
+            .fx-topnav-right .status-badge {
+                display: none !important;
+            }
+            .main > div {
+                padding: 0 0.5rem !important;
+            }
+            .churchgate-header {
+                padding: 0.8rem !important;
+            }
+            .churchgate-header h1 {
+                font-size: 1.1rem !important;
+            }
+            .fx-card {
+                padding: 0.6rem !important;
+            }
+            .fx-card-value {
+                font-size: 1.2rem !important;
+            }
+            .greeting-header {
+                padding: 0.8rem !important;
+            }
+            .greeting-header h1 {
+                font-size: 1rem !important;
+            }
+            
+            [data-testid="collapsedControl"] {
+                display: flex !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                position: fixed !important;
+                top: 60px !important;
+                left: 0 !important;
+                z-index: 99999 !important;
+                background: #C8A951 !important;
+                border-radius: 0 8px 8px 0 !important;
+                padding: 10px 5px !important;
+                width: 24px !important;
+                height: 40px !important;
+            }
+            [data-testid="collapsedControl"] svg {
+                fill: white !important;
+            }
+            
+            section[data-testid="stSidebar"] {
+                width: 100vw !important;
+                max-width: 100vw !important;
+            }
+            
+            [data-testid="stDataFrame"] {
+                overflow-x: auto !important;
+                font-size: 0.6rem !important;
+            }
+            
+            .stColumns {
+                flex-wrap: wrap !important;
+            }
+            
+            .stButton > button {
+                padding: 0.4rem 0.8rem !important;
+                font-size: 0.7rem !important;
+            }
+        }
+        
+        /* ============================================
            RESPONSIVE
            ============================================ */
         @media (max-width: 768px) {
@@ -1016,10 +1095,15 @@ def get_facility_logo(fc, h=60):
     return f'<span style="font-size:2.5rem;">🏢</span>'
 
 
-def ask_facility_xpert(query, categories):
+def ask_facility_xpert(query, categories, facility_name="World Trade Center", facility_city="Abuja"):
     """AI assistant using Groq (FREE, FAST, REAL LLM)"""
     try:
-        api_key = st.secrets.get("GROQ_API_KEY", "")
+        api_key = ""
+        try:
+            api_key = st.secrets["GROQ_API_KEY"]
+        except:
+            api_key = os.environ.get("GROQ_API_KEY", "")
+        
         cat_list = ", ".join(categories[:10])
         
         response = requests.post(
@@ -1029,9 +1113,9 @@ def ask_facility_xpert(query, categories):
                 "Content-Type": "application/json"
             },
             json={
-                "model": "llama3-8b-8192",
+                "model": "llama-3.1-8b-instant",
                 "messages": [
-                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria. You help tenants and staff resolve facility issues quickly. Available departments: {cat_list}. For emergencies (fire, elevator stuck, major water leak, electrical hazard), ALWAYS tell them to raise an URGENT ticket or call the facility team. NEVER make up phone numbers or email addresses. If you don't know something, say so. Be concise, helpful, and professional. Give step-by-step solutions."},
+                    {"role": "system", "content": f"You are facilityXpert, the AI assistant for Churchgate Group's {facility_name} in {facility_city}, Nigeria. You help tenants and staff resolve facility issues quickly. Available departments: {cat_list}. For emergencies (fire, elevator stuck, major water leak, electrical hazard), ALWAYS tell them to raise an URGENT ticket or call the facility team. NEVER make up phone numbers or email addresses. If you don't know something, say so. Be concise, helpful, and professional. Give step-by-step solutions."},
                     {"role": "user", "content": query}
                 ],
                 "max_tokens": 300,
@@ -1043,8 +1127,6 @@ def ask_facility_xpert(query, categories):
         if response.status_code == 200:
             data = response.json()
             return data["choices"][0]["message"]["content"]
-        else:
-            st.error(f"⚠️ Groq API error: Status {response.status_code} - {response.text[:200]}")
         
         # Fallback to knowledge base
         kb = safe_supabase_query(lambda: supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute(), error_prefix="Knowledge base")
@@ -1052,8 +1134,7 @@ def ask_facility_xpert(query, categories):
             solutions = "\n\n".join([f"**{k.get('question')}**\n{k.get('answer','')}" for k in kb.data])
             return f"Here are solutions from our knowledge base:\n\n{solutions}"
         return None
-    except Exception as e:
-        st.error(f"⚠️ AI error: {str(e)[:150]}")
+    except:
         try:
             kb = safe_supabase_query(lambda: supabase.table("knowledge_base").select("*").or_(f"question.ilike.%{query}%,tags.ilike.%{query}%").limit(3).execute(), error_prefix="Knowledge base")
             if kb and kb.data:
@@ -1383,6 +1464,7 @@ def sidebar():
             ("🔧 MAINTENANCE", [("📋 Work Orders", "wo"), ("🛡️ Work Permits", "wp")], ["Work Orders", "Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit", "Work Permit Reports"]),
             ("🛡️ RISK MANAGEMENT", [("📊 Risk Assessment", "fo")], ["Risk Assessment"]),
             ("👥 PEOPLE", [("🛂 Visitor Management", "vm"), ("👤 User Management", "up")], ["Visitor Management", "User Management"]),
+            ("🔑 KEY MANAGEMENT", [("🔑 Key Register", "km"), ("📊 Key Reports", "kmr")], ["Key Register", "Key Reports"]),
             ("💬 SERVICES", [("🎫 Raise a Ticket", "rt"), ("💬 Helpdesk", "hd"), ("⭐ Feedback", "fb")], ["Raise Ticket", "Helpdesk", "Feedback"]),
             ("✅ COMPLIANCE", [("✅ Audit Checklist", "ac"), ("🚨 Incident Check", "ic"), ("🔄 HOTO Check", "hot")], ["Audit Checklist", "Incident Report", "HOTO Check"]),
             ("⚡ UTILITY", [("⚡ Utility Dashboard", "uc")], ["Utility Dashboard"]),
@@ -2497,15 +2579,24 @@ def page_ar():
         with c3: st.markdown('<div style="background:#EFF6FF;color:#2563EB;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📆 Upcoming</div>', unsafe_allow_html=True)
         with c4: st.markdown('<div style="background:#ECFDF5;color:#059669;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">✅ Completed</div>', unsafe_allow_html=True)
         with c5: st.markdown('<div style="background:#F5F3FF;color:#7C3AED;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⏳ Pending</div>', unsafe_allow_html=True)
-        with c6: st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
+        with c6:
+                    st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
         
-        st.markdown("---")
+                st.markdown("---")
         
-        # Get PPM data
-        ppm_schedules = DB.get_all("ppm_schedules", fc, 5000)
-        ppm_df = pd.DataFrame(ppm_schedules) if ppm_schedules else pd.DataFrame()
-        
-        if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
+                # Get PPM data - force fresh pull
+                import time as _time
+                ppm_data = None
+                for attempt in range(3):
+                    try:
+                        ppm_data = supabase.table("ppm_schedules").select("*").eq("facility_code", fc).order("next_due_date", desc=False).limit(5000).execute()
+                        break
+                    except:
+                        _time.sleep(0.5)
+                ppm_schedules = ppm_data.data if ppm_data and ppm_data.data else []
+                ppm_df = pd.DataFrame(ppm_schedules) if ppm_schedules else pd.DataFrame()
+                
+                if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
             ppm_df["due_date_dt"] = pd.to_datetime(ppm_df["next_due_date"], errors='coerce')
         
         if cal_dept != "All" and "assigned_team" in ppm_df.columns:
@@ -3374,6 +3465,32 @@ def page_wp():
                 "Fire Hoses", "Non-Sparking Tools", "Gas Detector", "Additional Lighting"
             ])
             
+            # ============================================
+            # 🔑 KEY ACCESS INTEGRATION
+            # ============================================
+            st.markdown("---")
+            st.markdown("**🔑 Key Access Required?**")
+            key_access_needed = st.checkbox("Yes, key access is required for this work")
+            
+            selected_key_ids = []
+            if key_access_needed:
+                selected_building_name = building_options.get(selected_building, selected_building)
+                building_keys = safe_supabase_query(lambda: supabase.table("key_registry").select("*").eq("facility_code", fc).eq("location_building", selected_building_name).gt("available_copies", 0).order("location_floor,key_name").execute(), error_prefix="Key lookup")
+                
+                if building_keys and building_keys.data:
+                    key_options = {}
+                    for k in building_keys.data:
+                        label = f"{k.get('key_name','')[:80]} | 📍{k.get('location_floor','')} | 🏷️{k.get('key_type','')} | 📋{k.get('available_copies',0)} avail"
+                        key_options[label] = k
+                    
+                    selected_key_labels = st.multiselect("Select Keys Required*", list(key_options.keys()))
+                    selected_key_ids = [key_options[label]["id"] for label in selected_key_labels]
+                    
+                    if selected_key_labels:
+                        st.caption(f"🔑 {len(selected_key_labels)} key(s) selected. These will be reserved upon permit approval.")
+                else:
+                    st.info(f"No available keys found for {selected_building_name}.")
+            
             with st.expander("📋 General Instructions to Contractors"):
                 st.markdown("""
                 1. ID card mandatory for all workers
@@ -3414,6 +3531,7 @@ def page_wp():
                 
                 if not description: errors.append("Description of Work")
                 if not sub_location or sub_location == "Select building first": errors.append("Sub-Location")
+                if key_access_needed and not selected_key_ids: errors.append("Please select at least one key")
                 
                 if errors:
                     st.error(f"⚠️ Please fix: {', '.join(errors)}")
@@ -3436,6 +3554,45 @@ def page_wp():
                     }
                     
                     DB.insert("work_permits", permit_data)
+                    
+                    # Reserve keys if requested
+                    if key_access_needed and selected_key_ids:
+                        for key_id in selected_key_ids:
+                            safe_supabase_query(lambda kid=key_id: supabase.table("key_transactions").insert({
+                                "key_id": kid,
+                                "transaction_type": "reserved",
+                                "requested_by": rname,
+                                "requested_by_email": "",
+                                "work_permit_id": permit_number,
+                                "status": "reserved",
+                                "notes": f"Auto-reserved for Work Permit {permit_number}",
+                                "expected_return": str(ed) if ed else str(date.today() + timedelta(days=1)),
+                                "created_at": wat_now.isoformat()
+                            }).execute(), error_prefix="Key reservation")
+                        
+                        try:
+                            send_email_notification(
+                                "helpdesk_wtc_ct@churchgate.com",
+                                f"🔑 Key Access Requested — {permit_number}",
+                                f"""
+                                <div style="font-family:Arial;max-width:550px;border:1px solid #ddd;border-radius:12px;overflow:hidden;">
+                                    <div style="background:#F59E0B;padding:20px;color:white;">
+                                        <h2 style="margin:0;">🔑 Key Access Requested</h2>
+                                        <p style="margin:5px 0 0 0;font-size:12px;">Work Permit: {permit_number}</p>
+                                    </div>
+                                    <div style="padding:20px;">
+                                        <p><b>Permit:</b> {permit_number}</p>
+                                        <p><b>Raised by:</b> {rname}</p>
+                                        <p><b>Location:</b> {full_location}</p>
+                                        <p><b>Keys Requested:</b> {len(selected_key_ids)} key(s)</p>
+                                        <p><b>Description:</b> {description[:200]}</p>
+                                        <p>Please prepare keys for the contractor upon permit activation.</p>
+                                    </div>
+                                </div>
+                                """
+                            )
+                        except: pass
+                    
                     st.success(f"✅ Work Permit {permit_number} Submitted Successfully!")
                     st.balloons()
                     
@@ -3752,10 +3909,6 @@ def page_raise_ticket():
     
     st.markdown(f'## 🎫 Raise a Ticket — {info.get("full_name", fc)}')
     
-    # Check Groq API key
-    api_key = st.secrets.get("GROQ_API_KEY", "")
-    if not api_key:
-        st.error("⚠️ GROQ_API_KEY not configured. AI assistant unavailable.")    
     # ============================================
     # AI CHAT — TOP OF PAGE
     # ============================================
@@ -3764,11 +3917,21 @@ def page_raise_ticket():
     
     user_email = st.session_state.get("user", {}).get("email", "guest")
     
+    # Initialize chat history
     if "ai_chat_history" not in st.session_state:
         st.session_state.ai_chat_history = []
     if "ai_conversation" not in st.session_state:
         st.session_state.ai_conversation = []
     
+    # Clear chat history when switching facilities
+    if "last_facility" not in st.session_state:
+        st.session_state.last_facility = fc
+    if st.session_state.last_facility != fc:
+        st.session_state.ai_chat_history = []
+        st.session_state.ai_conversation = []
+        st.session_state.last_facility = fc
+    
+    # Load saved chat history for this user
     if not st.session_state.ai_chat_history and user_email != "guest":
         try:
             saved = safe_supabase_query(lambda: supabase.table("ai_chat_sessions").select("*").eq("user_email", user_email).order("updated_at", desc=True).limit(1).execute(), error_prefix="AI chat history")
@@ -3813,13 +3976,24 @@ def page_raise_ticket():
                 except:
                     api_key = os.environ.get("GROQ_API_KEY", "")
                 
+                # Get AI-friendly facility name
+                if fc == "FCPL":
+                    facility_display = "Churchgate Tower 1"
+                elif fc == "RBPL":
+                    facility_display = "Churchgate Tower 2"
+                elif fc == "AGVL":
+                    facility_display = "Churchgate Plaza"
+                else:
+                    facility_display = info.get('full_name', fc)
+                
                 messages = [
-                    {"role": "system", "content": f"""You are facilityXpert, the official AI assistant for Churchgate Group's World Trade Center in Abuja, Nigeria.
+                    {"role": "system", "content": f"""You are facilityXpert, the official AI assistant for Churchgate Group's {facility_display} in {info.get('city', 'Nigeria')}.
 
 YOUR ROLE: Help tenants and staff resolve facility-related issues only.
 
 FACILITY CONTEXT:
-- World Trade Center Abuja: 22-floor Office Tower + 24-floor Residential Tower + Recreation Center
+- {info.get('full_name', fc)}: {info.get('desc', 'Facility')}
+- Located in {info.get('city', 'Nigeria')}
 - Managed by Churchgate Group
 - Departments: {cat_names_list}
 
@@ -3843,7 +4017,7 @@ RESPONSE FORMAT: Give practical step-by-step troubleshooting first. If unresolve
                 response = requests.post(
                     "https://api.groq.com/openai/v1/chat/completions",
                     headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={"model": "llama3-8b-8192", "messages": messages, "max_tokens": 300, "temperature": 0.5},
+                    json={"model": "llama-3.1-8b-instant", "messages": messages, "max_tokens": 300, "temperature": 0.5},
                     timeout=15
                 )
                 
@@ -5976,7 +6150,32 @@ def page_users():
                 
                 st.markdown("---")
                 st.markdown("**🏢 Department Access**")
-                all_depts = sorted(df["dept_full"].dropna().unique().tolist()) if "dept_full" in df.columns else []
+                all_depts = [
+                    "Engineering — Electrical",
+                    "Engineering — HVAC", 
+                    "Engineering — Plumbing",
+                    "Engineering — Vertical Transportation (Lifts)",
+                    "Engineering — Fire Fighting",
+                    "Engineering — Civil & Structural",
+                    "Engineering — Utilities & Energy",
+                    "Facility Management — Hard Services",
+                    "Facility Management — Soft Services (Housekeeping)",
+                    "Facility Management — FM Operations & Helpdesk",
+                    "Facility Management — Fitout Works",
+                    "Facility Management — HSSE Safety & Compliance",
+                    "Facility Management — Front of House",
+                    "Technology Group — Network & Connectivity",
+                    "Technology Group — Building Technology",
+                    "Technology Group — Access Control",
+                    "Technology Group — Automation",
+                    "Technology Group — BMS",
+                    "Technology Group — CCTV",
+                    "Technology Group — Fire Alarm & Voice Evac",
+                    "Technology Group — MDTH (DSTV)",
+                    "Security — Man Guarding Operations",
+                    "Contractor — Clyde Engineering",
+                    "Contractor — Gates and Shield",
+                ]
                 new_depts = st.multiselect("Departments (leave empty for All)", all_depts, key="add_depts")
                 
                 new_password = st.text_input("Password*", type="password", key="add_pw")
@@ -6290,7 +6489,19 @@ def page_users():
                 st.markdown("---")
                 st.markdown("#### 📋 Module Permissions")
                 existing_perms = safe_parse_permissions(user.get("extra_permissions", []))
-                module_groups = {"Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"], "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"], "People": ["Visitor Management", "User Management"], "Services": ["Raise Ticket", "Helpdesk", "Feedback"], "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"], "Utility": ["Utility Dashboard"]}
+                module_groups = {
+                    "Dashboards": ["Command Center", "PPM Dashboard", "Facility Operations"],
+                    "Asset & PPM": ["Asset Register", "PPM Activities", "Checklist Status"],
+                    "Work Permit": ["Raise Permit", "Authorize Permit", "Confirm Permit", "Approve Permit"],
+                    "Work Orders": ["Work Orders"],
+                    "Risk Management": ["Risk Assessment"],
+                    "People": ["Visitor Management", "User Management"],
+                    "Services": ["Raise Ticket", "Helpdesk", "Feedback"],
+                    "Compliance": ["Audit Checklist", "Incident Report", "HOTO Check"],
+                    "Utility": ["Utility Dashboard"],
+                    "Reports": ["Monthly MIS"],
+                    "Key Management": ["Key Register", "Key Reports"],
+                }
                 selected_modules = []
                 for group, modules in module_groups.items():
                     st.markdown(f"""<div style="background:#f9fafb;border-radius:8px;padding:0.5rem;margin:0.3rem 0;border:1px solid #e5e7eb;"><b style="font-size:0.75rem;">📁 {group}</b></div>""", unsafe_allow_html=True)
@@ -6303,9 +6514,34 @@ def page_users():
                 
                 st.markdown("---")
                 st.markdown("#### 🏢 Department Access")
-                all_depts_edit = sorted(df["dept_full"].dropna().unique().tolist()) if "dept_full" in df.columns else []
+                all_depts_edit = [
+                    "Engineering — Electrical",
+                    "Engineering — HVAC", 
+                    "Engineering — Plumbing",
+                    "Engineering — Vertical Transportation (Lifts)",
+                    "Engineering — Fire Fighting",
+                    "Engineering — Civil & Structural",
+                    "Engineering — Utilities & Energy",
+                    "Facility Management — Hard Services",
+                    "Facility Management — Soft Services (Housekeeping)",
+                    "Facility Management — FM Operations & Helpdesk",
+                    "Facility Management — Fitout Works",
+                    "Facility Management — HSSE Safety & Compliance",
+                    "Facility Management — Front of House",
+                    "Technology Group — Network & Connectivity",
+                    "Technology Group — Building Technology",
+                    "Technology Group — Access Control",
+                    "Technology Group — Automation",
+                    "Technology Group — BMS",
+                    "Technology Group — CCTV",
+                    "Technology Group — Fire Alarm & Voice Evac",
+                    "Technology Group — MDTH (DSTV)",
+                    "Security — Man Guarding Operations",
+                    "Contractor — Clyde Engineering",
+                    "Contractor — Gates and Shield",
+                ]
                 current_depts = safe_parse_permissions(user.get("department_permissions", []))
-                valid_defaults = [d for d in current_depts if d in all_depts_edit] if current_depts != ["All"] else all_depts_edit
+                valid_defaults = [d for d in current_depts if d in all_depts_edit] if current_depts and current_depts != ["All"] else []
                 edit_depts = st.multiselect("Departments (leave empty for All)", all_depts_edit, default=valid_defaults)
                 
                 st.markdown("---")
@@ -13402,15 +13638,392 @@ def page_ppm_activities():
             else:
                 st.info("No PPM schedules found.")
 
+
+
+# ============================================
+# KEY MANAGEMENT — FORTUNE 500 COMMAND CENTER
+# ============================================
+def page_key_management():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    user_role = st.session_state.get("user_role", "staff")
+    user_name = st.session_state.get("user_name", "User")
+    user_email = st.session_state.get("user", {}).get("email", "guest")
+    is_admin = user_role in ["admin", "approver", "super_admin", "sr_management", "manager", "team_lead"]
+    
+    st.markdown(f'## 🔑 Key Management Command Center — {info.get("full_name", fc)}')
+    
+    from datetime import timezone, timedelta
+    wat_now = datetime.now(timezone(timedelta(hours=1)))
+    today = wat_now.date()
+    
+   # Fetch all keys with pagination
+    import time as _time
+    all_keys = []
+    page_size = 1000
+    offset = 0
+    
+    while True:
+        keys_page = None
+        for attempt in range(3):
+            try:
+                keys_page = supabase.table("key_registry").select("*").eq("facility_code", fc).range(offset, offset + page_size - 1).execute()
+                break
+            except:
+                _time.sleep(0.5)
+        
+        if keys_page and keys_page.data:
+            all_keys.extend(keys_page.data)
+            if len(keys_page.data) < page_size:
+                break
+            offset += page_size
+        else:
+            break
+    
+    keys_df = pd.DataFrame(all_keys) if all_keys else pd.DataFrame()
+    
+    total_keys = len(keys_df)
+    available_keys = len(keys_df[keys_df["available_copies"] > 0]) if total_keys > 0 else 0
+    not_available = total_keys - available_keys
+    issued_keys = 0
+    
+    # Get active transactions
+    import time as _time
+    active_transactions = None
+    for attempt in range(3):
+        try:
+            active_transactions = supabase.table("key_transactions").select("*").eq("status", "issued").execute()
+            break
+        except:
+            _time.sleep(0.5)
+    if active_transactions and active_transactions.data:
+        issued_keys = len(active_transactions.data)
+    
+    # ============================================
+    # TOP RIBBON
+    # ============================================
+    st.markdown("### 🟦 Key Management Ribbon")
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1: st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Total Keys</div><div style="font-size:1.4rem;font-weight:800;color:#3B82F6;">{total_keys}</div></div>""", unsafe_allow_html=True)
+    with c2: st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Available</div><div style="font-size:1.4rem;font-weight:800;color:#10B981;">{available_keys}</div></div>""", unsafe_allow_html=True)
+    with c3: st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:3px solid #EF4444;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Not Available</div><div style="font-size:1.4rem;font-weight:800;color:#EF4444;">{not_available}</div></div>""", unsafe_allow_html=True)
+    with c4: st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Issued</div><div style="font-size:1.4rem;font-weight:800;color:#F59E0B;">{issued_keys}</div></div>""", unsafe_allow_html=True)
+    with c5: st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Buildings</div><div style="font-size:1.4rem;font-weight:800;color:#8B5CF6;">{keys_df['location_building'].nunique() if total_keys > 0 else 0}</div></div>""", unsafe_allow_html=True)
+    with c6: st.markdown(f"""<div style="background:white;border-radius:12px;padding:0.8rem;text-align:center;border-top:3px solid #EC4899;box-shadow:0 2px 6px rgba(0,0,0,0.04);"><div style="font-size:0.55rem;color:#888;">Overdue</div><div style="font-size:1.4rem;font-weight:800;color:#EC4899;">0</div></div>""", unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
+    # ============================================
+    # TABS
+    # ============================================
+    tabs = st.tabs(["📋 Key Register", "🔄 Issue/Return", "📊 Transaction Log", "🔍 Quick Lookup", "📄 Reports"])
+    
+    # ============================================
+    # TAB 0: KEY REGISTER
+    # ============================================
+    with tabs[0]:
+        st.markdown("### 📋 Key Register")
+        
+        if total_keys == 0:
+            st.info("No keys registered for this facility.")
+        else:
+            # Filters
+            c1, c2, c3, c4, c5 = st.columns(5)
+            with c1:
+                buildings = ["All"] + sorted(keys_df["location_building"].dropna().unique().tolist())
+                sel_building = st.selectbox("Building", buildings, key="key_bldg")
+            with c2:
+                floors = ["All"] + sorted(keys_df["location_floor"].dropna().unique().tolist())
+                sel_floor = st.selectbox("Floor", floors, key="key_floor")
+            with c3:
+                key_types = ["All"] + sorted(keys_df["key_type"].dropna().unique().tolist())
+                sel_type = st.selectbox("Type", key_types, key="key_type_filter")
+            with c4:
+                status_opts = ["All", "Available", "Not Available"]
+                sel_status = st.selectbox("Status", status_opts, key="key_status_filter")
+            with c5:
+                search_key = st.text_input("🔍 Search", key="key_search", placeholder="Key name or code...")
+            
+            # Apply filters
+            display_keys = keys_df.copy()
+            if sel_building != "All": display_keys = display_keys[display_keys["location_building"] == sel_building]
+            if sel_floor != "All": display_keys = display_keys[display_keys["location_floor"] == sel_floor]
+            if sel_type != "All": display_keys = display_keys[display_keys["key_type"] == sel_type]
+            if sel_status == "Available": display_keys = display_keys[display_keys["available_copies"] > 0]
+            elif sel_status == "Not Available": display_keys = display_keys[display_keys["available_copies"] == 0]
+            if search_key:
+                mask = display_keys["key_name"].str.contains(search_key, case=False, na=False) | display_keys["key_code"].str.contains(search_key, case=False, na=False)
+                display_keys = display_keys[mask]
+            
+            st.caption(f"📋 Showing {len(display_keys)} of {total_keys} keys")
+            
+            # Pagination
+            page_size = 15
+            if "key_page" not in st.session_state: st.session_state.key_page = 1
+            total_pages = max(1, (len(display_keys) + page_size - 1) // page_size)
+            start = (st.session_state.key_page - 1) * page_size
+            end = min(start + page_size, len(display_keys))
+            
+            c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+            with c1:
+                if st.button("◀◀", key="k_first") and st.session_state.key_page > 1: st.session_state.key_page = 1; st.rerun()
+            with c2:
+                if st.button("◀", key="k_prev") and st.session_state.key_page > 1: st.session_state.key_page -= 1; st.rerun()
+            with c3: st.markdown(f"**Page {st.session_state.key_page} of {total_pages}**")
+            with c4:
+                if st.button("▶", key="k_next") and st.session_state.key_page < total_pages: st.session_state.key_page += 1; st.rerun()
+            with c5:
+                if st.button("▶▶", key="k_last"): st.session_state.key_page = total_pages; st.rerun()
+            
+            st.markdown("---")
+            
+            # Key cards
+            for _, key in display_keys.iloc[start:end].iterrows():
+                avail = key.get("available_copies", 0)
+                total = key.get("total_copies", 0)
+                status = "Available" if avail > 0 else "Not Available"
+                sc = "#10B981" if avail > 0 else "#EF4444"
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:10px;padding:0.7rem;margin:0.3rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <b>{key.get('key_name','N/A')[:90]}</b>
+                            <br><span style="font-size:0.65rem;color:#666;">📍 {key.get('location_building','')} | 🏠 {key.get('location_floor','')} | 🏷️ {key.get('key_type','')}</span>
+                            <br><span style="font-size:0.6rem;color:#888;">🆔 {key.get('key_code','')} | 📋 {avail}/{total} available</span>
+                        </div>
+                        <span style="background:{sc};color:white;padding:3px 10px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Quick action buttons
+                if avail > 0 and is_admin:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button(f"🔑 Issue Key", key=f"issue_{key['id']}", use_container_width=True):
+                            st.session_state.issuing_key = key["id"]
+                            st.rerun()
+                    with c2:
+                        if st.button(f"📋 Details", key=f"det_{key['id']}", use_container_width=True):
+                            st.session_state.key_detail = key["id"]
+                            st.rerun()
+    
+    # ============================================
+    # TAB 1: ISSUE / RETURN
+    # ============================================
+    with tabs[1]:
+        st.markdown("### 🔄 Issue / Return Key")
+        
+        if "issuing_key" in st.session_state and st.session_state.issuing_key:
+            key_id = st.session_state.issuing_key
+            key_info = keys_df[keys_df["id"] == key_id].iloc[0] if len(keys_df[keys_df["id"] == key_id]) > 0 else None
+            
+            if key_info is not None:
+                st.markdown(f"""
+                <div style="background:#EFF6FF;border-left:4px solid #3B82F6;border-radius:10px;padding:1rem;margin:1rem 0;">
+                    <b>Issuing Key:</b> {key_info.get('key_name','')[:100]}<br>
+                    <span style="font-size:0.8rem;">📍 {key_info.get('location_building','')} | 🏠 {key_info.get('location_floor','')}</span><br>
+                    <span style="font-size:0.8rem;">Available: {key_info.get('available_copies',0)}/{key_info.get('total_copies',0)}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                with st.form("issue_key_form"):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        issued_to = st.text_input("Issue To*", value=st.session_state.get("user_name",""))
+                        issued_email = st.text_input("Recipient Email*", value=user_email)
+                    with c2:
+                        work_permit_ref = st.text_input("Work Permit Reference (if applicable)")
+                        expected_return = st.date_input("Expected Return Date", today + timedelta(days=1))
+                    
+                    issue_notes = st.text_area("Notes", placeholder="Purpose of key issue...")
+                    
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.form_submit_button("🔑 ISSUE KEY", use_container_width=True, type="primary"):
+                            if issued_to:
+                                safe_supabase_query(lambda: supabase.table("key_transactions").insert({
+                                    "key_id": key_id,
+                                    "transaction_type": "issue",
+                                    "requested_by": issued_to,
+                                    "requested_by_email": issued_email,
+                                    "work_permit_id": work_permit_ref if work_permit_ref else None,
+                                    "issued_by": user_name,
+                                    "issued_at": wat_now.isoformat(),
+                                    "expected_return": str(expected_return),
+                                    "status": "issued",
+                                    "notes": issue_notes,
+                                    "created_at": wat_now.isoformat()
+                                }).execute(), error_prefix="Issue key")
+                                
+                                new_avail = max(0, key_info.get("available_copies", 0) - 1)
+                                safe_supabase_query(lambda: supabase.table("key_registry").update({"available_copies": new_avail}).eq("id", key_id).execute(), error_prefix="Update copies")
+                                
+                                try:
+                                    send_email_notification(issued_email, f"🔑 Key Issued — {key_info.get('key_name','')[:50]}",
+                                        f"""<div style="font-family:Arial;max-width:500px;border:1px solid #ddd;border-radius:12px;overflow:hidden;">
+                                        <div style="background:#C8A951;padding:20px;color:white;"><h2>Key Issued</h2><p>{info.get('full_name',fc)}</p></div>
+                                        <div style="padding:20px;"><p><b>Key:</b> {key_info.get('key_name','')}</p><p><b>Issued to:</b> {issued_to}</p><p><b>Expected return:</b> {expected_return}</p></div></div>""")
+                                except: pass
+                                
+                                st.success("✅ Key issued!"); st.session_state.issuing_key = None; st.balloons(); st.rerun()
+                    with c2:
+                        if st.form_submit_button("❌ Cancel", use_container_width=True):
+                            st.session_state.issuing_key = None; st.rerun()
+        
+        # Return section
+        st.markdown("---")
+        st.markdown("### 📤 Return Key")
+        
+        import time as _time
+        active_issued = None
+        for attempt in range(3):
+            try:
+                active_issued = supabase.table("key_transactions").select("*, key_registry!inner(key_name, key_code, location_building, location_floor)").eq("status", "issued").order("issued_at", desc=True).execute()
+                break
+            except:
+                _time.sleep(0.5)
+        
+        if active_issued and active_issued.data:
+            for txn in active_issued.data:
+                key_info_nested = txn.get("key_registry", {})
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid #F59E0B;border-radius:8px;padding:0.7rem;margin:0.3rem 0;">
+                    <b>{key_info_nested.get('key_name','')[:80]}</b>
+                    <br><span style="font-size:0.7rem;">👤 {txn.get('requested_by','')} | 📅 Issued: {str(txn.get('issued_at',''))[:10]}</span>
+                    <br><span style="font-size:0.65rem;">Expected return: {str(txn.get('expected_return',''))[:10]}</span>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button(f"✅ Return This Key", key=f"return_{txn['id']}", use_container_width=True):
+                    safe_supabase_query(lambda: supabase.table("key_transactions").update({
+                        "status": "returned",
+                        "returned_at": wat_now.isoformat()
+                    }).eq("id", txn["id"]).execute(), error_prefix="Return key")
+                    
+                    key_reg = safe_supabase_query(lambda: supabase.table("key_registry").select("available_copies,total_copies").eq("id", txn["key_id"]).single().execute(), error_prefix="Get copies")
+                    if key_reg and key_reg.data:
+                        new_avail = min(key_reg.data.get("total_copies", 1), key_reg.data.get("available_copies", 0) + 1)
+                        safe_supabase_query(lambda: supabase.table("key_registry").update({"available_copies": new_avail}).eq("id", txn["key_id"]).execute(), error_prefix="Update copies")
+                    
+                    st.success("✅ Key returned!"); st.rerun()
+        else:
+            st.info("No keys currently issued.")
+    
+    # ============================================
+    # TAB 2: TRANSACTION LOG
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 📊 Transaction Log")
+        
+        all_transactions = safe_supabase_query(lambda: supabase.table("key_transactions").select("*, key_registry(key_name, key_code)").order("created_at", desc=True).limit(100).execute(), error_prefix="Transactions")
+        
+        if all_transactions and all_transactions.data:
+            for txn in all_transactions.data:
+                txn_type = txn.get("transaction_type", "issue")
+                status = txn.get("status", "pending")
+                sc = {"issued": "#F59E0B", "returned": "#10B981", "pending": "#3B82F6", "rejected": "#EF4444"}.get(status, "#3B82F6")
+                ki = txn.get("key_registry", {})
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.6rem;margin:0.2rem 0;font-size:0.75rem;">
+                    <b>{txn_type.upper()}</b> — {ki.get('key_name','')[:60]}
+                    <br>👤 {txn.get('requested_by','')} | 📅 {str(txn.get('created_at',''))[:16]}
+                    <span style="float:right;color:{sc};font-weight:600;">{status.upper()}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No transactions recorded.")
+    
+    # ============================================
+    # TAB 3: QUICK LOOKUP
+    # ============================================
+    with tabs[3]:
+        st.markdown("### 🔍 Quick Key Lookup")
+        
+        lookup_code = st.text_input("Enter Key Code or Key Name", placeholder="e.g., SAT-GF-FRONT-WD")
+        
+        if lookup_code:
+            result = safe_supabase_query(lambda: supabase.table("key_registry").select("*").or_(f"key_code.ilike.%{lookup_code}%,key_name.ilike.%{lookup_code}%").eq("facility_code", fc).limit(10).execute(), error_prefix="Key lookup")
+            
+            if result and result.data:
+                for key in result.data:
+                    avail = key.get("available_copies", 0)
+                    sc = "#10B981" if avail > 0 else "#EF4444"
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-left:4px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                        <h4>{key.get('key_name','')}</h4>
+                        <p><b>Code:</b> {key.get('key_code','')} | <b>Type:</b> {key.get('key_type','')}</p>
+                        <p><b>Location:</b> {key.get('location_building','')} — {key.get('location_floor','')}</p>
+                        <p><b>Available:</b> {avail} of {key.get('total_copies',0)} copies</p>
+                        <p><b>Status:</b> <span style="color:{sc};font-weight:600;">{'Available' if avail > 0 else 'Not Available'}</span></p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Show recent transactions for this key
+                    recent_txn = safe_supabase_query(lambda: supabase.table("key_transactions").select("*").eq("key_id", key["id"]).order("created_at", desc=True).limit(5).execute(), error_prefix="Recent transactions")
+                    if recent_txn and recent_txn.data:
+                        with st.expander("📋 Recent Transactions"):
+                            for txn in recent_txn.data:
+                                st.caption(f"{str(txn.get('created_at',''))[:16]} | {txn.get('transaction_type','').upper()} | {txn.get('requested_by','')} | {txn.get('status','').upper()}")
+            else:
+                st.info("No keys found matching your search.")
+    
+    # ============================================
+    # TAB 4: REPORTS
+    # ============================================
+    with tabs[4]:
+        st.markdown("### 📄 Key Management Reports")
+        
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.metric("Total Keys", total_keys)
+        with c2: st.metric("Available", available_keys)
+        with c3: st.metric("Issued Now", issued_keys)
+        with c4: st.metric("Buildings", keys_df["location_building"].nunique() if total_keys > 0 else 0)
+        
+        st.markdown("---")
+        
+        # Building breakdown
+        if total_keys > 0:
+            st.markdown("### 🏢 Keys by Building")
+            bldg_counts = keys_df["location_building"].value_counts()
+            fig = px.bar(x=bldg_counts.values, y=bldg_counts.index, orientation='h', title="Keys per Building", color=bldg_counts.values, color_continuous_scale="Reds")
+            fig.update_layout(height=300)
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Export
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("📥 Export Key Register (CSV)", use_container_width=True):
+                st.download_button("Download CSV", keys_df.to_csv(index=False), f"key_register_{fc}_{today}.csv", "text/csv", use_container_width=True)
+        with c2:
+            if st.button("📥 Export Transactions (CSV)", use_container_width=True):
+                all_txn = safe_supabase_query(lambda: supabase.table("key_transactions").select("*").order("created_at", desc=True).limit(500).execute(), error_prefix="Export transactions")
+                if all_txn and all_txn.data:
+                    txn_df = pd.DataFrame(all_txn.data)
+                    st.download_button("Download CSV", txn_df.to_csv(index=False), f"key_transactions_{today}.csv", "text/csv", use_container_width=True)
+
+
+def page_key_reports():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    st.markdown(f'## 📊 Key Reports — {info.get("full_name", fc)}')
+    st.info("Advanced key analytics and audit reports coming soon.")
+
+
+
 # ============================================
 # ROUTER
 # ============================================
 ROUTER={
     "cc":page_cc,"ar":page_ar,"cal":page_cal,"cs":page_cs,"ppm":page_ppm,
     "wo":page_wo,"wp":page_wp,"fo":page_fo,
+    "km":page_key_management,"kmr":page_key_reports,
     "vm": page_visitor,"up":page_users,"rt":page_raise_ticket,"hd":page_helpdesk_queue,"fb": page_feedback,
     "ac":page_ac,"ic":page_ic,"hot":page_hot,"uc":page_uc,"mis":page_mis,
-    "ppma": page_ppm_activities,  # <-- ADD THIS LINE
+    "ppma": page_ppm_activities,
 }
 
 # ============================================
@@ -13450,7 +14063,7 @@ def login_page():
                     st.stop()
                 
                 try:
-                    res = safe_supabase_query(lambda: supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute(), error_prefix="Login lookup")
+                    res = supabase.table("app_users").select("*").eq("email", email).eq("is_active", True).single().execute()
                 except:
                     res = type('obj', (object,), {'data': None})()
                 
