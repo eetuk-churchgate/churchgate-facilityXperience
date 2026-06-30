@@ -2580,23 +2580,23 @@ def page_ar():
         with c4: st.markdown('<div style="background:#ECFDF5;color:#059669;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">✅ Completed</div>', unsafe_allow_html=True)
         with c5: st.markdown('<div style="background:#F5F3FF;color:#7C3AED;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⏳ Pending</div>', unsafe_allow_html=True)
         with c6:
-                    st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
+            st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
         
-                st.markdown("---")
+        st.markdown("---")  # ← Fixed - now matches outer indentation level
         
-                # Get PPM data - force fresh pull
-                import time as _time
-                ppm_data = None
-                for attempt in range(3):
-                    try:
-                        ppm_data = supabase.table("ppm_schedules").select("*").eq("facility_code", fc).order("next_due_date", desc=False).limit(5000).execute()
-                        break
-                    except:
-                        _time.sleep(0.5)
-                ppm_schedules = ppm_data.data if ppm_data and ppm_data.data else []
-                ppm_df = pd.DataFrame(ppm_schedules) if ppm_schedules else pd.DataFrame()
-                
-                if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
+        # Get PPM data - force fresh pull
+        import time as _time
+        ppm_data = None
+        for attempt in range(3):
+            try:
+                ppm_data = supabase.table("ppm_schedules").select("*").eq("facility_code", fc).order("next_due_date", desc=False).limit(5000).execute()
+                break
+            except:
+                _time.sleep(0.5)
+        ppm_schedules = ppm_data.data if ppm_data and ppm_data.data else []
+        ppm_df = pd.DataFrame(ppm_schedules) if ppm_schedules else pd.DataFrame()
+        
+        if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
             ppm_df["due_date_dt"] = pd.to_datetime(ppm_df["next_due_date"], errors='coerce')
         
         if cal_dept != "All" and "assigned_team" in ppm_df.columns:
