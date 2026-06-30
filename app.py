@@ -2541,7 +2541,9 @@ def page_ar():
         st.markdown("### 🔍 Filters")
         c1, c2, c3, c4 = st.columns(4)
         with c1:
+            # Create dept_full for display BUT don't modify original df
             df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
+            
             if is_admin:
                 dept_options = ["All"] + sorted(df["dept_full"].dropna().unique().tolist())
             else:
@@ -2582,7 +2584,7 @@ def page_ar():
         with c6:
             st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
         
-        st.markdown("---")  # ← Fixed - now matches outer indentation level
+        st.markdown("---")
         
         # Get PPM data - force fresh pull
         import time as _time
@@ -2599,8 +2601,11 @@ def page_ar():
         if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
             ppm_df["due_date_dt"] = pd.to_datetime(ppm_df["next_due_date"], errors='coerce')
         
+        # Apply department filter - PRESERVES original department structure
         if cal_dept != "All" and "assigned_team" in ppm_df.columns:
-            ppm_df = ppm_df[ppm_df["assigned_team"].str.contains(cal_dept.replace(" — "," "), case=False, na=False)]
+            # Extract just the department part from cal_dept (before " — " if sub-division exists)
+            base_dept = cal_dept.split(" — ")[0] if " — " in cal_dept else cal_dept
+            ppm_df = ppm_df[ppm_df["assigned_team"].str.contains(base_dept, case=False, na=False)]
         
         ppm_dates = {}
         if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
