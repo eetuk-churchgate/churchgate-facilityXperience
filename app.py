@@ -12555,7 +12555,6 @@ def page_ppm_activities():
     df["checklist_clean"] = df["checklist"].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() not in ["", "NA", "na", "APPLICABLE", "NOTAPPLICABLE", "None"] else None)
     df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
     
-    # Role-based department restriction
     if is_admin:
         allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
     elif user_depts and len(user_depts) > 0 and user_depts != ["All"]:
@@ -12564,18 +12563,13 @@ def page_ppm_activities():
     else:
         allowed_depts = sorted(df["dept_full"].dropna().unique().tolist())
     
-    # Get custom checklists from database
     custom_checklists = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").select("*").execute(), error_prefix="Checklist templates")
     checklist_options = ["Standard Template"] + [c.get("template_name","") for c in custom_checklists.data] if custom_checklists and custom_checklists.data else ["Standard Template"]
     
-    # ============================================
-    # MAIN TABS
-    # ============================================
     tabs = st.tabs(["🔧 Execute PPM", "📋 Daily Checklist", "⏰ Hourly Checklist", "📊 My Submissions", "⏳ Pending Approval", "⚙️ Checklist Builder", "📋 Manage Schedules"])
-
     
     # ============================================
-    # TAB 0: EXECUTE PPM (SCHEDULED)
+    # TAB 0: EXECUTE PPM
     # ============================================
     with tabs[0]:
         st.markdown("### 🔧 Execute Scheduled PPM")
@@ -12611,7 +12605,6 @@ def page_ppm_activities():
                     
                     st.markdown("---")
                     
-                    # Asset details card
                     st.markdown(f"""
                     <div style="background:white;border-radius:10px;padding:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:1rem;">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -12627,44 +12620,38 @@ def page_ppm_activities():
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # ============================================
-                    # DYNAMIC CHECKLIST — CUSTOMIZABLE
-                    # ============================================
                     st.markdown("### 📝 PPM Checklist")
                     
-                    # Select checklist template
                     sel_checklist = st.selectbox("Select Checklist Template", checklist_options, key="ppm_checklist_template")
                     
-                    # Build checklist items
                     checklist_items = []
                     
                     if sel_checklist == "Standard Template":
                         checklist_items = [
                             {"item_number": 1, "description": "Safety Precautions & Pre-Checks", "check_type": "section", "options": None},
-                            {"item_number": 2, "description": "LOTO (Lock-Out/Tag-Out): Power isolated and locked out", "check_type": "yes_no", "options": None},
-                            {"item_number": 3, "description": "PPE: Appropriate PPE worn (gloves, safety glasses)", "check_type": "yes_no", "options": None},
-                            {"item_number": 4, "description": "Work Area Assessment: Area clear of obstructions", "check_type": "status", "options": ["Clear", "Not Clear"]},
+                            {"item_number": 2, "description": "LOTO: Power isolated and locked out", "check_type": "yes_no", "options": None},
+                            {"item_number": 3, "description": "PPE: Appropriate PPE worn", "check_type": "yes_no", "options": None},
+                            {"item_number": 4, "description": "Work Area Assessment", "check_type": "status", "options": ["Clear", "Not Clear"]},
                             {"item_number": 5, "description": "Permits: All necessary work permits obtained", "check_type": "yes_no", "options": None},
-                            {"item_number": 6, "description": "Visual Inspection - Unit casing for damage, cleanliness", "check_type": "yes_no", "options": None},
-                            {"item_number": 7, "description": "Air Filter(s) - Inspect for cleanliness and damage", "check_type": "status", "options": ["Clean", "Dirty", "Replaced"]},
-                            {"item_number": 8, "description": "Fan & Motor - Check for unusual noise, vibration", "check_type": "status", "options": ["Normal", "Abnormal"]},
-                            {"item_number": 9, "description": "Condensate Drain - Inspect drain pan", "check_type": "status", "options": ["Good", "Damage", "Dirty"]},
-                            {"item_number": 10, "description": "Electrical - Check wiring for damage, loose connections", "check_type": "yes_no", "options": None},
+                            {"item_number": 6, "description": "Visual Inspection - Unit casing", "check_type": "yes_no", "options": None},
+                            {"item_number": 7, "description": "Air Filter(s) - Inspect", "check_type": "status", "options": ["Clean", "Dirty", "Replaced"]},
+                            {"item_number": 8, "description": "Fan & Motor - Check for noise/vibration", "check_type": "status", "options": ["Normal", "Abnormal"]},
+                            {"item_number": 9, "description": "Condensate Drain - Inspect", "check_type": "status", "options": ["Good", "Damage", "Dirty"]},
+                            {"item_number": 10, "description": "Electrical - Check wiring", "check_type": "yes_no", "options": None},
                             {"item_number": 11, "description": "Measure air-on temperature (°C)", "check_type": "reading", "options": None},
                             {"item_number": 12, "description": "Measure air-off temperature (°C)", "check_type": "reading", "options": None},
-                            {"item_number": 13, "description": "Record voltage parameters - RY", "check_type": "reading", "options": None},
-                            {"item_number": 14, "description": "Record voltage parameters - YB", "check_type": "reading", "options": None},
-                            {"item_number": 15, "description": "Record voltage parameters - BR", "check_type": "reading", "options": None},
-                            {"item_number": 16, "description": "Record Amps parameters - R", "check_type": "reading", "options": None},
-                            {"item_number": 17, "description": "Record Amps parameters - Y", "check_type": "reading", "options": None},
-                            {"item_number": 18, "description": "Record Amps parameters - B", "check_type": "reading", "options": None},
-                            {"item_number": 19, "description": "Check earthing connections of the panel", "check_type": "status", "options": ["Tight", "Loose"]},
-                            {"item_number": 20, "description": "Check BMS integration units", "check_type": "yes_no", "options": None},
+                            {"item_number": 13, "description": "Record voltage - RY", "check_type": "reading", "options": None},
+                            {"item_number": 14, "description": "Record voltage - YB", "check_type": "reading", "options": None},
+                            {"item_number": 15, "description": "Record voltage - BR", "check_type": "reading", "options": None},
+                            {"item_number": 16, "description": "Record Amps - R", "check_type": "reading", "options": None},
+                            {"item_number": 17, "description": "Record Amps - Y", "check_type": "reading", "options": None},
+                            {"item_number": 18, "description": "Record Amps - B", "check_type": "reading", "options": None},
+                            {"item_number": 19, "description": "Check earthing connections", "check_type": "status", "options": ["Tight", "Loose"]},
+                            {"item_number": 20, "description": "Check BMS integration", "check_type": "yes_no", "options": None},
                             {"item_number": 21, "description": "Replace defective indication lamps", "check_type": "yes_no", "options": None},
-                            {"item_number": 22, "description": "Observations / abnormality If any", "check_type": "text", "options": None},
+                            {"item_number": 22, "description": "Observations / abnormalities", "check_type": "text", "options": None},
                         ]
                     else:
-                        # Load from database
                         matched = None
                         for c in custom_checklists.data if custom_checklists.data else []:
                             if c.get("template_name") == sel_checklist:
@@ -12682,9 +12669,6 @@ def page_ppm_activities():
                                         "options": opts if len(opts) > 1 else None
                                     })
                     
-                    # ============================================
-                    # RENDER DYNAMIC CHECKLIST
-                    # ============================================
                     with st.form("ppm_execution_form", clear_on_submit=True):
                         checklist_results = []
                         has_issues = False
@@ -12695,13 +12679,11 @@ def page_ppm_activities():
                             item_desc = item.get("description", "")
                             item_opts = item.get("options")
                             
-                            # Section headers
                             if item_type == "section":
                                 st.markdown(f"### {item_desc}")
                                 continue
                             
                             st.markdown(f"**{item_num}. {item_desc}**")
-                            
                             c1, c2 = st.columns([1, 2])
                             
                             if item_type == "yes_no":
@@ -12742,21 +12724,18 @@ def page_ppm_activities():
                             
                             st.markdown("---")
                         
-                        # Mitigation section
                         if has_issues:
                             st.markdown("### 🚨 Mitigation Plan (Required)")
-                            mitigation_plan = st.text_area("Describe mitigation actions*", height=80, placeholder="Required when items fail...")
+                            mitigation_plan = st.text_area("Describe mitigation actions*", height=80)
                             c1, c2 = st.columns(2)
                             with c1: mitigation_deadline = st.date_input("Mitigation Deadline", date.today() + timedelta(days=7))
                             with c2: st.markdown("<br>", unsafe_allow_html=True)
                         else:
                             mitigation_plan, mitigation_deadline = "", None
                         
-                        # Photo evidence
                         st.markdown("### 📸 Photo Evidence (Required)")
                         uploaded_photos = st.file_uploader("Upload photos", type=["png","jpg","jpeg"], accept_multiple_files=True, key="ppm_photos")
                         
-                        # Schedule
                         st.markdown("### 📅 Schedule")
                         c1, c2, c3 = st.columns(3)
                         with c1: execution_date = st.date_input("Execution Date", date.today())
@@ -12809,16 +12788,12 @@ def page_ppm_activities():
                                         }).execute(), error_prefix="PPM items")
                                     
                                     safe_supabase_query(lambda eid=execution_id: supabase.table("ppm_approvals").insert({
-                                        "execution_id": eid,
-                                        "approval_level": "team_lead",
-                                        "status": "pending",
-                                        "created_at": datetime.now().isoformat()
+                                        "execution_id": eid, "approval_level": "team_lead",
+                                        "status": "pending", "created_at": datetime.now().isoformat()
                                     }).execute(), error_prefix="PPM approval TL")
                                     safe_supabase_query(lambda eid=execution_id: supabase.table("ppm_approvals").insert({
-                                        "execution_id": eid,
-                                        "approval_level": "manager",
-                                        "status": "pending",
-                                        "created_at": datetime.now().isoformat()
+                                        "execution_id": eid, "approval_level": "manager",
+                                        "status": "pending", "created_at": datetime.now().isoformat()
                                     }).execute(), error_prefix="PPM approval MGR")
                                     
                                     st.success("✅ PPM Execution submitted!")
@@ -12832,34 +12807,23 @@ def page_ppm_activities():
     # ============================================
     with tabs[1]:
         st.markdown("### 📋 Daily Checklist Execution")
-        
         daily_assets = df[df["verification_frequency"].isin(["Daily","daily"])] if "verification_frequency" in df.columns else pd.DataFrame()
-        
         if len(daily_assets) == 0:
-            st.info("No daily checklist assets found. Assets with 'Daily' verification frequency will appear here.")
+            st.info("No daily checklist assets found.")
         else:
             c1, c2 = st.columns(2)
             with c1: st.metric("📋 Daily Assets", len(daily_assets))
             with c2: st.metric("⏳ Pending Today", len(daily_assets))
-            
             st.markdown("---")
-            
             sel_daily_dept = st.selectbox("Department", ["All"] + sorted(daily_assets["dept_full"].dropna().unique().tolist()), key="daily_dept")
-            
             display_daily = daily_assets.copy()
-            if sel_daily_dept != "All":
-                display_daily = display_daily[display_daily["dept_full"] == sel_daily_dept]
-            
+            if sel_daily_dept != "All": display_daily = display_daily[display_daily["dept_full"] == sel_daily_dept]
             for _, asset in display_daily.head(20).iterrows():
                 st.markdown(f"""
                 <div style="background:white;border-left:3px solid #3B82F6;border-radius:6px;padding:0.5rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <b>{asset.get('parent_asset','N/A')}</b> — {asset.get('name','N/A')[:50]}
-                        <br><span style="font-size:0.6rem;color:#666;">📍 {asset.get('location_building','')} | 📅 Daily</span>
-                    </div>
+                    <div><b>{asset.get('parent_asset','N/A')}</b> — {asset.get('name','N/A')[:50]}<br><span style="font-size:0.6rem;color:#666;">📍 {asset.get('location_building','')} | 📅 Daily</span></div>
                 </div>
                 """, unsafe_allow_html=True)
-            
             st.info("👆 Go to 'Execute PPM' tab, select this asset, and choose 'Daily Checklist' as PPM Type.")
     
     # ============================================
@@ -12867,25 +12831,18 @@ def page_ppm_activities():
     # ============================================
     with tabs[2]:
         st.markdown("### ⏰ Hourly Checklist Execution")
-        
         hourly_assets = df[df["verification_frequency"].isin(["Hourly","hourly","Bi-Weekly"])] if "verification_frequency" in df.columns else pd.DataFrame()
-        
         if len(hourly_assets) == 0:
             st.info("No hourly checklist assets found.")
         else:
             c1, c2 = st.columns(2)
             with c1: st.metric("⏰ Hourly Assets", len(hourly_assets))
             with c2: st.metric("⏳ Pending", len(hourly_assets))
-            
             st.markdown("---")
-            
             for _, asset in hourly_assets.head(20).iterrows():
                 st.markdown(f"""
                 <div style="background:white;border-left:3px solid #8B5CF6;border-radius:6px;padding:0.5rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
-                    <div>
-                        <b>{asset.get('parent_asset','N/A')}</b> — {asset.get('name','N/A')[:50]}
-                        <br><span style="font-size:0.6rem;color:#666;">📍 {asset.get('location_building','')} | ⏰ {asset.get('verification_frequency','')}</span>
-                    </div>
+                    <div><b>{asset.get('parent_asset','N/A')}</b> — {asset.get('name','N/A')[:50]}<br><span style="font-size:0.6rem;color:#666;">📍 {asset.get('location_building','')} | ⏰ {asset.get('verification_frequency','')}</span></div>
                 </div>
                 """, unsafe_allow_html=True)
     
@@ -12894,23 +12851,16 @@ def page_ppm_activities():
     # ============================================
     with tabs[3]:
         st.markdown("### 📊 My Submitted PPMs")
-        
         my_executions = safe_supabase_query(lambda: supabase.table("ppm_executions").select("*").eq("facility_code", fc).eq("executed_by_name", user_name).order("created_at", desc=True).limit(50).execute(), error_prefix="My PPMs")
-        
         if my_executions and my_executions.data and len(my_executions.data) > 0:
             for ex in my_executions.data:
                 status = ex.get("status", "submitted")
                 sc = {"submitted": "#3B82F6", "confirmed": "#F59E0B", "approved": "#10B981", "rejected": "#EF4444"}.get(status, "#3B82F6")
                 icon = {"submitted": "📤", "confirmed": "✅", "approved": "🟢", "rejected": "❌"}.get(status, "📋")
-                ppm_type = ex.get("ppm_type", "Scheduled PPM")
-                
                 st.markdown(f"""
-                <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);cursor:pointer;">
+                <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div>
-                            <div style="font-size:1rem;font-weight:700;color:#1a1a1a;">{icon} {ex.get('execution_date','')} — {ppm_type}</div>
-                            <div style="font-size:0.75rem;color:#666;margin-top:0.2rem;">🏢 {ex.get('building','N/A')} | ⏰ {ex.get('execution_time','')}</div>
-                        </div>
+                        <div><div style="font-size:1rem;font-weight:700;">{icon} {ex.get('execution_date','')}</div><div style="font-size:0.75rem;color:#666;">🏢 {ex.get('building','N/A')}</div></div>
                         <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">{status.upper()}</span>
                     </div>
                 </div>
@@ -12919,11 +12869,10 @@ def page_ppm_activities():
             st.info("No PPM submissions yet.")
     
     # ============================================
-    # TAB 4: PENDING APPROVAL — TWO LEVELS
+    # TAB 4: PENDING APPROVAL
     # ============================================
     with tabs[4]:
         st.markdown("### ⏳ Approval Center")
-        
         if user_role not in ["admin", "approver", "authorizer", "confirmer"]:
             st.info("This section is for Team Leads and Managers.")
         else:
@@ -12931,55 +12880,33 @@ def page_ppm_activities():
             
             with approval_tabs[0]:
                 st.markdown("#### 🔐 Pending Team Lead Confirmation")
-                
                 pending = safe_supabase_query(lambda: supabase.table("ppm_executions").select("*").eq("facility_code", fc).eq("status", "submitted").order("created_at", desc=True).execute(), error_prefix="Pending PPMs")
-                
                 if pending and pending.data and len(pending.data) > 0:
                     for ex in pending.data:
-                        sc = "#3B82F6"
-                        ppm_type = ex.get("ppm_type", "Scheduled PPM")
-                        
                         st.markdown(f"""
-                        <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                        <div style="background:white;border-left:5px solid #3B82F6;border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
-                                <div>
-                                    <div style="font-size:1rem;font-weight:700;">📋 {ex.get('execution_date','')} — {ppm_type}</div>
-                                    <div style="font-size:0.75rem;color:#666;">👤 {ex.get('executed_by_name','')} | 🏢 {ex.get('building','N/A')}</div>
-                                </div>
-                                <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">SUBMITTED</span>
+                                <div><div style="font-size:1rem;font-weight:700;">📋 {ex.get('execution_date','')}</div><div style="font-size:0.75rem;color:#666;">👤 {ex.get('executed_by_name','')}</div></div>
+                                <span style="background:#3B82F6;color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;">SUBMITTED</span>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
-                        
-                        if ex.get("general_comments"):
-                            st.caption(f"📝 {ex.get('general_comments','')}")
-                        if ex.get("is_early_execution"):
-                            st.warning(f"⚠️ Early Execution — {ex.get('early_execution_reason','')}")
-                        if ex.get("mitigation_plan"):
-                            st.error(f"🚨 Mitigation: {ex.get('mitigation_plan','')}")
-                        
                         items = safe_supabase_query(lambda eid=ex["id"]: supabase.table("ppm_execution_items").select("*").eq("execution_id", eid).order("item_number").execute(), error_prefix="PPM items")
                         if items and items.data:
                             with st.expander("📋 View Checklist Results"):
                                 for item in items.data:
                                     res = item.get("result","")
-                                    if res in ["Pass","Yes","Clear","Good","Normal","Tight","Ok"]:
-                                        icon = "✅"
-                                    elif res in ["Fail","No","Damage","Dirty","Abnormal","Loose","Not Ok"]:
-                                        icon = "❌"
-                                    else:
-                                        icon = "📝"
+                                    icon = "✅" if res in ["Pass","Yes","Clear","Good","Normal","Tight","Ok"] else "❌" if res in ["Fail","No","Damage","Dirty","Abnormal","Loose"] else "📝"
                                     st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — *{item.get('actual_value', res)}*")
-                        
                         st.markdown("---")
                         c1, c2 = st.columns(2)
                         with c1:
                             confirm_comment = st.text_area("Confirmation Comment*", key=f"tl_confirm_{ex['id']}", height=60)
-                            if st.button("✅ CONFIRM & SEND TO MANAGER", key=f"tl_btn_confirm_{ex['id']}", use_container_width=True, type="primary"):
+                            if st.button("✅ CONFIRM", key=f"tl_btn_confirm_{ex['id']}", use_container_width=True, type="primary"):
                                 if confirm_comment:
                                     safe_supabase_query(lambda eid=ex["id"]: supabase.table("ppm_executions").update({"status":"confirmed"}).eq("id", eid).execute(), error_prefix="Confirm PPM")
                                     safe_supabase_query(lambda eid=ex["id"]: supabase.table("ppm_approvals").update({"status":"approved","comments":confirm_comment,"approver_name":user_name,"action_date":datetime.now().isoformat()}).eq("execution_id", eid).eq("approval_level","team_lead").execute(), error_prefix="TL approval")
-                                    st.success("✅ Confirmed! Sent to Manager for final approval."); st.rerun()
+                                    st.success("✅ Confirmed!"); st.rerun()
                                 else: st.error("⚠️ Comment required")
                         with c2:
                             reject_comment = st.text_area("Rejection Reason*", key=f"tl_reject_{ex['id']}", height=60)
@@ -12990,50 +12917,29 @@ def page_ppm_activities():
                                     st.error("❌ Rejected"); st.rerun()
                                 else: st.error("⚠️ Reason required")
                 else:
-                    st.success("✅ No submissions waiting for Team Lead confirmation.")
+                    st.success("✅ No submissions waiting.")
             
             with approval_tabs[1]:
                 st.markdown("#### 🟢 Pending Manager Approval")
-                
                 if user_role not in ["admin", "approver"]:
                     st.info("This section is for Managers/HOD only.")
                 else:
                     pending_mgr = safe_supabase_query(lambda: supabase.table("ppm_executions").select("*").eq("facility_code", fc).eq("status", "confirmed").order("created_at", desc=True).execute(), error_prefix="Pending MGR")
-                    
                     if pending_mgr and pending_mgr.data and len(pending_mgr.data) > 0:
                         for ex in pending_mgr.data:
-                            sc = "#F59E0B"
-                            ppm_type = ex.get("ppm_type", "Scheduled PPM")
-                            
                             st.markdown(f"""
-                            <div style="background:white;border-left:5px solid {sc};border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-                                <div style="display:flex;justify-content:space-between;align-items:center;">
-                                    <div>
-                                        <div style="font-size:1rem;font-weight:700;">📋 {ex.get('execution_date','')} — {ppm_type}</div>
-                                        <div style="font-size:0.75rem;color:#666;">👤 {ex.get('executed_by_name','')} | 🏢 {ex.get('building','N/A')}</div>
-                                    </div>
-                                    <span style="background:{sc};color:white;padding:5px 16px;border-radius:20px;font-size:0.7rem;font-weight:700;">AWAITING MANAGER</span>
-                                </div>
+                            <div style="background:white;border-left:5px solid #F59E0B;border-radius:10px;padding:1rem;margin:0.5rem 0;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                                <div style="font-size:1rem;font-weight:700;">📋 {ex.get('execution_date','')}</div>
+                                <div style="font-size:0.75rem;color:#666;">👤 {ex.get('executed_by_name','')}</div>
                             </div>
                             """, unsafe_allow_html=True)
-                            
-                            tl_approval = safe_supabase_query(lambda eid=ex["id"]: supabase.table("ppm_approvals").select("*").eq("execution_id", eid).eq("approval_level","team_lead").single().execute(), error_prefix="TL status")
-                            if tl_approval and tl_approval.data:
-                                st.caption(f"✅ Team Lead: {tl_approval.data.get('approver_name','N/A')} — {tl_approval.data.get('comments','')}")
-                            
-                            if ex.get("mitigation_plan"):
-                                st.error(f"🚨 Mitigation: {ex.get('mitigation_plan','')}")
-                            
                             items = safe_supabase_query(lambda eid=ex["id"]: supabase.table("ppm_execution_items").select("*").eq("execution_id", eid).order("item_number").execute(), error_prefix="PPM items")
                             if items and items.data:
                                 with st.expander("📋 View Checklist Results"):
                                     for item in items.data:
                                         res = item.get("result","")
-                                        if res in ["Pass","Yes","Clear","Good","Normal","Tight","Ok"]: icon = "✅"
-                                        elif res in ["Fail","No","Damage","Dirty","Abnormal","Loose","Not Ok"]: icon = "❌"
-                                        else: icon = "📝"
+                                        icon = "✅" if res in ["Pass","Yes","Clear","Good","Normal","Tight","Ok"] else "❌" if res in ["Fail","No","Damage","Dirty","Abnormal","Loose"] else "📝"
                                         st.markdown(f"{icon} **{item.get('item_number')}.** {item.get('description')} — *{item.get('actual_value', res)}*")
-                            
                             st.markdown("---")
                             c1, c2 = st.columns(2)
                             with c1:
@@ -13042,7 +12948,7 @@ def page_ppm_activities():
                                     if mgr_comment:
                                         safe_supabase_query(lambda eid=ex["id"]: supabase.table("ppm_executions").update({"status":"approved"}).eq("id", eid).execute(), error_prefix="Approve PPM")
                                         safe_supabase_query(lambda eid=ex["id"]: supabase.table("ppm_approvals").update({"status":"approved","comments":mgr_comment,"approver_name":user_name,"action_date":datetime.now().isoformat()}).eq("execution_id", eid).eq("approval_level","manager").execute(), error_prefix="MGR approval")
-                                        st.success("🟢 Fully Approved!"); st.balloons(); st.rerun()
+                                        st.success("🟢 Approved!"); st.balloons(); st.rerun()
                                     else: st.error("⚠️ Comment required")
                             with c2:
                                 mgr_reject = st.text_area("Rejection Reason*", key=f"mgr_reject_{ex['id']}", height=60)
@@ -13053,212 +12959,69 @@ def page_ppm_activities():
                                         st.error("❌ Rejected"); st.rerun()
                                     else: st.error("⚠️ Reason required")
                     else:
-                        st.success("✅ No submissions waiting for Manager approval.")
+                        st.success("✅ No submissions waiting.")
     
     # ============================================
-    # TAB 5: CHECKLIST BUILDER (ADMIN) — INTERACTIVE
+    # TAB 5: CHECKLIST BUILDER (ADMIN ONLY)
     # ============================================
     with tabs[5]:
-        st.markdown("### ⚙️ Interactive Checklist Builder")
+        st.markdown("### ⚙️ Checklist Builder (Templates Only — No Dates)")
+        st.info("📅 Schedule dates are now configured during asset enrollment in the PPM Scheduling Center.")
         
         if not is_admin:
             st.error("⛔ Admin access only")
         else:
-            builder_tabs = st.tabs(["📋 Create Template", "✏️ Edit Template", "📅 Schedule Settings"])
+            cb_tabs = st.tabs(["📋 Create Template", "✏️ Edit Template", "ℹ️ Schedule Info"])
             
-            # ============================================
-            # SUB-TAB: CREATE TEMPLATE
-            # ============================================
-            with builder_tabs[0]:
+            with cb_tabs[0]:
                 st.markdown("#### ➕ Create New Checklist Template")
+                st.caption("Templates define WHAT to check. Schedule dates are set during asset enrollment.")
                 
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    template_name = st.text_input("Report Name*", placeholder="e.g. Automated Motor Monthly Checklist", key="tpl_name")
+                    template_name = st.text_input("Template Name*", placeholder="e.g. Monthly AHU Checklist", key="tpl_name")
                 with c2:
-                    period = st.selectbox("Period*", ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="tpl_period")
+                    period = st.selectbox("Default Frequency*", ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="tpl_period")
                 with c3:
-                    image_required = st.selectbox("Image Option*", ["Yes", "No"], key="tpl_image")
+                    image_required = st.selectbox("Image Required*", ["Yes", "No"], key="tpl_image")
                 
                 c1, c2 = st.columns(2)
                 with c1:
-                    perform_time = st.number_input("Perform Time (in Minutes)*", min_value=0, value=30, key="tpl_time")
+                    perform_time = st.number_input("Perform Time (min)*", min_value=0, value=30, key="tpl_time")
                     buffer_days = st.number_input("Buffer Days*", min_value=0, value=0, key="tpl_buffer")
                 with c2:
                     asset_category = st.selectbox("Asset Category", sorted(df["dept_full"].dropna().unique().tolist()), key="tpl_cat")
-                    standard_ref = st.text_input("Standard Reference", placeholder="e.g. ISO 8100, NFPA 25, Custom", key="tpl_std")
-                
-                st.markdown("---")
-                st.markdown("### 📅 Schedule Dates")
-                
-                date_mode = st.radio("Date Selection Mode", ["📅 Manual Multi-Date Picker", "🔄 Auto-Generate by Period"], horizontal=True, key="date_mode")
-                
-                if date_mode == "📅 Manual Multi-Date Picker":
-                    st.caption("Click dates on the calendar to add/remove them.")
-                    
-                    # Store selected dates in session state
-                    if "manual_selected_dates" not in st.session_state:
-                        st.session_state.manual_selected_dates = []
-                    
-                    # Date picker to add a single date
-                    c1, c2, c3 = st.columns([2, 1, 1])
-                    with c1:
-                        pick_date = st.date_input("Pick a date to add", date.today(), key="tpl_pick_date")
-                    with c2:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("➕ Add Date", key="btn_add_date", use_container_width=True):
-                            date_str = pick_date.strftime("%d-%m-%Y")
-                            if date_str not in st.session_state.manual_selected_dates:
-                                st.session_state.manual_selected_dates.append(date_str)
-                                st.session_state.manual_selected_dates.sort()
-                                st.rerun()
-                    with c3:
-                        st.markdown("<br>", unsafe_allow_html=True)
-                        if st.button("🗑️ Clear All", key="btn_clear_dates", use_container_width=True):
-                            st.session_state.manual_selected_dates = []
-                            st.rerun()
-                    
-                    # Show selected dates
-                    if st.session_state.manual_selected_dates:
-                        st.markdown("**Selected Dates:**")
-                        
-                        # Display as a simple list with remove buttons
-                        cols_per_row = 4
-                        for i in range(0, len(st.session_state.manual_selected_dates), cols_per_row):
-                            row_dates = st.session_state.manual_selected_dates[i:i+cols_per_row]
-                            dcols = st.columns(cols_per_row)
-                            for j, d in enumerate(row_dates):
-                                with dcols[j]:
-                                    st.markdown(f"""
-                                    <div style="background:#EFF6FF;border:2px solid #3B82F6;border-radius:8px;padding:0.4rem;text-align:center;font-size:0.7rem;font-weight:600;color:#2563EB;">
-                                        📅 {d}
-                                    </div>
-                                    """, unsafe_allow_html=True)
-                        
-                        # Remove date
-                        c1, c2 = st.columns([2, 1])
-                        with c1:
-                            remove_date = st.selectbox("Remove a date", ["Select..."] + st.session_state.manual_selected_dates, key="tpl_remove_date")
-                        with c2:
-                            st.markdown("<br>", unsafe_allow_html=True)
-                            if remove_date != "Select...":
-                                if st.button(f"🗑️ Remove", key="btn_remove_date", use_container_width=True):
-                                    st.session_state.manual_selected_dates.remove(remove_date)
-                                    st.rerun()
-                        
-                        dates_string = ",".join(st.session_state.manual_selected_dates)
-                        st.caption(f"📅 {len(st.session_state.manual_selected_dates)} dates selected")
-                
-                else:
-                    if "generated_dates" not in st.session_state:
-                        st.session_state.generated_dates = []
-                    
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        start_date = st.date_input("Start Date", date.today(), key="tpl_start_date")
-                        end_date = st.date_input("End Schedule Date", date.today() + timedelta(days=365), key="tpl_end_date")
-                    
-                    with c2:
-                        if st.button("🔄 Generate Dates", key="btn_gen_dates", use_container_width=True):
-                            selected_period = period
-                            dates_list = []
-                            current = start_date
-                            while current <= end_date:
-                                dates_list.append(current.strftime("%d-%m-%Y"))
-                                if selected_period == "Daily":
-                                    current = current + timedelta(days=1)
-                                elif selected_period == "Weekly":
-                                    current = current + timedelta(days=7)
-                                elif selected_period == "Bi-Weekly":
-                                    current = current + timedelta(days=14)
-                                elif selected_period == "Monthly":
-                                    if current.month == 12:
-                                        current = date(current.year + 1, 1, min(current.day, 28))
-                                    else:
-                                        current = date(current.year, current.month + 1, min(current.day, 28))
-                                elif selected_period == "Quarterly":
-                                    nm = current.month + 3
-                                    if nm > 12:
-                                        current = date(current.year + 1, nm - 12, min(current.day, 28))
-                                    else:
-                                        current = date(current.year, nm, min(current.day, 28))
-                                elif selected_period == "Half-Yearly":
-                                    nm = current.month + 6
-                                    if nm > 12:
-                                        current = date(current.year + 1, nm - 12, min(current.day, 28))
-                                    else:
-                                        current = date(current.year, nm, min(current.day, 28))
-                                elif selected_period == "Yearly":
-                                    current = date(current.year + 1, current.month, min(current.day, 28))
-                            st.session_state.generated_dates = dates_list
-                            st.rerun()
-                    
-                    if st.session_state.generated_dates:
-                        selected_dates = st.multiselect("Select Dates*", st.session_state.generated_dates, default=st.session_state.generated_dates[:3] if len(st.session_state.generated_dates) >= 3 else st.session_state.generated_dates, key="tpl_auto_selected")
-                        dates_string = ",".join(selected_dates)
-                        st.caption(f"📅 {len(selected_dates)} dates selected")
-                    else:
-                        dates_string = ""
-                        st.caption("Click 'Generate Dates' to auto-generate schedule dates.")
+                    standard_ref = st.text_input("Standard Reference", placeholder="e.g. ISO 8100, NFPA 25", key="tpl_std")
                 
                 st.markdown("---")
                 st.markdown("### 📝 Checklist Items")
-                st.caption("Add items one by one. Set the answer type and threshold options for each.")
                 
-                # Initialize session state for builder items
                 if "checklist_builder_items" not in st.session_state:
-                    st.session_state.checklist_builder_items = [
-                        {"sno": 1, "description": "", "answer_type": "yes_no", "threshold": "Yes/No"}
-                    ]
+                    st.session_state.checklist_builder_items = [{"sno": 1, "description": "", "answer_type": "yes_no", "threshold": "Yes/No"}]
                 
-                # Display current items as a table
                 item_data = []
                 for item in st.session_state.checklist_builder_items:
                     if item["description"].strip():
-                        item_data.append({
-                            "SNO": item["sno"],
-                            "Description": item["description"],
-                            "Answer Type": item["answer_type"],
-                            "Threshold / Options": item["threshold"]
-                        })
+                        item_data.append({"SNO": item["sno"], "Description": item["description"], "Answer Type": item["answer_type"], "Options": item["threshold"]})
+                if item_data:
+                    st.dataframe(pd.DataFrame(item_data), use_container_width=True, hide_index=True, height=200)
                 
-                if len(item_data) > 0:
-                    items_df = pd.DataFrame(item_data)
-                    st.dataframe(items_df, use_container_width=True, hide_index=True, height=200)
-                
-                # ============================================
-                # ADD ITEM SECTION (OUTSIDE FORM)
-                # ============================================
                 st.markdown("**➕ Add Checklist Item**")
                 c1, c2, c3, c4 = st.columns([1, 3, 2, 2])
                 with c1:
                     new_sno = st.number_input("SNO", min_value=1, value=len(st.session_state.checklist_builder_items)+1, key="new_sno")
                 with c2:
-                    new_desc = st.text_input("Description", key="new_desc", placeholder="e.g. Check damages on Rollers/Conveyor Belt")
+                    new_desc = st.text_input("Description", key="new_desc", placeholder="e.g. Check filter condition")
                 with c3:
                     answer_type = st.selectbox("Answer Type", ["yes_no", "pass_fail", "status", "reading", "text", "section"], key="new_type")
                 with c4:
-                    if answer_type == "yes_no":
-                        threshold = st.text_input("Options", value="Yes/No", key="new_thresh", help="Use / separator")
-                    elif answer_type == "pass_fail":
-                        threshold = st.text_input("Options", value="Pass/Fail/NA", key="new_thresh")
-                    elif answer_type == "status":
-                        threshold = st.text_input("Options", value="Normal/Abnormal", key="new_thresh", help="e.g., High/Low, Clean/Dirty, Tight/Loose, Good/Damage")
-                    elif answer_type == "reading":
-                        threshold = st.text_input("Unit", value="°C", key="new_thresh", placeholder="e.g., °C, V, A, Bar")
-                    else:
-                        threshold = st.text_input("Options", value="", key="new_thresh")
+                    threshold = st.text_input("Options", value="Yes/No", key="new_thresh")
                 
                 c1, c2, c3 = st.columns([1, 1, 2])
                 with c1:
                     if st.button("➕ Add Item", key="btn_add_item", use_container_width=True):
                         if new_desc:
-                            st.session_state.checklist_builder_items.append({
-                                "sno": new_sno,
-                                "description": new_desc,
-                                "answer_type": answer_type,
-                                "threshold": threshold
-                            })
+                            st.session_state.checklist_builder_items.append({"sno": new_sno, "description": new_desc, "answer_type": answer_type, "threshold": threshold})
                             st.rerun()
                 with c2:
                     if st.button("🗑️ Clear All", key="btn_clear_all", use_container_width=True):
@@ -13269,379 +13032,841 @@ def page_ppm_activities():
                         st.session_state.checklist_builder_items.pop()
                         st.rerun()
                 
-                # ============================================
-                # IMPORT OPTIONS
-                # ============================================
                 st.markdown("---")
-                st.markdown("### 📥 Import Checklist Items")
-                
-                import_mode = st.radio("Import Method", ["📋 Quick Paste", "📁 Upload File"], horizontal=True, key="import_mode")
-                
-                if import_mode == "📋 Quick Paste":
-                    st.caption("Paste from Excel. Detects Tab or multiple spaces as column separator.")
-                    
-                    quick_paste = st.text_area("Paste items here", height=200, key="quick_paste_builder",
-                        placeholder="1\tCheck damages on Rollers/Conveyor Belt\tYes/No\n2\tCheck Sensors/Photocells Sensitivity Status\tHigh/Low\n3\tCheck Moving Parts Lubrications\tYes/No\n4\tCheck Backup Batteries Status\tOk/Not Ok\n5\tCheck Mis-alignment/Knocks/Loose Bracket\tYes/No")
-                    
-                    if quick_paste:
-                        import re
-                        lines = [l.strip() for l in quick_paste.strip().split("\n") if l.strip()]
-                        
-                        # Smart separator detection
-                        tab_count = sum(1 for l in lines if "\t" in l)
-                        separator = "tab" if tab_count > len(lines) * 0.5 else "spaces"
-                        
-                        st.caption(f"📋 {len(lines)} items | Separator: {separator}")
-                        
-                        # Preview
-                        preview_rows = []
-                        for i, line in enumerate(lines[:10]):
-                            if separator == "tab":
-                                parts = [p.strip() for p in line.split("\t") if p.strip()]
-                            else:
-                                parts = re.split(r'\s{2,}', line)
-                                parts = [p.strip() for p in parts if p.strip()]
-                            
-                            if len(parts) >= 2:
-                                sno, desc = parts[0], parts[1]
-                                status = parts[2] if len(parts) > 2 else "Yes/No"
-                            elif len(parts) == 1:
-                                sno, desc = str(i+1), parts[0]
-                                status = "Yes/No"
-                            else:
-                                continue
-                            preview_rows.append({"SNO": sno, "Description": desc[:100], "Status": status})
-                        
-                        if preview_rows:
-                            st.caption("👁️ Preview:")
-                            st.dataframe(pd.DataFrame(preview_rows), use_container_width=True, hide_index=True)
-                        
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            default_type_paste = st.selectbox("Default Answer Type", ["yes_no", "status", "pass_fail", "reading", "text"], key="paste_type")
-                        with c2:
-                            default_thresh_paste = st.text_input("Default Options", value="Yes/No", key="paste_thresh")
-                        
-                        if st.button(f"📋 Import {len(lines)} Items", key="btn_parse", use_container_width=True, type="primary"):
-                            imported = 0
-                            for i, line in enumerate(lines):
-                                if separator == "tab":
-                                    parts = [p.strip() for p in line.split("\t") if p.strip()]
-                                else:
-                                    parts = re.split(r'\s{2,}', line)
-                                    parts = [p.strip() for p in parts if p.strip()]
-                                
-                                if len(parts) >= 2:
-                                    desc = parts[1]
-                                    status = parts[2] if len(parts) > 2 else default_thresh_paste
-                                elif len(parts) == 1:
-                                    desc = parts[0]
-                                    status = default_thresh_paste
-                                else:
-                                    continue
-                                
-                                if desc:
-                                    st.session_state.checklist_builder_items.append({
-                                        "sno": len(st.session_state.checklist_builder_items) + 1,
-                                        "description": desc,
-                                        "answer_type": default_type_paste,
-                                        "threshold": status if status else default_thresh_paste
-                                    })
-                                    imported += 1
-                            st.success(f"✅ {imported} items imported!")
-                            st.rerun()
-                
-                else:
-                    st.caption("📁 Upload CSV or Excel file with columns: SNO, Description, Status")
-                    uploaded_file = st.file_uploader("Upload File", type=["csv", "xlsx"], key="checklist_upload")
-                    
-                    if uploaded_file:
-                        try:
-                            if uploaded_file.name.endswith(".csv"):
-                                import_df = pd.read_csv(uploaded_file, encoding='latin-1')
-                            else:
-                                import_df = pd.read_excel(uploaded_file)
-                            
-                            st.dataframe(import_df.head(10), use_container_width=True)
-                            st.caption(f"📋 {len(import_df)} rows found")
-                            
-                            cols = import_df.columns.tolist()
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                desc_col = st.selectbox("Description Column", cols, key="map_desc")
-                            with c2:
-                                status_col = st.selectbox("Status Column (optional)", ["--None--"] + cols, key="map_status")
-                            
-                            default_type_upload = st.selectbox("Default Answer Type", ["yes_no", "status", "pass_fail", "reading", "text"], key="upload_type")
-                            
-                            if st.button(f"📋 Import {len(import_df)} Items", key="btn_upload_import", use_container_width=True, type="primary"):
-                                count = 0
-                                for _, row in import_df.iterrows():
-                                    desc = str(row[desc_col])
-                                    status = str(row[status_col]) if status_col != "--None--" else "Yes/No"
-                                    if desc and desc != "nan":
-                                        st.session_state.checklist_builder_items.append({
-                                            "sno": len(st.session_state.checklist_builder_items) + 1,
-                                            "description": desc,
-                                            "answer_type": default_type_upload,
-                                            "threshold": status if status != "nan" else "Yes/No"
-                                        })
-                                        count += 1
-                                st.success(f"✅ {count} items imported!")
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Error: {str(e)}")
-                
-                # ============================================
-                # SUBMIT FORM (SEPARATE)
-                # ============================================
-                st.markdown("---")
-                
                 with st.form("create_template_submit"):
-                    st.markdown("### 💾 Save Template")
-                    
-                    if st.form_submit_button("💾 CREATE CHECKLIST TEMPLATE", use_container_width=True, type="primary"):
-                        if template_name and len(st.session_state.checklist_builder_items) > 0:
+                    if st.form_submit_button("💾 CREATE TEMPLATE", use_container_width=True, type="primary"):
+                        if template_name:
                             valid_items = [i for i in st.session_state.checklist_builder_items if i["description"].strip()]
-                            
-                            if len(valid_items) == 0:
-                                st.error("⚠️ Add at least one checklist item with a description")
-                            else:
+                            if valid_items:
                                 template_result = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").insert({
-                                    "template_name": template_name,
-                                    "asset_category": asset_category,
+                                    "template_name": template_name, "asset_category": asset_category,
                                     "international_standard": standard_ref,
-                                    "description": f"Period: {period} | Time: {perform_time}min | Buffer: {buffer_days}days | Image: {image_required}",
-                                    "schedule_dates": dates_string if dates_string else None,
-                                    "is_active": True
+                                    "description": f"Period: {period} | Time: {perform_time}min | Buffer: {buffer_days}days",
+                                    "schedule_dates": None, "is_active": True
                                 }).execute(), error_prefix="Create template")
-                                
                                 if template_result and template_result.data:
                                     template_id = template_result.data[0]["id"]
-                                    
                                     for item in valid_items:
                                         safe_supabase_query(lambda tid=template_id, it=item: supabase.table("ppm_checklist_items").insert({
-                                            "template_id": tid,
-                                            "item_number": it["sno"],
-                                            "description": it["description"],
-                                            "check_type": it["answer_type"],
-                                            "expected_value": it["threshold"],
-                                            "sort_order": it["sno"]
+                                            "template_id": tid, "item_number": it["sno"], "description": it["description"],
+                                            "check_type": it["answer_type"], "expected_value": it["threshold"], "sort_order": it["sno"]
                                         }).execute(), error_prefix="Checklist items")
-                                    
                                     st.session_state.checklist_builder_items = [{"sno": 1, "description": "", "answer_type": "yes_no", "threshold": "Yes/No"}]
-                                    st.success(f"✅ Template '{template_name}' created with {len(valid_items)} items!")
-                                    st.balloons()
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Failed to create template")
-                        else:
-                            st.error("⚠️ Template name and at least one item are required")
-            
-            # ============================================
-            # SUB-TAB: EDIT TEMPLATE
-            # ============================================
-            with builder_tabs[1]:
-                st.markdown("#### ✏️ Edit Existing Template")
-                
-                all_templates = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").select("*").order("created_at", desc=True).execute(), error_prefix="All templates")
-                
-                if all_templates and all_templates.data and len(all_templates.data) > 0:
-                    template_names_list = [t.get("template_name","") for t in all_templates.data]
-                    edit_template_name = st.selectbox("Select Template to Edit", template_names_list, key="edit_template")
-                    
-                    if edit_template_name:
-                        edit_template = next((t for t in all_templates.data if t.get("template_name") == edit_template_name), None)
-                        
-                        if edit_template:
-                            st.markdown(f"**Template:** {edit_template.get('template_name')} | **Standard:** {edit_template.get('international_standard','Custom')}")
-                            
-                            c1, c2, c3 = st.columns(3)
-                            with c1:
-                                new_name = st.text_input("Report Name", value=edit_template.get("template_name",""), key="edit_tpl_name")
-                            with c2:
-                                desc_parts = edit_template.get("description","").split("|")
-                                period_val = desc_parts[0].replace("Period:","").strip() if len(desc_parts) > 0 else "Monthly"
-                                new_period = st.selectbox("Period", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], 
-                                    index=["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"].index(period_val) if period_val in ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"] else 3, key="edit_period")
-                            with c3:
-                                new_image = st.selectbox("Image Option", ["Yes","No"], key="edit_image")
-                            
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                time_val = desc_parts[1].replace("Time:","").replace("min","").strip() if len(desc_parts) > 1 else "30"
-                                new_time = st.number_input("Perform Time (min)", value=int(time_val) if time_val.isdigit() else 30, key="edit_time")
-                            with c2:
-                                buf_val = desc_parts[2].replace("Buffer:","").replace("days","").strip() if len(desc_parts) > 2 else "0"
-                                new_buffer = st.number_input("Buffer Days", value=int(buf_val) if buf_val.isdigit() else 0, key="edit_buffer")
-                            
-                            new_standard = st.text_input("Standard Reference", value=edit_template.get("international_standard",""), key="edit_std")
-                            
-                            st.markdown("---")
-                            
-                            st.markdown("### 📅 Schedule Dates")
-                            existing_dates = edit_template.get("schedule_dates","")
-                            existing_dates_list = existing_dates.split(",") if existing_dates else []
-                            
-                            date_edit_mode = st.radio("Date Mode", ["📅 Manual Entry", "🔄 Auto-Generate"], horizontal=True, key="edit_date_mode")
-                            
-                            if date_edit_mode == "📅 Manual Entry":
-                                edit_manual = st.text_area("Enter dates (comma-separated, DD-MM-YYYY)", 
-                                    value=existing_dates, height=80, key="edit_manual_dates",
-                                    placeholder="29-06-2026,29-07-2026,29-08-2026")
-                                new_dates_string = edit_manual
+                                    st.success(f"✅ Template created!"); st.balloons(); st.rerun()
                             else:
-                                if "edit_generated_dates" not in st.session_state:
-                                    st.session_state.edit_generated_dates = existing_dates_list
-                                
-                                c1, c2 = st.columns(2)
-                                with c1:
-                                    edit_start = st.date_input("Start Date", date.today(), key="edit_start")
-                                with c2:
-                                    edit_end = st.date_input("End Date", date.today() + timedelta(days=365), key="edit_end")
-                                
-                                if st.button("🔄 Generate Dates", key="edit_gen_dates", use_container_width=True):
-                                    dates_list = []
-                                    current = edit_start
-                                    while current <= edit_end:
-                                        dates_list.append(current.strftime("%d-%m-%Y"))
-                                        if new_period == "Monthly":
-                                            current = date(current.year, current.month+1, min(current.day,28)) if current.month < 12 else date(current.year+1,1,min(current.day,28))
-                                        elif new_period == "Quarterly":
-                                            nm = current.month+3
-                                            current = date(current.year+1,nm-12,min(current.day,28)) if nm > 12 else date(current.year,nm,min(current.day,28))
-                                        elif new_period == "Weekly":
-                                            current += timedelta(days=7)
-                                        elif new_period == "Bi-Weekly":
-                                            current += timedelta(days=14)
-                                        elif new_period == "Half-Yearly":
-                                            nm = current.month+6
-                                            current = date(current.year+1,nm-12,min(current.day,28)) if nm > 12 else date(current.year,nm,min(current.day,28))
-                                        elif new_period == "Yearly":
-                                            current = date(current.year+1,current.month,min(current.day,28))
-                                        else:
-                                            current += timedelta(days=1)
-                                    st.session_state.edit_generated_dates = dates_list
-                                    st.rerun()
-                                
-                                if st.session_state.edit_generated_dates:
-                                    selected = st.multiselect("Select Dates", st.session_state.edit_generated_dates, default=st.session_state.edit_generated_dates, key="edit_multi_dates")
-                                    new_dates_string = ",".join(selected)
-                                    st.caption(f"📅 {len(selected)} dates selected")
-                                else:
-                                    new_dates_string = existing_dates
-                            
-                            st.markdown("---")
-                            
-                            st.markdown("### 📝 Checklist Items")
-                            
-                            existing_items = safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_items").select("*").eq("template_id", tid).order("sort_order").execute(), error_prefix="Existing items")
-                            
-                            if existing_items and existing_items.data:
-                                st.markdown("**Current Items (click to edit):**")
-                                for item in existing_items.data:
-                                    c1, c2, c3, c4 = st.columns([1, 4, 2, 2])
-                                    with c1:
-                                        new_sno = st.text_input("SNO", value=str(item.get("item_number","")), key=f"edit_sno_{item['id']}", label_visibility="collapsed")
-                                    with c2:
-                                        new_desc = st.text_input("Desc", value=item.get("description",""), key=f"edit_desc_{item['id']}", label_visibility="collapsed")
-                                    with c3:
-                                        new_type = st.selectbox("Type", ["yes_no","pass_fail","status","reading","text","section"], 
-                                            index=["yes_no","pass_fail","status","reading","text","section"].index(item.get("check_type","yes_no")) if item.get("check_type","yes_no") in ["yes_no","pass_fail","status","reading","text","section"] else 0,
-                                            key=f"edit_type_{item['id']}", label_visibility="collapsed")
-                                    with c4:
-                                        new_thresh = st.text_input("Options", value=item.get("expected_value","") or "", key=f"edit_thresh_{item['id']}", label_visibility="collapsed")
-                                
-                                st.markdown("---")
-                            
-                            st.markdown("**➕ Add New Item:**")
-                            c1, c2, c3, c4 = st.columns([1, 4, 2, 2])
-                            with c1:
-                                add_sno = st.number_input("SNO", min_value=1, value=len(existing_items.data)+1 if existing_items and existing_items.data else 1, key="edit_add_sno")
-                            with c2:
-                                add_desc = st.text_input("Description", key="edit_add_desc", placeholder="New checklist item...")
-                            with c3:
-                                add_type = st.selectbox("Type", ["yes_no","pass_fail","status","reading","text"], key="edit_add_type")
-                            with c4:
-                                add_thresh = st.text_input("Options", value="Yes/No", key="edit_add_thresh")
-                            
-                            if st.button("➕ Add Item to Template", key="edit_btn_add", use_container_width=True):
-                                if add_desc.strip():
-                                    safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_items").insert({
-                                        "template_id": tid,
-                                        "item_number": int(add_sno),
-                                        "description": add_desc.strip(),
-                                        "check_type": add_type,
-                                        "expected_value": add_thresh,
-                                        "sort_order": int(add_sno)
-                                    }).execute(), error_prefix="Add item")
-                                    st.success("✅ Item added!")
-                                    st.rerun()
-                            
-                            st.markdown("---")
-                            
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                if st.button("💾 SAVE ALL CHANGES", use_container_width=True, type="primary"):
-                                    safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_templates").update({
-                                        "template_name": new_name,
-                                        "international_standard": new_standard,
-                                        "description": f"Period: {new_period} | Time: {new_time}min | Buffer: {new_buffer}days | Image: {new_image}",
-                                        "schedule_dates": new_dates_string if new_dates_string else None
-                                    }).eq("id", tid).execute(), error_prefix="Update template")
-                                    
-                                    for item in existing_items.data if existing_items and existing_items.data else []:
-                                        safe_supabase_query(lambda iid=item["id"]: supabase.table("ppm_checklist_items").update({
-                                            "item_number": int(st.session_state.get(f"edit_sno_{iid}", item.get("item_number",1)) or 1),
-                                            "description": st.session_state.get(f"edit_desc_{iid}", item.get("description","")),
-                                            "check_type": st.session_state.get(f"edit_type_{iid}", item.get("check_type","yes_no")),
-                                            "expected_value": st.session_state.get(f"edit_thresh_{iid}", item.get("expected_value","") or "")
-                                        }).eq("id", iid).execute(), error_prefix="Update items")
-                                    
-                                    st.success("✅ Template updated!")
-                                    st.balloons()
-                                    st.rerun()
-                            with c2:
-                                if st.button("🗑️ DELETE TEMPLATE", use_container_width=True):
-                                    safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_items").delete().eq("template_id", tid).execute(), error_prefix="Delete items")
-                                    safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_templates").delete().eq("id", tid).execute(), error_prefix="Delete template")
-                                    st.warning("✅ Template deleted!")
-                                    st.rerun()
-                else:
-                    st.info("No templates created yet.")
+                                st.error("⚠️ Add at least one item")
+                        else:
+                            st.error("⚠️ Template name required")
             
-            with builder_tabs[2]:
-                st.markdown("#### 📅 Schedule Settings")
-                st.info("Schedule dates are managed when enrolling assets in the Checklist Status page.")
-                
-                if st.button("📋 GO TO CHECKLIST STATUS", use_container_width=True, type="primary"):
+            with cb_tabs[1]:
+                st.markdown("#### ✏️ Edit Template")
+                st.info("Use Supabase dashboard to edit templates directly, or delete and recreate.")
+            
+            with cb_tabs[2]:
+                st.markdown("#### ℹ️ Schedule Configuration")
+                st.info("📅 Schedule dates are configured during asset enrollment in the PPM Scheduling Center (Checklist Status page).")
+                if st.button("📋 GO TO PPM SCHEDULING CENTER", use_container_width=True, type="primary"):
                     st.session_state.page = "cs"
                     st.rerun()
-
+    
     # ============================================
-    # TAB 6: MANAGE ENROLLED PPM SCHEDULES (ADMIN ONLY)
+    # TAB 6: MANAGE SCHEDULES
     # ============================================
     with tabs[6]:
         st.markdown("### 📋 Manage Enrolled PPM Schedules")
-        
         if not is_admin:
             st.error("⛔ Admin access only")
         else:
             all_schedules = safe_supabase_query(lambda: supabase.table("ppm_schedules").select("*").eq("facility_code", fc).order("next_due_date", desc=False).execute(), error_prefix="PPM schedules")
-            
             if all_schedules and all_schedules.data and len(all_schedules.data) > 0:
                 sched_df = pd.DataFrame(all_schedules.data)
-                
-                # ... rest of Tab 6 stays the same but wrap the UPDATE/DELETE/INSERT calls below ...
-                
-                # Find the UPDATE ALL button and wrap:
-                # safe_supabase_query(lambda: supabase.table("ppm_schedules").delete()...
-                # safe_supabase_query(lambda: supabase.table("ppm_schedules").insert(...
-                
-                # Find the DELETE ALL button and wrap:
-                # safe_supabase_query(lambda: supabase.table("ppm_schedules").delete()...
+                st.caption(f"📋 {len(sched_df)} schedule entries")
+                st.dataframe(sched_df[[c for c in ["title", "assigned_team", "frequency", "next_due_date", "status"] if c in sched_df.columns]], use_container_width=True, hide_index=True, height=400)
             else:
                 st.info("No PPM schedules found.")
+                if st.button("📋 GO TO PPM SCHEDULING CENTER", use_container_width=True, type="primary"):
+                    st.session_state.page = "cs"
+                    st.rerun()
+
+
+
+# ============================================
+# PPM SCHEDULING CENTER — FORTUNE 500 GRADE
+# INDIVIDUAL • BULK • CALENDAR PREVIEW • CONFLICT DETECTION
+# STAGGERED SCHEDULING • TEMPLATE PREVIEW • QUICK PRESETS
+# ============================================
+def page_cs():
+    fc = st.session_state.get("facility", "WTC")
+    info = FACILITY_INFO.get(fc, {})
+    today = date.today()
+    
+    st.markdown(f'## 📅 PPM Scheduling Center — {info.get("full_name", fc)}')
+    st.caption("Individual & Bulk Scheduling • Calendar Preview • Conflict Detection • Template Preview • Staggered Dates")
+    
+    all_assets = DB.get_assets(fc, 50000)
+    
+    if not all_assets:
+        st.info("No assets registered.")
+        return
+    
+    df = pd.DataFrame(all_assets)
+    df["checklist_clean"] = df["checklist"].apply(lambda x: str(x).strip() if pd.notna(x) and str(x).strip() not in ["", "NA", "na", "APPLICABLE", "NOTAPPLICABLE", "None"] else None)
+    df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
+    
+    templates = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").select("*").execute(), error_prefix="Checklist templates")
+    template_names = [t.get("template_name","") for t in templates.data] if templates and templates.data else []
+    template_options = template_names if template_names else ["Standard Template"]
+    
+    existing_schedules = safe_supabase_query(lambda: supabase.table("ppm_schedules").select("*").eq("facility_code", fc).execute(), error_prefix="Existing schedules")
+    existing_df = pd.DataFrame(existing_schedules.data) if existing_schedules and existing_schedules.data else pd.DataFrame()
+    
+    # Stats ribbon
+    total_assets_count = len(df)
+    enrolled_count = len(df[df["checklist_clean"].notna()])
+    not_enrolled_count = total_assets_count - enrolled_count
+    total_schedules = len(existing_df)
+    overdue_schedules = len(existing_df[(pd.to_datetime(existing_df["next_due_date"], errors='coerce').dt.date < today) & (existing_df["status"] != "completed")]) if total_schedules > 0 else 0
+    completed_schedules = len(existing_df[existing_df["status"] == "completed"]) if total_schedules > 0 else 0
+    
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #3B82F6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Total Assets</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6;">{total_assets_count}</div></div>""", unsafe_allow_html=True)
+    with c2:
+        color = "#10B981" if enrolled_count > 0 else "#F59E0B"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Enrolled</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{enrolled_count}</div></div>""", unsafe_allow_html=True)
+    with c3:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #F59E0B;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Not Enrolled</div><div style="font-size:1.3rem;font-weight:800;color:#F59E0B;">{not_enrolled_count}</div></div>""", unsafe_allow_html=True)
+    with c4:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #8B5CF6;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Schedules</div><div style="font-size:1.3rem;font-weight:800;color:#8B5CF6;">{total_schedules}</div></div>""", unsafe_allow_html=True)
+    with c5:
+        color = "#EF4444" if overdue_schedules > 0 else "#10B981"
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid {color};box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Overdue</div><div style="font-size:1.3rem;font-weight:800;color:{color};">{overdue_schedules}</div></div>""", unsafe_allow_html=True)
+    with c6:
+        st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Completed</div><div style="font-size:1.3rem;font-weight:800;color:#10B981;">{completed_schedules}</div></div>""", unsafe_allow_html=True)
+    
+    # ============================================
+    # HELPER: Manual Date Picker with Mini Calendar
+    # ============================================
+    # ============================================
+    # HELPER: Manual Date Picker with Multi-Date Selection
+    # ============================================
+    def render_manual_date_picker(prefix="default"):
+        if f"{prefix}_manual_dates" not in st.session_state:
+            st.session_state[f"{prefix}_manual_dates"] = []
+        
+        st.markdown("**📅 Manual Date Selection**")
+        st.caption("Select multiple dates on the calendar, then click 'Add Selected Dates'. Use Quick Presets for common patterns.")
+        
+        # Multi-date picker - select start and end range
+        c1, c2 = st.columns(2)
+        with c1:
+            date_start = st.date_input("From Date", today, key=f"{prefix}_date_start")
+        with c2:
+            date_end = st.date_input("To Date", today + timedelta(days=30), key=f"{prefix}_date_end")
+        
+        # Or pick individual dates
+        st.caption("Or pick specific dates:")
+        individual_dates = st.multiselect(
+            "Select individual dates",
+            options=[date_start + timedelta(days=i) for i in range((date_end - date_start).days + 1)],
+            format_func=lambda d: d.strftime("%a, %d %b %Y"),
+            key=f"{prefix}_individual_pick",
+            placeholder="Click to select multiple dates..."
+        )
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            if st.button("➕ Add Selected Dates", key=f"{prefix}_add_dates", use_container_width=True, type="primary"):
+                added = 0
+                for d in individual_dates:
+                    date_str = d.strftime("%Y-%m-%d")
+                    if date_str not in st.session_state[f"{prefix}_manual_dates"]:
+                        st.session_state[f"{prefix}_manual_dates"].append(date_str)
+                        added += 1
+                if added > 0:
+                    st.session_state[f"{prefix}_manual_dates"].sort()
+                    st.rerun()
+                else:
+                    st.warning("No new dates selected or all dates already added.")
+        
+        with c2:
+            # Quick date range button
+            if st.button("📅 Add Full Range", key=f"{prefix}_add_range", use_container_width=True):
+                added = 0
+                current = date_start
+                while current <= date_end:
+                    date_str = current.strftime("%Y-%m-%d")
+                    if date_str not in st.session_state[f"{prefix}_manual_dates"]:
+                        st.session_state[f"{prefix}_manual_dates"].append(date_str)
+                        added += 1
+                    current += timedelta(days=1)
+                if added > 0:
+                    st.session_state[f"{prefix}_manual_dates"].sort()
+                    st.rerun()
+        
+        with c3:
+            if st.button("🗑️ Clear All", key=f"{prefix}_clear_dates", use_container_width=True):
+                st.session_state[f"{prefix}_manual_dates"] = []
+                st.rerun()
+        
+        # Quick Presets
+        st.markdown("**⚡ Quick Presets:**")
+        pc1, pc2, pc3, pc4, pc5 = st.columns(5)
+        presets = {
+            "Today": [today.strftime("%Y-%m-%d")],
+            "This Week (M-F)": [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(5) if (today + timedelta(days=i)).weekday() < 5],
+            "Next 7 Days": [(today + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)],
+            "Every Monday (4w)": [(today + timedelta(days=(7 - today.weekday()) % 7 + i*7)).strftime("%Y-%m-%d") for i in range(4)],
+            "1st of Month (3m)": [date(today.year + (today.month-1+i)//12, ((today.month-1+i)%12)+1, 1).strftime("%Y-%m-%d") for i in range(3)],
+        }
+        preset_keys = list(presets.keys())
+        for i, col in enumerate([pc1, pc2, pc3, pc4, pc5]):
+            if i < len(preset_keys):
+                with col:
+                    if st.button(preset_keys[i], key=f"{prefix}_preset_{i}", use_container_width=True):
+                        for d in presets[preset_keys[i]]:
+                            if d not in st.session_state[f"{prefix}_manual_dates"]:
+                                st.session_state[f"{prefix}_manual_dates"].append(d)
+                        st.session_state[f"{prefix}_manual_dates"].sort()
+                        st.rerun()
+        
+        if st.session_state[f"{prefix}_manual_dates"]:
+            # Mini Calendar Preview
+            try:
+                import calendar as cal_mod
+                cal_dates = [datetime.strptime(d, "%Y-%m-%d").date() for d in st.session_state[f"{prefix}_manual_dates"]]
+                cal_dates_set = set(d.strftime("%Y-%m-%d") for d in cal_dates)
+                months_with_dates = sorted(set(d.replace(day=1) for d in cal_dates))
+                
+                st.markdown("**📅 Calendar Preview:**")
+                
+                for cal_month in months_with_dates[:6]:
+                    cal_matrix = cal_mod.monthcalendar(cal_month.year, cal_month.month)
+                    month_name = cal_month.strftime('%B %Y')
+                    
+                    cal_html = f'''<div style="display:inline-block;background:white;border:1px solid #ddd;border-radius:8px;padding:8px;margin:5px;width:170px;vertical-align:top;"><div style="text-align:center;font-weight:700;font-size:0.7rem;margin-bottom:4px;color:#1a1a1a;">{month_name}</div><table style="width:100%;border-collapse:collapse;font-size:0.55rem;text-align:center;"><tr style="color:#888;font-weight:600;"><td>M</td><td>T</td><td>W</td><td>T</td><td>F</td><td>S</td><td>S</td></tr>'''
+                    
+                    for week in cal_matrix:
+                        cal_html += '<tr>'
+                        for day in week:
+                            if day == 0:
+                                cal_html += '<td></td>'
+                            else:
+                                check_date_str = date(cal_month.year, cal_month.month, day).strftime("%Y-%m-%d")
+                                if check_date_str in cal_dates_set:
+                                    cal_html += f'<td><span style="background:#CC0000;color:white;border-radius:50%;display:inline-block;width:18px;height:18px;line-height:18px;font-weight:700;font-size:0.5rem;">{day}</span></td>'
+                                else:
+                                    cal_html += f'<td style="color:#bbb;font-size:0.5rem;">{day}</td>'
+                        cal_html += '</tr>'
+                    
+                    cal_html += '</table></div>'
+                    st.markdown(cal_html, unsafe_allow_html=True)
+            except:
+                pass
+            
+            # Show dates as chips
+            st.markdown("**Selected Dates:**")
+            cols_per_row = 5
+            for i in range(0, len(st.session_state[f"{prefix}_manual_dates"]), cols_per_row):
+                row_dates = st.session_state[f"{prefix}_manual_dates"][i:i+cols_per_row]
+                dcols = st.columns(cols_per_row)
+                for j, d in enumerate(row_dates):
+                    with dcols[j]:
+                        st.markdown(f'<div style="background:#FEF2F2;border:1px solid #EF4444;border-radius:6px;padding:0.2rem;text-align:center;font-size:0.6rem;font-weight:600;color:#DC2626;">📅 {d}</div>', unsafe_allow_html=True)
+            
+            # Remove individual dates
+            remove_dates = st.multiselect("Remove dates", st.session_state[f"{prefix}_manual_dates"], key=f"{prefix}_remove_dates")
+            if remove_dates:
+                if st.button("🗑️ Remove Selected", key=f"{prefix}_btn_remove", use_container_width=True):
+                    for d in remove_dates:
+                        st.session_state[f"{prefix}_manual_dates"].remove(d)
+                    st.rerun()
+            
+            dates_string = ",".join(st.session_state[f"{prefix}_manual_dates"])
+            st.caption(f"📅 {len(st.session_state[f'{prefix}_manual_dates'])} dates selected")
+            return dates_string, True
+        else:
+            st.warning("⚠️ No dates selected. Please add at least one date.")
+            return "", False
+    
+    # ============================================
+    # HELPER: Auto-Generate Dates
+    # ============================================
+    def render_auto_generate_dates(prefix="default", default_freq="Monthly"):
+        st.markdown("**🔄 Auto-Generate Schedule Dates**")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            auto_start = st.date_input("Start Date", today, key=f"{prefix}_auto_start")
+        with c2:
+            auto_end = st.date_input("End Date", today + timedelta(days=365), key=f"{prefix}_auto_end")
+        
+        freq_options = ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"]
+        default_idx = freq_options.index(default_freq) if default_freq in freq_options else 3
+        auto_freq = st.selectbox("Frequency", freq_options, index=default_idx, key=f"{prefix}_auto_freq")
+        
+        if f"{prefix}_generated_dates" not in st.session_state:
+            st.session_state[f"{prefix}_generated_dates"] = []
+        
+        if st.button("🔄 Generate Dates", key=f"{prefix}_gen_dates", use_container_width=True):
+            dates_list = []
+            current = auto_start
+            while current <= auto_end:
+                dates_list.append(current.strftime("%Y-%m-%d"))
+                if auto_freq == "Daily":
+                    current += timedelta(days=1)
+                elif auto_freq == "Weekly":
+                    current += timedelta(days=7)
+                elif auto_freq == "Bi-Weekly":
+                    current += timedelta(days=14)
+                elif auto_freq == "Monthly":
+                    if current.month == 12:
+                        current = date(current.year + 1, 1, min(current.day, 28))
+                    else:
+                        current = date(current.year, current.month + 1, min(current.day, 28))
+                elif auto_freq == "Quarterly":
+                    nm = current.month + 3
+                    current = date(current.year + 1, nm - 12, min(current.day, 28)) if nm > 12 else date(current.year, nm, min(current.day, 28))
+                elif auto_freq == "Half-Yearly":
+                    nm = current.month + 6
+                    current = date(current.year + 1, nm - 12, min(current.day, 28)) if nm > 12 else date(current.year, nm, min(current.day, 28))
+                elif auto_freq == "Yearly":
+                    current = date(current.year + 1, current.month, min(current.day, 28))
+            st.session_state[f"{prefix}_generated_dates"] = dates_list
+            st.rerun()
+        
+        if st.session_state[f"{prefix}_generated_dates"]:
+            generated = st.session_state[f"{prefix}_generated_dates"]
+            st.caption(f"📅 {len(generated)} dates generated")
+            
+            selected = st.multiselect("Select Dates*", generated, default=generated[:min(5, len(generated))], key=f"{prefix}_auto_selected")
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                if st.button("✅ Select All", key=f"{prefix}_sel_all", use_container_width=True):
+                    st.session_state[f"{prefix}_auto_selected"] = generated
+                    st.rerun()
+            with c2:
+                if st.button("❌ Deselect All", key=f"{prefix}_desel_all", use_container_width=True):
+                    st.session_state[f"{prefix}_auto_selected"] = []
+                    st.rerun()
+            
+            if selected:
+                # Mini calendar preview
+                try:
+                    import calendar as cal_mod
+                    cal_dates_auto = [datetime.strptime(d, "%Y-%m-%d").date() for d in selected]
+                    cal_month = cal_dates_auto[0].replace(day=1) if cal_dates_auto else today.replace(day=1)
+                    cal_matrix = cal_mod.monthcalendar(cal_month.year, cal_month.month)
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border:1px solid #e5e7eb;border-radius:10px;padding:0.6rem;margin:0.5rem 0;max-width:350px;">
+                        <div style="text-align:center;font-weight:700;margin-bottom:0.3rem;font-size:0.8rem;">📅 {cal_month.strftime('%B %Y')}</div>
+                        <table style="width:100%;text-align:center;font-size:0.65rem;">
+                            <tr style="color:#888;">{"".join(f'<td>{d}</td>' for d in ['M','T','W','T','F','S','S'])}</tr>
+                    """, unsafe_allow_html=True)
+                    
+                    for week in cal_matrix:
+                        st.markdown("<tr>", unsafe_allow_html=True)
+                        for day in week:
+                            if day == 0:
+                                st.markdown('<td style="padding:1px;"></td>', unsafe_allow_html=True)
+                            else:
+                                check_date = date(cal_month.year, cal_month.month, day)
+                                if check_date in cal_dates_auto:
+                                    st.markdown(f'<td style="padding:1px;"><div style="background:#059669;color:white;border-radius:50%;width:22px;height:22px;line-height:22px;font-weight:700;font-size:0.6rem;margin:0 auto;">{day}</div></td>', unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f'<td style="padding:1px;color:#ccc;font-size:0.6rem;">{day}</td>', unsafe_allow_html=True)
+                        st.markdown("</tr>", unsafe_allow_html=True)
+                    st.markdown("</table></div>", unsafe_allow_html=True)
+                except:
+                    pass
+                
+                dates_string = ",".join(selected)
+                st.caption(f"📅 {len(selected)} dates selected")
+                return dates_string, True
+            else:
+                return "", False
+        else:
+            st.caption("Click 'Generate Dates' to create the schedule.")
+            return "", False
+    
+    # ============================================
+    # HELPER: Template Preview
+    # ============================================
+    def render_template_preview(template_name):
+        if template_name == "Standard Template":
+            items = ["LOTO: Power isolated", "PPE: Appropriate PPE worn", "Work Area Assessment", "Visual Inspection", "Air Filter(s) inspection", "Fan & Motor check", "Condensate Drain inspection", "Electrical wiring check", "Temperature measurements", "Voltage & Amps parameters", "Earthing connections", "BMS integration", "Observations"]
+        else:
+            matched = next((t for t in (templates.data if templates and templates.data else []) if t.get("template_name") == template_name), None)
+            if matched:
+                items_res = safe_supabase_query(lambda mid=matched["id"]: supabase.table("ppm_checklist_items").select("description").eq("template_id", mid).order("sort_order").execute(), error_prefix="Template items")
+                items = [i.get("description","") for i in items_res.data] if items_res and items_res.data else ["No items found"]
+            else:
+                items = ["Template not found"]
+        
+        with st.expander(f"📋 Preview: {template_name} ({len(items)} items)"):
+            for i, item in enumerate(items):
+                st.caption(f"{i+1}. {item}")
+    
+    # ============================================
+    # HELPER: Conflict Detection
+    # ============================================
+    def check_schedule_conflicts(asset_id, dates_list):
+        if existing_df.empty:
+            return []
+        conflicts = []
+        for d in dates_list:
+            existing = existing_df[(existing_df["asset_id"] == str(asset_id)) & (existing_df["next_due_date"] == d)]
+            if len(existing) > 0:
+                conflicts.append(d)
+        return conflicts
+    
+    # ============================================
+    # MAIN TABS
+    # ============================================
+    tabs = st.tabs([
+        "🔧 Individual Scheduling", 
+        "📦 Bulk Scheduling", 
+        "📋 Scheduled PPMs", 
+        "📊 Consolidated Report"
+    ])
+    
+    # ============================================
+    # TAB 0: INDIVIDUAL ASSET SCHEDULING
+    # ============================================
+    with tabs[0]:
+        st.markdown("### 🔧 Individual Asset PPM Scheduling")
+        st.caption("Schedule one asset at a time with full date control.")
+        
+        st.markdown("#### Step 1: Select Asset")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            dept_list = ["Select Department..."] + sorted(df["dept_full"].dropna().unique().tolist())
+            sel_dept = st.selectbox("Department*", dept_list, key="ind_dept")
+        
+        if sel_dept != "Select Department...":
+            dept_df = df[df["dept_full"] == sel_dept]
+            with c2:
+                asset_list = ["Select Asset..."] + sorted(dept_df["parent_asset"].dropna().unique().tolist())
+                sel_asset = st.selectbox("Asset (Parent)*", asset_list, key="ind_asset")
+            
+            if sel_asset != "Select Asset...":
+                asset_df = dept_df[dept_df["parent_asset"] == sel_asset]
+                with c3:
+                    sub_list = ["Select Sub-Asset..."] + sorted(asset_df["name"].dropna().unique().tolist())
+                    sel_sub = st.selectbox("Sub-Asset*", sub_list, key="ind_sub")
+                
+                if sel_sub != "Select Sub-Asset...":
+                    selected_asset = asset_df[asset_df["name"] == sel_sub].iloc[0]
+                    asset_id = selected_asset["id"]
+                    
+                    with c4:
+                        current = selected_asset.get("checklist_clean", None)
+                        if current:
+                            st.markdown(f'<div style="background:#ECFDF5;border-radius:8px;padding:0.5rem;text-align:center;border:1px solid #10B981;margin-top:0.5rem;"><div style="font-size:0.55rem;color:#059669;">✅ Enrolled</div><div style="font-weight:600;font-size:0.7rem;color:#059669;">{current}</div></div>', unsafe_allow_html=True)
+                        else:
+                            st.markdown(f'<div style="background:#FFFBEB;border-radius:8px;padding:0.5rem;text-align:center;border:1px solid #F59E0B;margin-top:0.5rem;"><div style="font-size:0.55rem;color:#D97706;">⚠️ Not Enrolled</div></div>', unsafe_allow_html=True)
+                    
+                    st.markdown(f"""
+                    <div style="background:white;border-radius:10px;padding:1rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);margin-bottom:1rem;border-left:4px solid #3B82F6;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <b style="font-size:0.9rem;">{sel_asset}</b>
+                                <br><span style="font-size:0.75rem;color:#666;">└ {sel_sub[:80]}</span>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:0.6rem;color:#888;">📍 {selected_asset.get('location_building','N/A')}</div>
+                                <div style="font-size:0.6rem;color:#888;">🏷️ {selected_asset.get('asset_tag','N/A')}</div>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.markdown("---")
+                    st.markdown("#### Step 2: Select Template & Frequency")
+                    
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        sel_template = st.selectbox("Checklist Template*", template_options, key="ind_template")
+                    with c2:
+                        sel_freq = st.selectbox("PPM Frequency*", ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="ind_freq")
+                    with c3:
+                        overwrite = st.checkbox("Overwrite existing enrollment", value=True, key="ind_overwrite")
+                    
+                    render_template_preview(sel_template)
+                    
+                    st.markdown("---")
+                    st.markdown("#### Step 3: Schedule Dates")
+                    
+                    date_mode = st.radio("Date Selection Mode", ["📅 Manual Date Picker", "🔄 Auto-Generate Dates"], horizontal=True, key="ind_date_mode")
+                    
+                    if date_mode == "📅 Manual Date Picker":
+                        dates_string, has_dates = render_manual_date_picker("ind")
+                    else:
+                        dates_string, has_dates = render_auto_generate_dates("ind", sel_freq)
+                    
+                    st.markdown("---")
+                    
+                    if has_dates and dates_string:
+                        dates_list = [d.strip() for d in dates_string.split(",") if d.strip()]
+                        conflicts = check_schedule_conflicts(asset_id, dates_list)
+                        
+                        if conflicts:
+                            st.warning(f"⚠️ **Schedule Conflict:** {len(conflicts)} dates already have PPMs for this asset.")
+                        
+                        st.markdown(f"""
+                        <div style="background:#EFF6FF;border-radius:10px;padding:1rem;margin:1rem 0;border:1px solid #BFDBFE;">
+                            <b>📋 Summary:</b><br>
+                            Asset: <b>{sel_sub[:60]}</b><br>
+                            Template: <b>{sel_template}</b><br>
+                            Frequency: <b>{sel_freq}</b><br>
+                            Dates: <b>{len(dates_list)}</b> ({dates_list[0]} → {dates_list[-1] if len(dates_list) > 1 else dates_list[0]})
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        if st.button("🚀 ENROLL ASSET", key="ind_enroll_btn", use_container_width=True, type="primary"):
+                            DB.update("assets", asset_id, {"checklist": sel_template, "ppm_frequency": sel_freq, "checklist_template": sel_template})
+                            
+                            schedule_count = 0
+                            for schedule_date in dates_list:
+                                if not overwrite:
+                                    existing = existing_df[(existing_df["asset_id"] == str(asset_id)) & (existing_df["next_due_date"] == schedule_date)]
+                                    if len(existing) > 0:
+                                        continue
+                                safe_supabase_query(lambda aid=asset_id, sd=schedule_date: supabase.table("ppm_schedules").insert({
+                                    "facility_code": fc, "asset_id": aid,
+                                    "title": f"{selected_asset.get('name','PPM')} - {sel_template}",
+                                    "frequency": sel_freq, "status": "scheduled",
+                                    "assigned_team": selected_asset.get("department", ""),
+                                    "next_due_date": sd, "created_at": datetime.now().isoformat()
+                                }).execute(), error_prefix="PPM schedule")
+                                schedule_count += 1
+                            
+                            if "ind_manual_dates" in st.session_state:
+                                st.session_state["ind_manual_dates"] = []
+                            if "ind_generated_dates" in st.session_state:
+                                st.session_state["ind_generated_dates"] = []
+                            
+                            st.success(f"✅ Enrolled! {schedule_count} schedule entries created.")
+                            st.balloons()
+                            st.rerun()
+    
+    # ============================================
+    # TAB 1: BULK ASSET SCHEDULING
+    # ============================================
+    with tabs[1]:
+        st.markdown("### 📦 Bulk Asset PPM Scheduling")
+        st.caption("Enroll multiple assets at once with the same template and schedule. Optionally stagger dates across assets.")
+        
+        st.markdown("#### Step 1: Filter & Select Assets")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            bulk_dept = st.selectbox("Department", ["All"] + sorted(df["dept_full"].dropna().unique().tolist()), key="bulk_dept")
+        with c2:
+            bulk_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="bulk_bldg")
+        with c3:
+            bulk_status = st.selectbox("Enrollment Status", ["All", "Enrolled", "Not Enrolled"], key="bulk_status")
+        with c4:
+            bulk_search = st.text_input("🔍 Search", key="bulk_search", placeholder="Asset name...")
+        
+        filtered = df.copy()
+        if bulk_dept != "All": filtered = filtered[filtered["dept_full"] == bulk_dept]
+        if bulk_bldg != "All": filtered = filtered[filtered["location_building"] == bulk_bldg]
+        if bulk_status == "Enrolled": filtered = filtered[filtered["checklist_clean"].notna()]
+        elif bulk_status == "Not Enrolled": filtered = filtered[filtered["checklist_clean"].isna()]
+        if bulk_search:
+            filtered = filtered[filtered["name"].str.contains(bulk_search, case=False, na=False) | filtered["parent_asset"].str.contains(bulk_search, case=False, na=False)]
+        
+        st.caption(f"📋 {len(filtered)} assets match filters")
+        
+        asset_options = [f"{row['parent_asset']} → {row['name'][:60]} ({row['asset_tag']})" for _, row in filtered.iterrows()]
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ Select All", key="bulk_select_all", use_container_width=True):
+                st.session_state["bulk_selected"] = asset_options
+                st.rerun()
+        with c2:
+            if st.button("❌ Clear", key="bulk_clear", use_container_width=True):
+                st.session_state["bulk_selected"] = []
+                st.rerun()
+        
+        if "bulk_selected" not in st.session_state:
+            st.session_state["bulk_selected"] = []
+        
+        selected_assets = st.multiselect("Select Assets to Enroll*", asset_options, default=st.session_state.get("bulk_selected", []), key="bulk_multi")
+        
+        if selected_assets:
+            st.caption(f"✅ {len(selected_assets)} assets selected")
+            st.markdown("---")
+            
+            st.markdown("#### Step 2: Template & Frequency")
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                bulk_template = st.selectbox("Checklist Template*", template_options, key="bulk_template")
+            with c2:
+                bulk_freq = st.selectbox("PPM Frequency*", ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="bulk_freq")
+            with c3:
+                bulk_overwrite = st.checkbox("Overwrite existing", value=True, key="bulk_overwrite")
+                create_schedules = st.checkbox("Create PPM Schedule entries", value=True, key="bulk_create_sched")
+            
+            render_template_preview(bulk_template)
+            
+            st.markdown("---")
+            
+            st.markdown("#### Step 3: Staggered Scheduling (Optional)")
+            staggered = st.checkbox("Stagger dates across assets", value=False, key="bulk_staggered",
+                help="Asset 1 gets original dates, Asset 2 gets dates offset by stagger interval, etc.")
+            stagger_days = 0
+            if staggered:
+                stagger_days = st.number_input("Stagger Interval (Days)", min_value=1, value=7, key="bulk_stagger_days")
+                st.info(f"Asset 1: Original dates | Asset 2: +{stagger_days}d | Asset 3: +{stagger_days*2}d | ...")
+            
+            st.markdown("---")
+            
+            st.markdown("#### Step 4: Schedule Dates")
+            date_mode_bulk = st.radio("Date Selection Mode", ["📅 Manual Date Picker", "🔄 Auto-Generate Dates"], horizontal=True, key="bulk_date_mode")
+            
+            if date_mode_bulk == "📅 Manual Date Picker":
+                dates_string_bulk, has_dates_bulk = render_manual_date_picker("bulk")
+            else:
+                dates_string_bulk, has_dates_bulk = render_auto_generate_dates("bulk", bulk_freq)
+            
+            st.markdown("---")
+            
+            if has_dates_bulk and dates_string_bulk:
+                dates_list_bulk = [d.strip() for d in dates_string_bulk.split(",") if d.strip()]
+                
+                st.markdown(f"""
+                <div style="background:#EFF6FF;border-radius:10px;padding:1rem;margin:1rem 0;border:1px solid #BFDBFE;">
+                    <b>📋 Bulk Summary:</b><br>
+                    Assets: <b>{len(selected_assets)}</b><br>
+                    Template: <b>{bulk_template}</b><br>
+                    Frequency: <b>{bulk_freq}</b><br>
+                    Dates per asset: <b>{len(dates_list_bulk)}</b><br>
+                    Total entries: <b>{len(selected_assets) * len(dates_list_bulk)}</b><br>
+                    Staggered: <b>{'Yes (+' + str(stagger_days) + 'd)' if staggered else 'No'}</b>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                if st.button("🚀 ENROLL ALL ASSETS", key="bulk_enroll_btn", use_container_width=True, type="primary"):
+                    enrolled = 0
+                    schedule_count = 0
+                    skipped = 0
+                    
+                    for idx, asset_label in enumerate(selected_assets):
+                        parts = asset_label.split(" (")
+                        asset_tag = parts[-1].replace(")", "").strip()
+                        asset_row = filtered[filtered["asset_tag"] == asset_tag]
+                        if len(asset_row) == 0: continue
+                        
+                        asset = asset_row.iloc[0]
+                        asset_id = asset["id"]
+                        
+                        if pd.notna(asset.get("checklist_clean")) and not bulk_overwrite:
+                            skipped += 1
+                            continue
+                        
+                        DB.update("assets", asset_id, {"checklist": bulk_template, "ppm_frequency": bulk_freq, "checklist_template": bulk_template})
+                        
+                        if create_schedules:
+                            for date_idx, schedule_date in enumerate(dates_list_bulk):
+                                try:
+                                    actual_date = schedule_date
+                                    if staggered:
+                                        offset = idx * stagger_days
+                                        actual_date = (datetime.strptime(schedule_date, "%Y-%m-%d") + timedelta(days=offset)).strftime("%Y-%m-%d")
+                                    
+                                    safe_supabase_query(lambda aid=asset_id, sd=actual_date: supabase.table("ppm_schedules").insert({
+                                        "facility_code": fc, "asset_id": aid,
+                                        "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                                        "frequency": bulk_freq, "status": "scheduled",
+                                        "assigned_team": asset.get("department", ""),
+                                        "next_due_date": sd, "created_at": datetime.now().isoformat()
+                                    }).execute(), error_prefix="PPM schedule")
+                                    schedule_count += 1
+                                except:
+                                    pass
+                        enrolled += 1
+                    
+                    if "bulk_manual_dates" in st.session_state:
+                        st.session_state["bulk_manual_dates"] = []
+                    if "bulk_generated_dates" in st.session_state:
+                        st.session_state["bulk_generated_dates"] = []
+                    st.session_state["bulk_selected"] = []
+                    
+                    msg = f"✅ {enrolled} assets enrolled! ({schedule_count} schedule entries)"
+                    if skipped > 0: msg += f" ({skipped} skipped)"
+                    st.success(msg)
+                    st.balloons()
+                    st.rerun()
+    
+    # ============================================
+    # TAB 2: SCHEDULED PPMs (READ-ONLY)
+    # ============================================
+    with tabs[2]:
+        st.markdown("### 📋 Scheduled PPMs Overview")
+        st.caption("View all enrolled PPMs across all assets.")
+        
+        if total_schedules == 0:
+            st.info("No PPMs scheduled yet. Use Individual or Bulk Scheduling tabs to enroll assets.")
+        else:
+            c1, c2, c3, c4 = st.columns(4)
+            with c1:
+                view_status = st.selectbox("Status", ["All", "scheduled", "completed", "overdue"], key="view_status")
+            with c2:
+                view_freq = st.selectbox("Frequency", ["All"] + ["Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Yearly"], key="view_freq")
+            with c3:
+                view_dept = st.selectbox("Department", ["All"] + sorted(existing_df["assigned_team"].dropna().unique().tolist()) if "assigned_team" in existing_df.columns else ["All"], key="view_dept")
+            with c4:
+                view_search = st.text_input("🔍 Search", key="view_search", placeholder="Title...")
+            
+            display_sched = existing_df.copy()
+            if view_status != "All": display_sched = display_sched[display_sched["status"] == view_status]
+            if view_freq != "All": display_sched = display_sched[display_sched["frequency"] == view_freq]
+            if view_dept != "All" and "assigned_team" in display_sched.columns: display_sched = display_sched[display_sched["assigned_team"] == view_dept]
+            if view_search: display_sched = display_sched[display_sched["title"].str.contains(view_search, case=False, na=False)]
+            
+            st.caption(f"📋 Showing {len(display_sched)} of {total_schedules} schedules")
+            
+            page_size = 20
+            if "view_page" not in st.session_state: st.session_state.view_page = 1
+            total_pages = max(1, (len(display_sched) + page_size - 1) // page_size)
+            start = (st.session_state.view_page - 1) * page_size
+            end = min(start + page_size, len(display_sched))
+            
+            c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+            with c1:
+                if st.button("◀◀", key="v_first") and st.session_state.view_page > 1: st.session_state.view_page = 1; st.rerun()
+            with c2:
+                if st.button("◀", key="v_prev") and st.session_state.view_page > 1: st.session_state.view_page -= 1; st.rerun()
+            with c3: st.markdown(f"**Page {st.session_state.view_page} of {total_pages}**")
+            with c4:
+                if st.button("▶", key="v_next") and st.session_state.view_page < total_pages: st.session_state.view_page += 1; st.rerun()
+            with c5:
+                if st.button("▶▶", key="v_last"): st.session_state.view_page = total_pages; st.rerun()
+            
+            for _, sched in display_sched.iloc[start:end].iterrows():
+                status = sched.get("status", "scheduled")
+                sc = {"scheduled": "#3B82F6", "completed": "#10B981", "overdue": "#EF4444"}.get(status, "#3B82F6")
+                asset_name = "N/A"
+                if sched.get("asset_id"):
+                    match = df[df["id"] == str(sched.get("asset_id"))]
+                    if len(match) > 0: asset_name = match.iloc[0].get("name", "N/A")[:60]
+                
+                st.markdown(f"""
+                <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.6rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="flex:1;">
+                        <b>{sched.get('title','N/A')[:80]}</b>
+                        <br><span style="font-size:0.65rem;color:#666;">🏢 {sched.get('assigned_team','N/A')} | 🔄 {sched.get('frequency','N/A')}</span>
+                        <br><span style="font-size:0.6rem;color:#888;">🏗️ {asset_name} | 📅 {sched.get('next_due_date','N/A')}</span>
+                    </div>
+                    <span style="background:{sc};color:white;padding:3px 12px;border-radius:12px;font-size:0.6rem;font-weight:600;">{status.upper()}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+            st.download_button("📥 Download CSV", display_sched.to_csv(index=False), f"ppm_schedules_{today}.csv", "text/csv", use_container_width=True)
+    
+    # ============================================
+    # TAB 3: CONSOLIDATED REPORT
+    # ============================================
+    with tabs[3]:
+        st.markdown("### 📊 Consolidated PPM Report")
+        
+        consolidated = []
+        for _, asset in df.iterrows():
+            enrolled = pd.notna(asset.get("checklist_clean"))
+            asset_schedules = existing_df[existing_df["asset_id"] == str(asset.get("id"))] if not existing_df.empty else pd.DataFrame()
+            schedule_dates_list = sorted(asset_schedules["next_due_date"].tolist()) if len(asset_schedules) > 0 else []
+            
+            consolidated.append({
+                "SNO": len(consolidated) + 1,
+                "Asset": asset.get("parent_asset", "N/A"),
+                "Sub Asset": asset.get("name", "N/A"),
+                "Department": asset.get("dept_full", "N/A"),
+                "Checklist": asset.get("checklist_clean") if enrolled else "Not Enrolled",
+                "Frequency": asset.get("ppm_frequency", asset.get("verification_frequency", "N/A")),
+                "Schedule Dates": ", ".join(schedule_dates_list[:5]) + (f" +{len(schedule_dates_list)-5} more" if len(schedule_dates_list) > 5 else ""),
+                "Total Dates": len(schedule_dates_list),
+                "Status": "Enrolled" if enrolled else "Pending"
+            })
+        
+        cons_df = pd.DataFrame(consolidated)
+        
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            cons_status = st.selectbox("Status", ["All", "Enrolled", "Pending"], key="cons_status_rpt")
+        with c2:
+            cons_freq = st.selectbox("Frequency", ["All", "Daily", "Weekly", "Bi-Weekly", "Monthly", "Quarterly", "Half-Yearly", "Yearly"], key="cons_freq_rpt")
+        with c3:
+            cons_search = st.text_input("🔍 Search", key="cons_search_rpt", placeholder="Asset or checklist...")
+        
+        display_cons = cons_df.copy()
+        if cons_status != "All": display_cons = display_cons[display_cons["Status"] == cons_status]
+        if cons_freq != "All": display_cons = display_cons[display_cons["Frequency"] == cons_freq]
+        if cons_search:
+            mask = display_cons["Asset"].str.contains(cons_search, case=False, na=False) | display_cons["Sub Asset"].str.contains(cons_search, case=False, na=False) | display_cons["Checklist"].str.contains(cons_search, case=False, na=False)
+            display_cons = display_cons[mask]
+        
+        enrolled_total = len(display_cons[display_cons["Status"] == "Enrolled"])
+        pending_total = len(display_cons[display_cons["Status"] == "Pending"])
+        
+        c1, c2, c3 = st.columns(3)
+        with c1: st.metric("📋 Total", len(display_cons))
+        with c2: st.metric("⏳ Pending", pending_total)
+        with c3: st.metric("✅ Enrolled", enrolled_total)
+        
+        st.markdown("---")
+        
+        page_size = 25
+        if "cons_rpt_page" not in st.session_state: st.session_state.cons_rpt_page = 1
+        total_pages_cons = max(1, (len(display_cons) + page_size - 1) // page_size)
+        start_cons = (st.session_state.cons_rpt_page - 1) * page_size
+        end_cons = min(start_cons + page_size, len(display_cons))
+        page_data = display_cons.iloc[start_cons:end_cons]
+        
+        c1, c2, c3, c4, c5 = st.columns([1, 1, 2, 1, 1])
+        with c1:
+            if st.button("◀◀", key="cr_first") and st.session_state.cons_rpt_page > 1: st.session_state.cons_rpt_page = 1; st.rerun()
+        with c2:
+            if st.button("◀", key="cr_prev") and st.session_state.cons_rpt_page > 1: st.session_state.cons_rpt_page -= 1; st.rerun()
+        with c3: st.markdown(f"**Page {st.session_state.cons_rpt_page} of {total_pages_cons}**")
+        with c4:
+            if st.button("▶", key="cr_next") and st.session_state.cons_rpt_page < total_pages_cons: st.session_state.cons_rpt_page += 1; st.rerun()
+        with c5:
+            if st.button("▶▶", key="cr_last"): st.session_state.cons_rpt_page = total_pages_cons; st.rerun()
+        
+        st.caption(f"Showing {start_cons+1}–{end_cons} of {len(display_cons)} records")
+        
+        if len(page_data) > 0:
+            for _, row in page_data.iterrows():
+                is_enrolled_row = row["Status"] == "Enrolled"
+                border = "#10B981" if is_enrolled_row else "#F59E0B"
+                bg = "#ECFDF5" if is_enrolled_row else "#FFFBEB"
+                badge = "✅ Enrolled" if is_enrolled_row else "⏳ Pending"
+                badge_bg = "#10B981" if is_enrolled_row else "#F59E0B"
+                
+                st.markdown(f"""
+                <div style="background:{bg};border-left:3px solid {border};border-radius:6px;padding:0.5rem;margin:0.2rem 0;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="flex:1;">
+                        <b>#{row['SNO']} {row['Asset']}</b>
+                        <br><span style="font-size:0.65rem;color:#666;">└ {row['Sub Asset'][:80]}</span>
+                        <br><span style="font-size:0.6rem;color:#888;">📋 {row['Checklist']} | 📅 {row['Frequency']} | 🔢 {row['Total Dates']} dates</span>
+                    </div>
+                    <span style="background:{badge_bg};color:white;padding:3px 12px;border-radius:15px;font-size:0.65rem;font-weight:700;white-space:nowrap;">{badge}</span>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("No records match your filters.")
+        
+        st.markdown("---")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button("📥 Download CSV", display_cons.to_csv(index=False), f"consolidated_ppm_{today}.csv", "text/csv", use_container_width=True)
+        with c2:
+            st.download_button("📥 Download HTML", display_cons.to_html(index=False), f"consolidated_ppm_{today}.html", "text/html", use_container_width=True)
 
 
 
