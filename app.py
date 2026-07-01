@@ -2781,7 +2781,7 @@ def page_ar():
                             badge = f'<span class="badge">{pc}</span>' if pc > 0 else ''
                             
                             # FIXED: Robust cross-frame click handler
-                            cal_html += f'<td class="{cls}" style="cursor:pointer;" onclick="(function(){{var input=parent.document.getElementById(\'ppm_cal_date_input\');if(input){{var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,\'value\').set;setter.call(input,\'{dk}\');input.dispatchEvent(new Event(\'input\',{{bubbles:true}}));input.dispatchEvent(new Event(\'change\',{{bubbles:true}}));var btn=parent.document.getElementById(\'ppm_cal_search_btn\');if(btn){{btn.click();}}else{{var forms=parent.document.querySelectorAll(\'button\');for(var i=0;i<forms.length;i++){{if(forms[i].innerText.includes(\'Search\')){{forms[i].click();break;}}}}}}}})()">{dc}{badge}</td>'
+                            cal_html += f'<td class="{cls}" style="cursor:pointer;" onclick="window.parent.document.getElementById(\'ppm_cal_date_input\').value=\'{dk}\';window.parent.document.getElementById(\'ppm_cal_date_input\').focus();">{dc}{badge}</td>'
                             dc += 1
                     cal_html += "</tr>"
                     if dc > ld.day: break
@@ -2919,7 +2919,7 @@ def page_ar():
                 st.session_state.ppm_cal_click_value = ""
                 st.rerun()
         else:
-            st.info("👆 **Click any date** on the calendar above to view scheduled PPMs. Or type a date (YYYY-MM-DD) and click Search."
+            st.info("👆 **Click any date** on the calendar above to view scheduled PPMs. Or type a date (YYYY-MM-DD) and click Search.")
         
         
     
@@ -10120,27 +10120,19 @@ def page_cs():
                                     except:
                                         parsed_date = str(date.today())
                                 
-                                safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
+                                try:
+                                result = supabase.table("ppm_schedules").insert({
                                     "facility_code": fc,
-                                    "asset_id": asset.get("id"),
+                                    "asset_id": str(asset.get("id")),
                                     "title": f"{asset.get('name','PPM')} - {bulk_template}",
                                     "frequency": bulk_freq,
                                     "status": "scheduled",
-                                    "assigned_team": asset.get("department", ""),
-                                    "next_due_date": parsed_date,
+                                    "assigned_team": str(asset.get("department", "")),
+                                    "next_due_date": str(date.today()),
                                     "created_at": datetime.now().isoformat()
-                                }).execute(), error_prefix="PPM schedule")
-                        else:
-                            safe_supabase_query(lambda: supabase.table("ppm_schedules").insert({
-                                "facility_code": fc,
-                                "asset_id": asset.get("id"),
-                                "title": f"{asset.get('name','PPM')} - {bulk_template}",
-                                "frequency": bulk_freq,
-                                "status": "scheduled",
-                                "assigned_team": asset.get("department", ""),
-                                "next_due_date": str(date.today()),
-                                "created_at": datetime.now().isoformat()
-                            }).execute(), error_prefix="PPM schedule")
+                                }).execute()
+                            except:
+                                pass
                         
                         count += 1
                     
@@ -13837,14 +13829,21 @@ def page_cs():
                                     existing = existing_df[(existing_df["asset_id"] == str(asset_id)) & (existing_df["next_due_date"] == schedule_date)]
                                     if len(existing) > 0:
                                         continue
-                                safe_supabase_query(lambda aid=asset_id, sd=schedule_date: supabase.table("ppm_schedules").insert({
-                                    "facility_code": fc, "asset_id": aid,
-                                    "title": f"{selected_asset.get('name','PPM')} - {sel_template}",
-                                    "frequency": sel_freq, "status": "scheduled",
-                                    "assigned_team": selected_asset.get("department", ""),
-                                    "next_due_date": sd, "created_at": datetime.now().isoformat()
-                                }).execute(), error_prefix="PPM schedule")
-                                schedule_count += 1
+                                try:
+                                    result = supabase.table("ppm_schedules").insert({
+                                        "facility_code": fc,
+                                        "asset_id": str(asset_id),
+                                        "title": f"{selected_asset.get('name','PPM')} - {sel_template}",
+                                        "frequency": sel_freq,
+                                        "status": "scheduled",
+                                        "assigned_team": str(selected_asset.get("department", "")),
+                                        "next_due_date": schedule_date,
+                                        "created_at": datetime.now().isoformat()
+                                    }).execute()
+                                    if result and result.data:
+                                        schedule_count += 1
+                                except:
+                                    pass
                             
                             if "ind_manual_dates" in st.session_state:
                                 st.session_state["ind_manual_dates"] = []
