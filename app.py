@@ -2510,7 +2510,7 @@ def page_ar():
                     st.error(f"PDF: {str(e)[:50]}")
     
     # ============================================
-    # TAB 5: PPM CALENDAR — FINAL WORKING VERSION
+    # TAB 5: PPM CALENDAR — FORTUNE 500 UPGRADED v2
     # ============================================
     with ar_tabs[5]:
         st.markdown("### 📅 PPM Calendar — Financial Year View")
@@ -2525,6 +2525,10 @@ def page_ar():
             st.session_state.cal_offset = 0
         if "selected_ppm_date" not in st.session_state:
             st.session_state.selected_ppm_date = None
+        if "ppm_cal_click_value" not in st.session_state:
+            st.session_state.ppm_cal_click_value = ""
+        if "cal_view_mode" not in st.session_state:
+            st.session_state.cal_view_mode = "6-Month Grid"
         
         block_start_month = 4 + (st.session_state.cal_offset * 6)
         block_start_year = fy_start_year + (block_start_month - 1) // 12
@@ -2537,23 +2541,52 @@ def page_ar():
         user_role = st.session_state.get("user_role", "staff")
         is_admin = user_role in ["admin", "approver", "super_admin"]
         
-        # Filters
+        # ============================================
+        # QUICK JUMP & VIEW CONTROLS
+        # ============================================
+        c1, c2, c3, c4 = st.columns([1, 1, 1, 1])
+        with c1:
+            jump_month = st.selectbox("📅 Quick Jump", 
+                ["Current Block"] + [f"{months_full[i]} {fy_start_year if i >= 3 else fy_start_year+1}" for i in range(12)],
+                key="cal_quick_jump")
+            if jump_month != "Current Block":
+                target_month = months_full.index(jump_month.split(" ")[0]) + 1
+                target_year = int(jump_month.split(" ")[1])
+                if target_month >= 4:
+                    months_from_start = target_month - 4
+                else:
+                    months_from_start = target_month + 8
+                st.session_state.cal_offset = months_from_start // 6
+                st.rerun()
+        with c2:
+            view_mode = st.selectbox("👁️ View Mode", ["6-Month Grid", "Single Month", "Week List"], key="cal_view_mode_sel")
+            st.session_state.cal_view_mode = view_mode
+        with c3:
+            auto_refresh = st.checkbox("🔄 Auto-refresh", value=True, key="cal_auto_refresh")
+        with c4:
+            if st.button("📥 Export Calendar", key="cal_export_btn", use_container_width=True):
+                st.session_state.cal_show_export = True
+        
+        st.markdown("---")
+        
+        # ============================================
+        # FILTERS
+        # ============================================
         st.markdown("### 🔍 Filters")
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            # Create dept_full for display BUT don't modify original df
             df["dept_full"] = df.apply(lambda row: f"{row['department']} — {row['sub_division']}" if pd.notna(row.get('sub_division')) and row.get('sub_division') not in ['', 'N/A', 'NA'] else row['department'], axis=1)
-            
             if is_admin:
                 dept_options = ["All"] + sorted(df["dept_full"].dropna().unique().tolist())
             else:
                 dept_options = ["All"] + [d for d in sorted(df["dept_full"].dropna().unique().tolist()) if any(ud in d for ud in user_depts)] if user_depts else ["All"]
             cal_dept = st.selectbox("Department", dept_options, key="cal_dept_filter")
         with c2:
-            cal_asset = st.selectbox("Asset", ["All"] + sorted(df["parent_asset"].dropna().unique().tolist()), key="cal_asset_filter")
+            cal_asset = st.selectbox("Asset (Parent)", ["All"] + sorted(df["parent_asset"].dropna().unique().tolist()), key="cal_asset_filter")
         with c3:
             cal_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="cal_bldg_filter")
         with c4:
+            cal_status = st.selectbox("Status", ["All", "Scheduled", "Completed", "Overdue", "Pending"], key="cal_status_filter")
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("🔧 PPM ACTIVITIES", key="goto_ppma_top", use_container_width=True, type="primary"):
                 st.session_state.page = "ppma"
@@ -2561,7 +2594,9 @@ def page_ar():
         
         st.markdown("---")
         
-        # Navigation & Legend
+        # ============================================
+        # NAVIGATION
+        # ============================================
         c1, c2, c3 = st.columns([1, 2, 1])
         with c1:
             if st.button("◀ PREV 6 MONTHS", key="cal_prev6", use_container_width=True):
@@ -2575,38 +2610,60 @@ def page_ar():
                 st.session_state.cal_offset += 1
                 st.rerun()
         
+        # Legend
         c1, c2, c3, c4, c5, c6 = st.columns(6)
-        with c1: st.markdown('<div style="background:#FEF2F2;color:#DC2626;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">🔴 Overdue</div>', unsafe_allow_html=True)
-        with c2: st.markdown('<div style="background:#CC0000;color:white;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📍 Today</div>', unsafe_allow_html=True)
-        with c3: st.markdown('<div style="background:#EFF6FF;color:#2563EB;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📆 Upcoming</div>', unsafe_allow_html=True)
-        with c4: st.markdown('<div style="background:#ECFDF5;color:#059669;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">✅ Completed</div>', unsafe_allow_html=True)
-        with c5: st.markdown('<div style="background:#F5F3FF;color:#7C3AED;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⏳ Pending</div>', unsafe_allow_html=True)
-        with c6:
-            st.markdown('<div style="background:#FAFAFA;color:#999;padding:4px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
+        with c1: st.markdown('<div style="background:#FEF2F2;color:#DC2626;padding:6px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">🔴 Overdue</div>', unsafe_allow_html=True)
+        with c2: st.markdown('<div style="background:#CC0000;color:white;padding:6px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📍 Today</div>', unsafe_allow_html=True)
+        with c3: st.markdown('<div style="background:#EFF6FF;color:#2563EB;padding:6px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">📆 Upcoming</div>', unsafe_allow_html=True)
+        with c4: st.markdown('<div style="background:#ECFDF5;color:#059669;padding:6px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">✅ Completed</div>', unsafe_allow_html=True)
+        with c5: st.markdown('<div style="background:#F5F3FF;color:#7C3AED;padding:6px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⏳ Pending</div>', unsafe_allow_html=True)
+        with c6: st.markdown('<div style="background:#FAFAFA;color:#999;padding:6px;border-radius:8px;text-align:center;font-size:0.6rem;font-weight:700;">⬜ None</div>', unsafe_allow_html=True)
         
         st.markdown("---")
         
-        # Get PPM data - force fresh pull
+        # ============================================
+        # GET PPM DATA - FORCE FRESH PULL
+        # ============================================
         import time as _time
         ppm_data = None
         for attempt in range(3):
             try:
-                ppm_data = supabase.table("ppm_schedules").select("*").eq("facility_code", fc).order("next_due_date", desc=False).limit(5000).execute()
-                break
-            except:
+                ppm_data = supabase.table("ppm_schedules").select("*").eq("facility_code", fc).order("next_due_date", desc=False).limit(10000).execute()
+                if ppm_data and ppm_data.data:
+                    break
+            except Exception as e:
+                if attempt == 2:
+                    st.error(f"⚠️ Failed to load PPM data: {str(e)[:50]}")
                 _time.sleep(0.5)
+        
         ppm_schedules = ppm_data.data if ppm_data and ppm_data.data else []
         ppm_df = pd.DataFrame(ppm_schedules) if ppm_schedules else pd.DataFrame()
         
         if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
             ppm_df["due_date_dt"] = pd.to_datetime(ppm_df["next_due_date"], errors='coerce')
         
-        # Apply department filter - PRESERVES original department structure
+        # Apply filters
         if cal_dept != "All" and "assigned_team" in ppm_df.columns:
-            # Extract just the department part from cal_dept (before " — " if sub-division exists)
             base_dept = cal_dept.split(" — ")[0] if " — " in cal_dept else cal_dept
             ppm_df = ppm_df[ppm_df["assigned_team"].str.contains(base_dept, case=False, na=False)]
+        if cal_asset != "All":
+            asset_ids = df[df["parent_asset"] == cal_asset]["id"].tolist()
+            if asset_ids and "asset_id" in ppm_df.columns:
+                ppm_df = ppm_df[ppm_df["asset_id"].astype(str).isin([str(a) for a in asset_ids])]
+        if cal_bldg != "All":
+            bldg_asset_ids = df[df["location_building"] == cal_bldg]["id"].tolist()
+            if bldg_asset_ids and "asset_id" in ppm_df.columns:
+                ppm_df = ppm_df[ppm_df["asset_id"].astype(str).isin([str(a) for a in bldg_asset_ids])]
+        if cal_status == "Scheduled":
+            ppm_df = ppm_df[ppm_df["status"] == "scheduled"]
+        elif cal_status == "Completed":
+            ppm_df = ppm_df[ppm_df["status"] == "completed"]
+        elif cal_status == "Overdue":
+            ppm_df = ppm_df[(ppm_df["due_date_dt"].dt.date < today) & (ppm_df["status"] != "completed")]
+        elif cal_status == "Pending":
+            ppm_df = ppm_df[ppm_df["status"] == "pending"]
         
+        # Build ppm_dates dictionary
         ppm_dates = {}
         if len(ppm_df) > 0 and "due_date_dt" in ppm_df.columns:
             for _, row in ppm_df.iterrows():
@@ -2622,16 +2679,26 @@ def page_ar():
         overdue_ppm = len(ppm_df[(ppm_df["due_date_dt"].dt.date < today) & (ppm_df["status"] != "completed")]) if len(ppm_df) > 0 else 0
         today_ppm = len(ppm_df[ppm_df["due_date_dt"].dt.date == today]) if len(ppm_df) > 0 else 0
         completed_ppm = len(ppm_df[ppm_df["status"] == "completed"]) if len(ppm_df) > 0 else 0
+        pending_ppm = len(ppm_df[ppm_df["status"] == "pending"]) if len(ppm_df) > 0 else 0
+        compliance_rate = round((completed_ppm / max(total_ppm, 1)) * 100)
         
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3, c4, c5, c6 = st.columns(6)
         with c1: st.metric("📋 Total", total_ppm)
         with c2: st.metric("🔴 Overdue", overdue_ppm)
         with c3: st.metric("📍 Today", today_ppm)
         with c4: st.metric("✅ Completed", completed_ppm)
+        with c5: st.metric("⏳ Pending", pending_ppm)
+        with c6: st.metric("📈 Compliance", f"{compliance_rate}%")
+        
+        # Show data range for debugging
+        if len(ppm_df) > 0 and "next_due_date" in ppm_df.columns:
+            st.caption(f"📋 {len(ppm_df)} PPM records | Range: {ppm_df['next_due_date'].min()} to {ppm_df['next_due_date'].max()}")
         
         st.markdown("---")
         
-        # Build calendar HTML
+        # ============================================
+        # BUILD CALENDAR HTML
+        # ============================================
         cal_html = """<style>
             .cg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-family: 'Inter', sans-serif; }
             .cm { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; }
@@ -2640,19 +2707,19 @@ def page_ar():
             .ch.reg { background: #1a1a1a; }
             .ct { width: 100%; border-collapse: collapse; }
             .ct th { padding: 3px 0; text-align: center; font-size: 0.6rem; font-weight: 800; border-bottom: 2px solid #e5e7eb; }
-            .ct td { text-align: center; padding: 0; height: 28px; cursor: pointer; border: 1px solid #f0f0f0; transition: all 0.1s; }
-            .ct td a { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; width: 100%; text-decoration: none; font-size: 11px; font-weight: 600; }
-            .ct td:hover { outline: 2px solid #CC0000; outline-offset: -2px; z-index: 5; transform: scale(1.05); }
+            .ct td { text-align: center; padding: 0; height: 28px; cursor: pointer; border: 1px solid #f0f0f0; transition: all 0.15s; }
+            .ct td:hover { outline: 2px solid #CC0000; outline-offset: -2px; z-index: 5; transform: scale(1.08); box-shadow: 0 4px 12px rgba(204,0,0,0.3); }
             .ct td.em { background: #fafafa; cursor: default; }
-            .ct td.em:hover { outline: none; transform: none; }
-            .ct td.td { background: #CC0000; } .ct td.td a { color: white; font-weight: 800; }
-            .ct td.ov { background: #FEF2F2; border: 2px solid #EF4444; } .ct td.ov a { color: #DC2626; font-weight: 800; font-size: 12px; }
-            .ct td.up { background: #DBEAFE; border: 2px solid #3B82F6; } .ct td.up a { color: #1E40AF; font-weight: 800; font-size: 12px; }
-            .ct td.cp { background: #D1FAE5; border: 2px solid #10B981; } .ct td.cp a { color: #065F46; font-weight: 800; font-size: 12px; }
-            .ct td.pn { background: #EDE9FE; border: 2px solid #8B5CF6; } .ct td.pn a { color: #5B21B6; font-weight: 800; font-size: 12px; }
-            .ct td.no { background: #fdfdfd; } .ct td.no a { color: #bbb; font-weight: 400; }
-            .badge { font-size: 8px; background: #CC0000; color: white; border-radius: 8px; padding: 0px 4px; min-width: 14px; text-align: center; line-height: 1.3; margin-top: 1px; }
-        </style><div class="cg">"""
+            .ct td.em:hover { outline: none; transform: none; box-shadow: none; }
+            .ct td.td { background: #CC0000; color: white; font-weight: 800; }
+            .ct td.ov { border: 2px solid #EF4444; font-weight: 800; font-size: 12px; }
+            .ct td.up { border: 2px solid #3B82F6; font-weight: 800; font-size: 12px; }
+            .ct td.cp { border: 2px solid #10B981; font-weight: 800; font-size: 12px; }
+            .ct td.pn { border: 2px solid #8B5CF6; font-weight: 800; font-size: 12px; }
+            .ct td.no { background: #fdfdfd; color: #bbb; font-weight: 400; }
+            .badge { font-size: 8px; background: #CC0000; color: white; border-radius: 8px; padding: 0px 4px; min-width: 14px; text-align: center; line-height: 1.3; margin-top: 1px; display: inline-block; }
+        </style>
+        <div class="cg">"""
         
         day_colors = ["#3B82F6","#10B981","#F59E0B","#8B5CF6","#EC4899","#EF4444","#6366F1"]
         
@@ -2660,11 +2727,16 @@ def page_ar():
             for col_idx in range(3):
                 mo = row_idx * 3 + col_idx
                 dm = ((block_start_month - 1 + mo) % 12) + 1
-                dy = block_start_year + ((block_start_month - 1 + mo) // 12)
+                months_from_april = (block_start_month - 4) + mo
+                if months_from_april < 0:
+                    months_from_april += 12
+                dy = fy_start_year + (months_from_april // 12)
                 
                 fd = date(dy, dm, 1)
-                if dm == 12: ld = date(dy, 12, 31)
-                else: ld = date(dy, dm + 1, 1) - timedelta(days=1)
+                if dm == 12:
+                    ld = date(dy, 12, 31)
+                else:
+                    ld = date(dy, dm + 1, 1) - timedelta(days=1)
                 
                 sw = fd.weekday()
                 ic = (dm == today.month and dy == today.year)
@@ -2688,8 +2760,10 @@ def page_ar():
                             pt = ppm_dates.get(dk, [])
                             pc = len(pt)
                             
-                            if it: cls = "td"
-                            elif pc == 0: cls = "no"
+                            if it:
+                                cls = "td"
+                            elif pc == 0:
+                                cls = "no"
                             else:
                                 has_ov, has_cp, has_pn = False, False, False
                                 for p in pt:
@@ -2705,7 +2779,9 @@ def page_ar():
                                 else: cls = "up"
                             
                             badge = f'<span class="badge">{pc}</span>' if pc > 0 else ''
-                            cal_html += f'<td class="{cls}" onclick="var inputs=window.parent.document.querySelectorAll(\'input[type=text]\');for(var i=0;i<inputs.length;i++){{if(inputs[i].getAttribute(\'aria-label\')===\'📅 Selected Date\'){{var s=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,\'value\').set;s.call(inputs[i],\'{dk}\');inputs[i].dispatchEvent(new Event(\'input\',{{bubbles:true}}));break;}}}}">{dc}{badge}</td>'
+                            
+                            # FIXED: Robust cross-frame click handler
+                            cal_html += f'<td class="{cls}" style="cursor:pointer;" onclick="(function(){{var input=parent.document.getElementById(\'ppm_cal_date_input\');if(input){{var setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,\'value\').set;setter.call(input,\'{dk}\');input.dispatchEvent(new Event(\'input\',{{bubbles:true}}));input.dispatchEvent(new Event(\'change\',{{bubbles:true}}));var btn=parent.document.getElementById(\'ppm_cal_search_btn\');if(btn){{btn.click();}}else{{var forms=parent.document.querySelectorAll(\'button\');for(var i=0;i<forms.length;i++){{if(forms[i].innerText.includes(\'Search\')){{forms[i].click();break;}}}}}}}})()">{dc}{badge}</td>'
                             dc += 1
                     cal_html += "</tr>"
                     if dc > ld.day: break
@@ -2715,17 +2791,68 @@ def page_ar():
         
         st.components.v1.html(f"<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>{cal_html}</body></html>", height=480, scrolling=False)
         
-        cal_click = st.text_input("📅 Selected Date", value="", key="ppm_cal_click", placeholder="Click a day on the calendar (auto-loads)")
+        # ============================================
+        # SEARCH SECTION
+        # ============================================
+        st.markdown("---")
+        st.markdown("### 🔍 Search PPM by Date")
         
-        if cal_click and cal_click.strip():
+        c1, c2, c3 = st.columns([3, 1, 1])
+        with c1:
+            cal_click = st.text_input("📅 Enter Date or Click Calendar", value=st.session_state.ppm_cal_click_value, key="ppm_cal_date_input", placeholder="YYYY-MM-DD")
+        with c2:
+            st.markdown('<button id="ppm_cal_search_btn" style="display:none;"></button>', unsafe_allow_html=True)
+            if st.button("🔍 Search", key="ppm_cal_search_visible", use_container_width=True, type="primary"):
+                if cal_click and cal_click.strip():
+                    try:
+                        parsed_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
+                        st.session_state.selected_ppm_date = parsed_date
+                        st.session_state.ppm_cal_click_value = cal_click.strip()
+                        st.rerun()
+                    except:
+                        st.error("Invalid date format. Use YYYY-MM-DD")
+        with c3:
+            if st.button("❌ Clear", key="ppm_cal_clear", use_container_width=True):
+                st.session_state.selected_ppm_date = None
+                st.session_state.ppm_cal_click_value = ""
+                st.rerun()
+        
+        # Auto-detect manual entry
+        if cal_click and cal_click.strip() and cal_click != st.session_state.ppm_cal_click_value:
             try:
                 parsed_date = datetime.strptime(cal_click.strip(), "%Y-%m-%d").date()
                 st.session_state.selected_ppm_date = parsed_date
+                st.session_state.ppm_cal_click_value = cal_click.strip()
                 st.rerun()
             except:
                 pass
         
         st.markdown("---")
+        
+        # ============================================
+        # EXPORT
+        # ============================================
+        if st.session_state.get("cal_show_export", False):
+            st.markdown("### 📥 Export Calendar Data")
+            export_data = []
+            for dk, pps in sorted(ppm_dates.items()):
+                for p in pps:
+                    export_data.append({
+                        "Date": dk, "Title": p.get("title", "N/A"),
+                        "Status": p.get("status", "N/A"), "Team": p.get("assigned_team", "N/A"),
+                        "Frequency": p.get("frequency", "N/A"),
+                    })
+            if export_data:
+                export_df = pd.DataFrame(export_data)
+                c1, c2, c3 = st.columns(3)
+                with c1: st.download_button("📥 CSV", export_df.to_csv(index=False), f"ppm_calendar_{today}.csv", "text/csv", use_container_width=True)
+                with c2: st.download_button("📥 Excel", export_df.to_csv(index=False), f"ppm_calendar_{today}.xlsx", "text/csv", use_container_width=True)
+                with c3:
+                    if st.button("❌ Close Export", use_container_width=True): st.session_state.cal_show_export = False; st.rerun()
+                st.dataframe(export_df.head(20), use_container_width=True, hide_index=True)
+            else:
+                st.info("No PPM data.")
+                if st.button("❌ Close", use_container_width=True): st.session_state.cal_show_export = False; st.rerun()
         
         # ============================================
         # PPM DETAILS FOR SELECTED DAY
@@ -2736,7 +2863,14 @@ def page_ar():
             pps = ppm_dates.get(dks, [])
             
             if pps:
+                day_completed = len([p for p in pps if p.get("status") == "completed"])
+                day_overdue = len([p for p in pps if p.get("status") != "completed" and pd.to_datetime(p.get("next_due_date"), errors='coerce').date() < today])
+                
                 st.markdown(f"### 📋 {len(pps)} PPMs — {sel.strftime('%d %B %Y')}")
+                c1, c2, c3 = st.columns(3)
+                with c1: st.metric("Total", len(pps))
+                with c2: st.metric("✅ Completed", day_completed)
+                with c3: st.metric("🔴 Overdue", day_overdue)
                 
                 c1, c2 = st.columns(2)
                 with c1:
@@ -2755,12 +2889,19 @@ def page_ar():
                     sc = {"completed":"#10B981","scheduled":"#3B82F6","pending":"#F59E0B","overdue":"#EF4444","approved":"#059669"}.get(sts,"#3B82F6")
                     ic = {"completed":"✅","scheduled":"📆","pending":"⏳","overdue":"🔴","approved":"🟢"}.get(sts,"📋")
                     
+                    asset_name = ""
+                    if p.get("asset_id"):
+                        asset_match = df[df["id"] == str(p.get("asset_id"))]
+                        if len(asset_match) > 0:
+                            asset_name = asset_match.iloc[0].get("name", "")[:50]
+                    
                     st.markdown(f"""
                     <div style="background:white;border-left:4px solid {sc};border-radius:8px;padding:0.7rem;margin:0.2rem 0;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
                             <div>
                                 <b>{ic} {p.get('title','N/A')[:80]}</b>
                                 <br><span style="font-size:0.7rem;color:#666;">👤 {p.get('assigned_team','N/A')} | 🔄 {p.get('frequency','N/A')}</span>
+                                {f'<br><span style="font-size:0.65rem;color:#888;">🏗️ {asset_name}</span>' if asset_name else ''}
                             </div>
                             <span style="background:{sc};color:white;padding:2px 10px;border-radius:12px;font-size:0.6rem;font-weight:700;">{sts.upper()}</span>
                         </div>
@@ -2775,9 +2916,10 @@ def page_ar():
             
             if st.button("❌ CLEAR SELECTION", key="clearppm", use_container_width=True):
                 st.session_state.selected_ppm_date = None
+                st.session_state.ppm_cal_click_value = ""
                 st.rerun()
         else:
-            st.info("👆 **Click any day** on the calendar to view scheduled PPMs.")
+            st.info("👆 **Click any date** on the calendar above to view scheduled PPMs. Or type a date (YYYY-MM-DD) and click Search."
         
         
     
@@ -3406,7 +3548,11 @@ def page_wp():
         
         st.markdown("---")
         
-        with st.form("wp_raise_form", clear_on_submit=True):
+        # Use a flag to track if form should be processed
+        if "wp_form_submitted" not in st.session_state:
+            st.session_state.wp_form_submitted = False
+        
+        with st.form("wp_raise_form", clear_on_submit=False):
             c1, c2 = st.columns(2)
             with c1:
                 permit_type = st.selectbox("Permit Type*", [
@@ -3435,10 +3581,10 @@ def page_wp():
                 rname = st.text_input("Requester Name*")
                 rdesignation = st.text_input("Requester Designation*")
             with c2:
-                rcontact = st.text_input("Requester Contact No*")
+                rcontact = st.text_input("Requester Contact No*", placeholder="08012345678")
                 powner = st.text_input("Process Owner Name*")
             with c3:
-                pcontact = st.text_input("Process Owner Contact*")
+                pcontact = st.text_input("Process Owner Contact*", placeholder="08012345678")
                 scoordinator = st.text_input("Site Coordinator*")
             
             st.markdown("---")
@@ -3471,11 +3617,11 @@ def page_wp():
             ])
             
             # ============================================
-            # 🔑 KEY ACCESS INTEGRATION
+            # 🔑 KEY ACCESS INTEGRATION — FIXED
             # ============================================
             st.markdown("---")
             st.markdown("**🔑 Key Access Required?**")
-            key_access_needed = st.checkbox("Yes, key access is required for this work")
+            key_access_needed = st.checkbox("Yes, key access is required for this work", key="wp_key_needed")
             
             selected_key_ids = []
             if key_access_needed:
@@ -3488,13 +3634,13 @@ def page_wp():
                         label = f"{k.get('key_name','')[:80]} | 📍{k.get('location_floor','')} | 🏷️{k.get('key_type','')} | 📋{k.get('available_copies',0)} avail"
                         key_options[label] = k
                     
-                    selected_key_labels = st.multiselect("Select Keys Required*", list(key_options.keys()))
+                    selected_key_labels = st.multiselect("Select Keys Required*", list(key_options.keys()), key="wp_selected_keys")
                     selected_key_ids = [key_options[label]["id"] for label in selected_key_labels]
                     
                     if selected_key_labels:
                         st.caption(f"🔑 {len(selected_key_labels)} key(s) selected. These will be reserved upon permit approval.")
                 else:
-                    st.info(f"No available keys found for {selected_building_name}.")
+                    st.info(f"No available keys found for {selected_building_name}. Keys can be requested after permit approval.")
             
             with st.expander("📋 General Instructions to Contractors"):
                 st.markdown("""
@@ -3514,6 +3660,7 @@ def page_wp():
             
             if submitted:
                 errors = []
+                
                 # Name validations
                 name_valid, name_msg = validate_name_input(rname)
                 if not name_valid: errors.append(f"Requester Name: {name_msg}")
@@ -3521,25 +3668,40 @@ def page_wp():
                 desig_valid, desig_msg = validate_name_input(rdesignation)
                 if not desig_valid: errors.append(f"Requester Designation: {desig_msg}")
                 
-                # Phone validations
-                phone_valid, phone_msg = validate_phone_input(rcontact)
-                if not phone_valid: errors.append(f"Requester Contact: {phone_msg}")
+                # Phone validations - NUMERIC ONLY, 11 DIGITS
+                # Strip any + or spaces
+                rcontact_clean = rcontact.strip().replace("+", "").replace(" ", "") if rcontact else ""
+                if not rcontact_clean:
+                    errors.append("Requester Contact: Phone number is required")
+                elif not rcontact_clean.isdigit():
+                    errors.append("Requester Contact: Numbers only (no letters or symbols)")
+                elif len(rcontact_clean) != 11:
+                    errors.append(f"Requester Contact: Must be 11 digits (entered {len(rcontact_clean)})")
                 
                 owner_valid, owner_msg = validate_name_input(powner)
                 if not owner_valid: errors.append(f"Process Owner Name: {owner_msg}")
                 
-                pcontact_valid, pcontact_msg = validate_phone_input(pcontact)
-                if not pcontact_valid: errors.append(f"Process Owner Contact: {pcontact_msg}")
+                pcontact_clean = pcontact.strip().replace("+", "").replace(" ", "") if pcontact else ""
+                if not pcontact_clean:
+                    errors.append("Process Owner Contact: Phone number is required")
+                elif not pcontact_clean.isdigit():
+                    errors.append("Process Owner Contact: Numbers only (no letters or symbols)")
+                elif len(pcontact_clean) != 11:
+                    errors.append(f"Process Owner Contact: Must be 11 digits (entered {len(pcontact_clean)})")
                 
                 coord_valid, coord_msg = validate_name_input(scoordinator)
                 if not coord_valid: errors.append(f"Site Coordinator: {coord_msg}")
                 
                 if not description: errors.append("Description of Work")
                 if not sub_location or sub_location == "Select building first": errors.append("Sub-Location")
+                if not workers_names or not workers_names.strip(): errors.append("Workers Names")
+                if not ppe_selected: errors.append("PPE Required")
+                if not equip_selected: errors.append("Equipment Required")
                 if key_access_needed and not selected_key_ids: errors.append("Please select at least one key")
                 
                 if errors:
-                    st.error(f"⚠️ Please fix: {', '.join(errors)}")
+                    st.error(f"⚠️ Please fix the following:\n" + "\n".join(f"• {e}" for e in errors))
+                    # DO NOT clear form - keep all entries
                 else:
                     now = datetime.now().isoformat()
                     cnt = len(DB.get_all("work_permits", fc, 1000))
@@ -3549,8 +3711,8 @@ def page_wp():
                         "facility_code": fc, "permit_number": permit_number, "document_no": document_no,
                         "permit_type": permit_type, "department": dept, "title": description[:100],
                         "description": description, "raised_by_name": rname, "raised_by_designation": rdesignation,
-                        "requester_contact": rcontact, "process_owner_name": powner,
-                        "process_owner_contact": pcontact, "site_coordinator_name": scoordinator,
+                        "requester_contact": rcontact_clean, "process_owner_name": powner,
+                        "process_owner_contact": pcontact_clean, "site_coordinator_name": scoordinator,
                         "workers_count": workers, "workers_names": workers_names,
                         "work_location": full_location,
                         "start_datetime": f"{sd}T{stime}", "end_datetime": f"{ed}T{etime}",
@@ -3563,24 +3725,34 @@ def page_wp():
                     # Reserve keys if requested
                     if key_access_needed and selected_key_ids:
                         for key_id in selected_key_ids:
-                            safe_supabase_query(lambda kid=key_id: supabase.table("key_transactions").insert({
-                                "key_id": kid,
-                                "transaction_type": "reserved",
-                                "requested_by": rname,
-                                "requested_by_email": "",
-                                "work_permit_id": permit_number,
-                                "status": "reserved",
-                                "notes": f"Auto-reserved for Work Permit {permit_number}",
-                                "expected_return": str(ed) if ed else str(date.today() + timedelta(days=1)),
-                                "created_at": wat_now.isoformat()
-                            }).execute(), error_prefix="Key reservation")
+                            try:
+                                key_result = supabase.table("key_transactions").insert({
+                                    "key_id": str(key_id),
+                                    "transaction_type": "reserved",
+                                    "requested_by": str(rname),
+                                    "requested_by_email": "",
+                                    "work_permit_id": str(permit_number),
+                                    "status": "reserved",
+                                    "notes": f"Auto-reserved for Work Permit {permit_number}",
+                                    "expected_return": str(ed) if ed else str(date.today() + timedelta(days=1)),
+                                    "created_at": datetime.now().isoformat()
+                                }).execute()
+                                
+                                if key_result and key_result.data:
+                                    key_info = supabase.table("key_registry").select("available_copies").eq("id", str(key_id)).single().execute()
+                                    if key_info and key_info.data:
+                                        current_avail = key_info.data.get("available_copies", 1)
+                                        new_avail = max(0, current_avail - 1)
+                                        supabase.table("key_registry").update({"available_copies": new_avail}).eq("id", str(key_id)).execute()
+                            except Exception as e:
+                                st.warning(f"⚠️ Key reservation failed for one key: {str(e)[:50]}")
+                                continue
                         
                         try:
                             send_email_notification(
                                 "helpdesk_wtc_ct@churchgate.com",
                                 f"🔑 Key Access Requested — {permit_number}",
-                                f"""
-                                <div style="font-family:Arial;max-width:550px;border:1px solid #ddd;border-radius:12px;overflow:hidden;">
+                                f"""<div style="font-family:Arial;max-width:550px;border:1px solid #ddd;border-radius:12px;overflow:hidden;">
                                     <div style="background:#F59E0B;padding:20px;color:white;">
                                         <h2 style="margin:0;">🔑 Key Access Requested</h2>
                                         <p style="margin:5px 0 0 0;font-size:12px;">Work Permit: {permit_number}</p>
@@ -3593,8 +3765,7 @@ def page_wp():
                                         <p><b>Description:</b> {description[:200]}</p>
                                         <p>Please prepare keys for the contractor upon permit activation.</p>
                                     </div>
-                                </div>
-                                """
+                                </div>"""
                             )
                         except: pass
                     
@@ -3615,6 +3786,9 @@ def page_wp():
                             f"<p><b>Description:</b> {description[:300]}</p>"
                         )
                     
+                    # Clear form by rerunning
+                    import time as _time
+                    _time.sleep(1.5)
                     st.rerun()
     
     with tab3:
@@ -13059,8 +13233,130 @@ def page_ppm_activities():
                             st.error("⚠️ Template name required")
             
             with cb_tabs[1]:
-                st.markdown("#### ✏️ Edit Template")
-                st.info("Use Supabase dashboard to edit templates directly, or delete and recreate.")
+                st.markdown("#### ✏️ Edit Existing Template")
+                
+                all_templates = safe_supabase_query(lambda: supabase.table("ppm_checklist_templates").select("*").order("created_at", desc=True).execute(), error_prefix="All templates")
+                
+                if all_templates and all_templates.data and len(all_templates.data) > 0:
+                    template_names_list = [t.get("template_name","") for t in all_templates.data]
+                    edit_template_name = st.selectbox("Select Template to Edit", template_names_list, key="edit_template")
+                    
+                    if edit_template_name:
+                        edit_template = next((t for t in all_templates.data if t.get("template_name") == edit_template_name), None)
+                        
+                        if edit_template:
+                            st.markdown(f"**Editing:** {edit_template.get('template_name')} | **Standard:** {edit_template.get('international_standard','Custom')}")
+                            
+                            c1, c2, c3 = st.columns(3)
+                            with c1:
+                                new_name = st.text_input("Template Name", value=edit_template.get("template_name",""), key="edit_tpl_name")
+                            with c2:
+                                desc_parts = edit_template.get("description","").split("|")
+                                period_val = desc_parts[0].replace("Period:","").strip() if len(desc_parts) > 0 else "Monthly"
+                                new_period = st.selectbox("Default Frequency", ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"], 
+                                    index=["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"].index(period_val) if period_val in ["Daily","Weekly","Bi-Weekly","Monthly","Quarterly","Half-Yearly","Yearly"] else 3, key="edit_period")
+                            with c3:
+                                new_image = st.selectbox("Image Required", ["Yes","No"], 
+                                    index=0 if "Image: Yes" in edit_template.get("description","") else 1, key="edit_image")
+                            
+                            c1, c2 = st.columns(2)
+                            with c1:
+                                time_val = desc_parts[1].replace("Time:","").replace("min","").strip() if len(desc_parts) > 1 else "30"
+                                new_time = st.number_input("Perform Time (min)", value=int(time_val) if time_val.isdigit() else 30, key="edit_time")
+                            with c2:
+                                buf_val = desc_parts[2].replace("Buffer:","").replace("days","").strip() if len(desc_parts) > 2 else "0"
+                                new_buffer = st.number_input("Buffer Days", value=int(buf_val) if buf_val.isdigit() else 0, key="edit_buffer")
+                            
+                            new_standard = st.text_input("Standard Reference", value=edit_template.get("international_standard",""), key="edit_std")
+                            
+                            st.info("📅 Schedule dates are now configured during asset enrollment. Templates only define checklist items.")
+                            
+                            st.markdown("---")
+                            st.markdown("### 📝 Checklist Items")
+                            
+                            existing_items = safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_items").select("*").eq("template_id", tid).order("sort_order").execute(), error_prefix="Existing items")
+                            
+                            if existing_items and existing_items.data:
+                                st.markdown("**Current Items (edit inline):**")
+                                for item in existing_items.data:
+                                    c1, c2, c3, c4, c5 = st.columns([0.5, 3, 1.5, 1.5, 0.5])
+                                    with c1:
+                                        st.text_input("SNO", value=str(item.get("item_number","")), key=f"edit_sno_{item['id']}", label_visibility="collapsed")
+                                    with c2:
+                                        st.text_input("Description", value=item.get("description",""), key=f"edit_desc_{item['id']}", label_visibility="collapsed")
+                                    with c3:
+                                        st.selectbox("Type", ["yes_no","pass_fail","status","reading","text","section"], 
+                                            index=["yes_no","pass_fail","status","reading","text","section"].index(item.get("check_type","yes_no")) if item.get("check_type","yes_no") in ["yes_no","pass_fail","status","reading","text","section"] else 0,
+                                            key=f"edit_type_{item['id']}", label_visibility="collapsed")
+                                    with c4:
+                                        st.text_input("Options", value=item.get("expected_value","") or "", key=f"edit_thresh_{item['id']}", label_visibility="collapsed")
+                                    with c5:
+                                        if st.button("🗑️", key=f"del_item_{item['id']}", use_container_width=True):
+                                            safe_supabase_query(lambda iid=item["id"]: supabase.table("ppm_checklist_items").delete().eq("id", iid).execute(), error_prefix="Delete item")
+                                            st.rerun()
+                                
+                                st.markdown("---")
+                            
+                            st.markdown("**➕ Add New Item:**")
+                            c1, c2, c3, c4 = st.columns([1, 3, 2, 2])
+                            with c1:
+                                add_sno = st.number_input("SNO", min_value=1, value=len(existing_items.data)+1 if existing_items and existing_items.data else 1, key="edit_add_sno")
+                            with c2:
+                                add_desc = st.text_input("Description", key="edit_add_desc", placeholder="New checklist item...")
+                            with c3:
+                                add_type = st.selectbox("Type", ["yes_no","pass_fail","status","reading","text"], key="edit_add_type")
+                            with c4:
+                                add_thresh = st.text_input("Options", value="Yes/No", key="edit_add_thresh")
+                            
+                            if st.button("➕ Add Item", key="edit_btn_add", use_container_width=True):
+                                if add_desc.strip():
+                                    safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_items").insert({
+                                        "template_id": tid,
+                                        "item_number": int(add_sno),
+                                        "description": add_desc.strip(),
+                                        "check_type": add_type,
+                                        "expected_value": add_thresh,
+                                        "sort_order": int(add_sno)
+                                    }).execute(), error_prefix="Add item")
+                                    st.success("✅ Item added!")
+                                    st.rerun()
+                            
+                            st.markdown("---")
+                            
+                            c1, c2, c3 = st.columns(3)
+                            with c1:
+                                if st.button("💾 SAVE ALL CHANGES", use_container_width=True, type="primary"):
+                                    # Update template
+                                    safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_templates").update({
+                                        "template_name": new_name,
+                                        "international_standard": new_standard,
+                                        "description": f"Period: {new_period} | Time: {new_time}min | Buffer: {new_buffer}days | Image: {new_image}",
+                                        "schedule_dates": None
+                                    }).eq("id", tid).execute(), error_prefix="Update template")
+                                    
+                                    # Update existing items
+                                    for item in existing_items.data if existing_items and existing_items.data else []:
+                                        safe_supabase_query(lambda iid=item["id"]: supabase.table("ppm_checklist_items").update({
+                                            "item_number": int(st.session_state.get(f"edit_sno_{iid}", item.get("item_number",1)) or 1),
+                                            "description": st.session_state.get(f"edit_desc_{iid}", item.get("description","")),
+                                            "check_type": st.session_state.get(f"edit_type_{iid}", item.get("check_type","yes_no")),
+                                            "expected_value": st.session_state.get(f"edit_thresh_{iid}", item.get("expected_value","") or "")
+                                        }).eq("id", iid).execute(), error_prefix="Update items")
+                                    
+                                    st.success("✅ Template updated!")
+                                    st.balloons()
+                                    st.rerun()
+                            with c2:
+                                if st.button("🗑️ DELETE TEMPLATE", use_container_width=True):
+                                    safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_items").delete().eq("template_id", tid).execute(), error_prefix="Delete items")
+                                    safe_supabase_query(lambda tid=edit_template["id"]: supabase.table("ppm_checklist_templates").delete().eq("id", tid).execute(), error_prefix="Delete template")
+                                    st.warning("✅ Template deleted!")
+                                    st.rerun()
+                            with c3:
+                                if st.button("❌ CANCEL", use_container_width=True):
+                                    st.rerun()
+                else:
+                    st.info("No templates created yet. Create one in the 'Create Template' tab.")
             
             with cb_tabs[2]:
                 st.markdown("#### ℹ️ Schedule Configuration")
@@ -13145,9 +13441,6 @@ def page_cs():
         st.markdown(f"""<div style="background:white;border-radius:10px;padding:0.7rem;text-align:center;border-top:3px solid #10B981;box-shadow:0 2px 4px rgba(0,0,0,0.04);"><div style="font-size:0.5rem;color:#888;">Completed</div><div style="font-size:1.3rem;font-weight:800;color:#10B981;">{completed_schedules}</div></div>""", unsafe_allow_html=True)
     
     # ============================================
-    # HELPER: Manual Date Picker with Mini Calendar
-    # ============================================
-    # ============================================
     # HELPER: Manual Date Picker with Multi-Date Selection
     # ============================================
     def render_manual_date_picker(prefix="default"):
@@ -13155,32 +13448,43 @@ def page_cs():
             st.session_state[f"{prefix}_manual_dates"] = []
         
         st.markdown("**📅 Manual Date Selection**")
-        st.caption("Select multiple dates on the calendar, then click 'Add Selected Dates'. Use Quick Presets for common patterns.")
+        st.caption("Pick your date range, select dates from the list, then click 'Add Selected Dates'.")
         
-        # Multi-date picker - select start and end range
+        # Date range picker
         c1, c2 = st.columns(2)
         with c1:
             date_start = st.date_input("From Date", today, key=f"{prefix}_date_start")
         with c2:
             date_end = st.date_input("To Date", today + timedelta(days=30), key=f"{prefix}_date_end")
         
-        # Or pick individual dates
-        st.caption("Or pick specific dates:")
-        individual_dates = st.multiselect(
-            "Select individual dates",
-            options=[date_start + timedelta(days=i) for i in range((date_end - date_start).days + 1)],
-            format_func=lambda d: d.strftime("%a, %d %b %Y"),
+        # Generate list of dates in range as formatted strings
+        date_options = []
+        date_map = {}
+        current = date_start
+        while current <= date_end:
+            date_str = current.strftime("%Y-%m-%d")
+            label = current.strftime("%a, %d %b %Y")
+            date_options.append(label)
+            date_map[label] = date_str
+            current += timedelta(days=1)
+        
+        st.caption(f"📅 {len(date_options)} dates available in range. Select the ones you want:")
+        
+        # Multi-select using formatted strings
+        selected_labels = st.multiselect(
+            "Select dates to add",
+            options=date_options,
             key=f"{prefix}_individual_pick",
-            placeholder="Click to select multiple dates..."
+            placeholder="Click here to pick dates..."
         )
         
         c1, c2, c3 = st.columns(3)
         with c1:
             if st.button("➕ Add Selected Dates", key=f"{prefix}_add_dates", use_container_width=True, type="primary"):
                 added = 0
-                for d in individual_dates:
-                    date_str = d.strftime("%Y-%m-%d")
-                    if date_str not in st.session_state[f"{prefix}_manual_dates"]:
+                for label in selected_labels:
+                    date_str = date_map.get(label, "")
+                    if date_str and date_str not in st.session_state[f"{prefix}_manual_dates"]:
                         st.session_state[f"{prefix}_manual_dates"].append(date_str)
                         added += 1
                 if added > 0:
@@ -13190,19 +13494,18 @@ def page_cs():
                     st.warning("No new dates selected or all dates already added.")
         
         with c2:
-            # Quick date range button
             if st.button("📅 Add Full Range", key=f"{prefix}_add_range", use_container_width=True):
                 added = 0
-                current = date_start
-                while current <= date_end:
-                    date_str = current.strftime("%Y-%m-%d")
-                    if date_str not in st.session_state[f"{prefix}_manual_dates"]:
+                for label in date_options:
+                    date_str = date_map.get(label, "")
+                    if date_str and date_str not in st.session_state[f"{prefix}_manual_dates"]:
                         st.session_state[f"{prefix}_manual_dates"].append(date_str)
                         added += 1
-                    current += timedelta(days=1)
                 if added > 0:
                     st.session_state[f"{prefix}_manual_dates"].sort()
                     st.rerun()
+                else:
+                    st.info("All dates already added.")
         
         with c3:
             if st.button("🗑️ Clear All", key=f"{prefix}_clear_dates", use_container_width=True):
@@ -13553,33 +13856,50 @@ def page_cs():
                             st.rerun()
     
     # ============================================
-    # TAB 1: BULK ASSET SCHEDULING
+    # TAB 1: BULK ASSET SCHEDULING - FIXED
     # ============================================
     with tabs[1]:
         st.markdown("### 📦 Bulk Asset PPM Scheduling")
         st.caption("Enroll multiple assets at once with the same template and schedule. Optionally stagger dates across assets.")
         
         st.markdown("#### Step 1: Filter & Select Assets")
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2 = st.columns(2)
         with c1:
-            bulk_dept = st.selectbox("Department", ["All"] + sorted(df["dept_full"].dropna().unique().tolist()), key="bulk_dept")
+            bulk_dept = st.selectbox("Department*", ["Select Department..."] + sorted(df["dept_full"].dropna().unique().tolist()), key="bulk_dept")
         with c2:
-            bulk_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="bulk_bldg")
-        with c3:
-            bulk_status = st.selectbox("Enrollment Status", ["All", "Enrolled", "Not Enrolled"], key="bulk_status")
-        with c4:
-            bulk_search = st.text_input("🔍 Search", key="bulk_search", placeholder="Asset name...")
+            if bulk_dept != "Select Department...":
+                dept_filtered = df[df["dept_full"] == bulk_dept]
+                parent_assets = ["All"] + sorted(dept_filtered["parent_asset"].dropna().unique().tolist())
+            else:
+                parent_assets = ["All"]
+            bulk_parent = st.selectbox("Parent Asset", parent_assets, key="bulk_parent")
         
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            bulk_bldg = st.selectbox("Building", ["All"] + sorted(df["location_building"].dropna().unique().tolist()), key="bulk_bldg")
+        with c2:
+            bulk_status = st.selectbox("Enrollment Status", ["All", "Enrolled", "Not Enrolled"], key="bulk_status")
+        with c3:
+            bulk_search = st.text_input("🔍 Search Sub-Asset", key="bulk_search", placeholder="Sub-asset name...")
+        
+        # Apply filters
         filtered = df.copy()
-        if bulk_dept != "All": filtered = filtered[filtered["dept_full"] == bulk_dept]
-        if bulk_bldg != "All": filtered = filtered[filtered["location_building"] == bulk_bldg]
-        if bulk_status == "Enrolled": filtered = filtered[filtered["checklist_clean"].notna()]
-        elif bulk_status == "Not Enrolled": filtered = filtered[filtered["checklist_clean"].isna()]
+        if bulk_dept != "Select Department...":
+            filtered = filtered[filtered["dept_full"] == bulk_dept]
+        if bulk_parent != "All" and bulk_parent != "Select Department...":
+            filtered = filtered[filtered["parent_asset"] == bulk_parent]
+        if bulk_bldg != "All":
+            filtered = filtered[filtered["location_building"] == bulk_bldg]
+        if bulk_status == "Enrolled":
+            filtered = filtered[filtered["checklist_clean"].notna()]
+        elif bulk_status == "Not Enrolled":
+            filtered = filtered[filtered["checklist_clean"].isna()]
         if bulk_search:
-            filtered = filtered[filtered["name"].str.contains(bulk_search, case=False, na=False) | filtered["parent_asset"].str.contains(bulk_search, case=False, na=False)]
+            filtered = filtered[filtered["name"].str.contains(bulk_search, case=False, na=False)]
         
         st.caption(f"📋 {len(filtered)} assets match filters")
         
+        # Build asset options
         asset_options = [f"{row['parent_asset']} → {row['name'][:60]} ({row['asset_tag']})" for _, row in filtered.iterrows()]
         
         c1, c2 = st.columns(2)
@@ -13595,7 +13915,15 @@ def page_cs():
         if "bulk_selected" not in st.session_state:
             st.session_state["bulk_selected"] = []
         
-        selected_assets = st.multiselect("Select Assets to Enroll*", asset_options, default=st.session_state.get("bulk_selected", []), key="bulk_multi")
+        # FIX: Only use defaults that exist in current filtered options
+        valid_defaults = [d for d in st.session_state.get("bulk_selected", []) if d in asset_options]
+        
+        selected_assets = st.multiselect(
+            "Select Assets to Enroll*",
+            options=asset_options,
+            default=valid_defaults,
+            key="bulk_multi"
+        )
         
         if selected_assets:
             st.caption(f"✅ {len(selected_assets)} assets selected")
@@ -13678,15 +14006,17 @@ def page_cs():
                                         offset = idx * stagger_days
                                         actual_date = (datetime.strptime(schedule_date, "%Y-%m-%d") + timedelta(days=offset)).strftime("%Y-%m-%d")
                                     
-                                    safe_supabase_query(lambda aid=asset_id, sd=actual_date: supabase.table("ppm_schedules").insert({
-                                        "facility_code": fc, "asset_id": aid,
+                                    result = supabase.table("ppm_schedules").insert({
+                                        "facility_code": fc, "asset_id": str(asset_id),
                                         "title": f"{asset.get('name','PPM')} - {bulk_template}",
                                         "frequency": bulk_freq, "status": "scheduled",
                                         "assigned_team": asset.get("department", ""),
-                                        "next_due_date": sd, "created_at": datetime.now().isoformat()
-                                    }).execute(), error_prefix="PPM schedule")
-                                    schedule_count += 1
-                                except:
+                                        "next_due_date": actual_date, "created_at": datetime.now().isoformat()
+                                    }).execute()
+                                    
+                                    if result and result.data:
+                                        schedule_count += 1
+                                except Exception as e:
                                     pass
                         enrolled += 1
                     
