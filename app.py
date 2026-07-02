@@ -13707,7 +13707,7 @@ def page_cs():
                                 except:
                                     pass
                             
-                           if "ind_manual_dates" in st.session_state:
+                            if "ind_manual_dates" in st.session_state:
                                 st.session_state["ind_manual_dates"] = []
                             if "ind_generated_dates" in st.session_state:
                                 st.session_state["ind_generated_dates"] = []
@@ -13855,29 +13855,29 @@ def page_cs():
                         DB.update("assets", asset_id, {"checklist": bulk_template, "ppm_frequency": bulk_freq, "checklist_template": bulk_template})
                         
                       if create_schedules:
-                            for date_idx, schedule_date in enumerate(dates_list_bulk):
-                                try:
-                                    actual_date = schedule_date
-                                    if staggered:
-                                        offset = idx * stagger_days
-                                        actual_date = (datetime.strptime(schedule_date, "%Y-%m-%d") + timedelta(days=offset)).strftime("%Y-%m-%d")
-                                    
-                                    result = supabase.table("ppm_schedules").insert({
-                                        "facility_code": fc,
-                                        "asset_id": str(asset_id),
-                                        "title": f"{asset.get('name','PPM')} - {bulk_template}",
-                                        "frequency": bulk_freq,
-                                        "status": "scheduled",
-                                        "assigned_team": str(asset.get("department", "")),
-                                        "next_due_date": actual_date,
-                                        "created_at": datetime.now().isoformat()
-                                    }).execute()
-                                    
-                                    if result and result.data:
-                                        schedule_count += 1
-                                except:
-                                    pass
-                        enrolled += 1
+                        for date_idx, schedule_date in enumerate(dates_list_bulk):
+                            try:
+                                actual_date = schedule_date
+                                if staggered:
+                                    offset = idx * stagger_days
+                                    actual_date = (datetime.strptime(schedule_date, "%Y-%m-%d") + timedelta(days=offset)).strftime("%Y-%m-%d")
+                                
+                                result = supabase.table("ppm_schedules").insert({
+                                    "facility_code": fc,
+                                    "asset_id": str(asset_id),
+                                    "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                                    "frequency": bulk_freq,
+                                    "status": "scheduled",
+                                    "assigned_team": str(asset.get("department", "")),
+                                    "next_due_date": actual_date,
+                                    "created_at": datetime.now().isoformat()
+                                }).execute()
+                                
+                                if result and result.data:
+                                    schedule_count += 1
+                            except:
+                                pass
+                    enrolled += 1
                     
                     if "bulk_manual_dates" in st.session_state:
                         st.session_state["bulk_manual_dates"] = []
