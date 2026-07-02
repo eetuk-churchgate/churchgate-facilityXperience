@@ -13821,21 +13821,21 @@ def page_cs():
                 has_dates_bulk = len(st.session_state["bulk_manual_dates"]) > 0
             
             st.markdown("---")
-            
-            if has_dates_bulk and dates_string_bulk:
-                dates_list_bulk = [d.strip() for d in dates_string_bulk.split(",") if d.strip()]
                 
-                st.markdown(f"""
-                <div style="background:#EFF6FF;border-radius:10px;padding:1rem;margin:1rem 0;border:1px solid #BFDBFE;">
-                    <b>📋 Bulk Summary:</b><br>
-                    Assets: <b>{len(selected_assets)}</b><br>
-                    Template: <b>{bulk_template}</b><br>
-                    Frequency: <b>{bulk_freq}</b><br>
-                    Dates per asset: <b>{len(dates_list_bulk)}</b><br>
-                    Total entries: <b>{len(selected_assets) * len(dates_list_bulk)}</b><br>
-                    Staggered: <b>{'Yes (+' + str(stagger_days) + 'd)' if staggered else 'No'}</b>
-                </div>
-                """, unsafe_allow_html=True)
+                if has_dates_bulk and dates_string_bulk:
+                    dates_list_bulk = [d.strip() for d in dates_string_bulk.split(",") if d.strip()]
+                    
+                    st.markdown(f"""
+                    <div style="background:#EFF6FF;border-radius:10px;padding:1rem;margin:1rem 0;border:1px solid #BFDBFE;">
+                        <b>📋 Bulk Summary:</b><br>
+                        Assets: <b>{len(selected_assets)}</b><br>
+                        Template: <b>{bulk_template}</b><br>
+                        Frequency: <b>{bulk_freq}</b><br>
+                        Dates per asset: <b>{len(dates_list_bulk)}</b><br>
+                        Total entries: <b>{len(selected_assets) * len(dates_list_bulk)}</b><br>
+                        Staggered: <b>{'Yes (+' + str(stagger_days) + 'd)' if staggered else 'No'}</b>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
                 if st.button("🚀 ENROLL ALL ASSETS", key="bulk_enroll_btn", use_container_width=True, type="primary"):
                     enrolled = 0
@@ -13854,30 +13854,30 @@ def page_cs():
                         
                         DB.update("assets", asset_id, {"checklist": bulk_template, "ppm_frequency": bulk_freq, "checklist_template": bulk_template})
                         
-                      if create_schedules:
-                        for date_idx, schedule_date in enumerate(dates_list_bulk):
-                            try:
-                                actual_date = schedule_date
-                                if staggered:
-                                    offset = idx * stagger_days
-                                    actual_date = (datetime.strptime(schedule_date, "%Y-%m-%d") + timedelta(days=offset)).strftime("%Y-%m-%d")
-                                
-                                result = supabase.table("ppm_schedules").insert({
-                                    "facility_code": fc,
-                                    "asset_id": str(asset_id),
-                                    "title": f"{asset.get('name','PPM')} - {bulk_template}",
-                                    "frequency": bulk_freq,
-                                    "status": "scheduled",
-                                    "assigned_team": str(asset.get("department", "")),
-                                    "next_due_date": actual_date,
-                                    "created_at": datetime.now().isoformat()
-                                }).execute()
-                                
-                                if result and result.data:
-                                    schedule_count += 1
-                            except:
-                                pass
-                    enrolled += 1
+                        if create_schedules:
+                            for date_idx, schedule_date in enumerate(dates_list_bulk):
+                                try:
+                                    actual_date = schedule_date
+                                    if staggered:
+                                        offset = idx * stagger_days
+                                        actual_date = (datetime.strptime(schedule_date, "%Y-%m-%d") + timedelta(days=offset)).strftime("%Y-%m-%d")
+                                    
+                                    result = supabase.table("ppm_schedules").insert({
+                                        "facility_code": fc,
+                                        "asset_id": str(asset_id),
+                                        "title": f"{asset.get('name','PPM')} - {bulk_template}",
+                                        "frequency": bulk_freq,
+                                        "status": "scheduled",
+                                        "assigned_team": str(asset.get("department", "")),
+                                        "next_due_date": actual_date,
+                                        "created_at": datetime.now().isoformat()
+                                    }).execute()
+                                    
+                                    if result and result.data:
+                                        schedule_count += 1
+                                except:
+                                    pass
+                        enrolled += 1
                     
                     if "bulk_manual_dates" in st.session_state:
                         st.session_state["bulk_manual_dates"] = []
